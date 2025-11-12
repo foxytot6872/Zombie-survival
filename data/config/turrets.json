@@ -1,0 +1,41 @@
+{
+  "turret_ballistic": {
+    "cost": {
+      "wood": 40,
+      "iron": 30
+    },
+    "base_hp": 220,
+    "build_time": 2.5,
+    "range": 200,
+    "damage": 10,
+    "cooldown": 1700,
+    "projectile_speed": 400
+  },
+  "turret_gatling": {
+    "cost": {
+      "wood": 30,
+      "iron": 20
+    },
+    "base_hp": 150,
+    "build_time": 2.0,
+    "range": 150,
+    "damage": 5,
+    "cooldown": 300,
+    "projectile_speed": 500
+  },
+  "turret_piercer": {
+    "cost": {
+      "wood": 50,
+      "iron": 40
+    },
+    "base_hp": 250,
+    "build_time": 3.0,
+    "range": 250,
+    "damage": 25,
+    "cooldown": 2000,
+    "projectile_speed": 600,
+    "pierce": true,
+    "pierce_count": 3
+  }
+}
+

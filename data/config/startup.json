@@ -1,0 +1,24 @@
+{
+  "upper_fraction": 0.6667,
+  "north_wall": {
+    "y_offset_tiles": 1,
+    "length_tiles": 20,
+    "gate_width_tiles": 2,
+    "organic_shape": true,
+    "curve_depth_tiles": 2,
+    "variation_tiles": 1
+  },
+  "hq": {
+    "behind_wall_offset_tiles": 8,
+    "center_x_offset_tiles": 0
+  },
+  "turret_pads": {
+    "behind_wall_offset_tiles": 3,
+    "x_offsets_from_gate": [-6, 6],
+    "additional_turrets": [
+      {"x_offset": -10, "y_offset": 2},
+      {"x_offset": 10, "y_offset": 2}
+    ]
+  }
+}
+

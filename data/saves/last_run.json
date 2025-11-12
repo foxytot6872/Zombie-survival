@@ -1,0 +1,180 @@
+{
+  "version": "1.0",
+  "wave_manager": {
+    "night": 2,
+    "day": 1,
+    "state": "SUMMARY",
+    "difficulty": "normal",
+    "enemies_killed": 0,
+    "enemies_spawned": 12,
+    "timer": 0.0
+  },
+  "resources": {
+    "wood": 490.0,
+    "iron": 260.0,
+    "food": 200.0
+  },
+  "buildings": [
+    {
+      "uid": "c234a0d8-089e-468c-9ce1-45085b75b8a4",
+      "type": "wall_wood",
+      "grid": [
+        20,
+        22
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "88b94de7-d7ea-404d-8783-d5e0c91cac9c",
+      "type": "wall_wood",
+      "grid": [
+        22,
+        21
+      ],
+      "tier": 1,
+      "hp": 165,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "4775fb51-c5c2-4b6c-927a-bcedc189d8c8",
+      "type": "wall_wood",
+      "grid": [
+        24,
+        21
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "89bf75b1-bca3-4e67-aced-e9df3624cb7a",
+      "type": "wall_wood",
+      "grid": [
+        33,
+        21
+      ],
+      "tier": 1,
+      "hp": 140,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "a7018f95-5af5-41e5-8c20-baea94f1271d",
+      "type": "wall_wood",
+      "grid": [
+        34,
+        20
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "7e4d5ff9-a02d-461f-8d1f-ca7658160907",
+      "type": "wall_wood",
+      "grid": [
+        35,
+        21
+      ],
+      "tier": 1,
+      "hp": 205,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "02c139be-e6d9-44cf-bd9a-cc5c1e6ef976",
+      "type": "wall_wood",
+      "grid": [
+        36,
+        20
+      ],
+      "tier": 1,
+      "hp": 70,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "28238d20-5d89-49a8-9fe8-af0be65117c7",
+      "type": "hq",
+      "grid": [
+        29,
+        30
+      ],
+      "tier": 1,
+      "hp": 2000,
+      "state": "active",
+      "progress": 0.0
+    },
+    {
+      "uid": "ca1207d4-0352-4b6a-82e3-fd6eed706c38",
+      "type": "turret_ballistic",
+      "grid": [
+        24,
+        25
+      ],
+      "tier": 1,
+      "hp": 220,
+      "state": "active",
+      "progress": 2.5,
+      "turret_type": "turret_ballistic"
+    },
+    {
+      "uid": "4e62cf30-baba-47cd-a54e-0c2f6f068f75",
+      "type": "turret_ballistic",
+      "grid": [
+        36,
+        25
+      ],
+      "tier": 1,
+      "hp": 220,
+      "state": "active",
+      "progress": 2.5,
+      "turret_type": "turret_ballistic"
+    },
+    {
+      "uid": "cb7f219e-4792-4458-972b-c129e63fd31b",
+      "type": "turret_ballistic",
+      "grid": [
+        20,
+        27
+      ],
+      "tier": 1,
+      "hp": 220,
+      "state": "active",
+      "progress": 2.5,
+      "turret_type": "turret_ballistic"
+    },
+    {
+      "uid": "7be2ce68-e450-402c-8da9-ffb8eda47858",
+      "type": "turret_ballistic",
+      "grid": [
+        40,
+        27
+      ],
+      "tier": 1,
+      "hp": 220,
+      "state": "active",
+      "progress": 2.5,
+      "turret_type": "turret_ballistic"
+    },
+    {
+      "uid": "7cea35f5-8e27-4fa7-8bff-71b4acb524b2",
+      "type": "wall_iron",
+      "grid": [
+        25,
+        21
+      ],
+      "tier": 1,
+      "hp": 565,
+      "state": "active",
+      "progress": 0.8
+    }
+  ],
+  "game_state": "playing"
+}

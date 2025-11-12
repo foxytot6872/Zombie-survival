@@ -1,0 +1,15 @@
+{
+  "worker": {
+    "hp": 100,
+    "speed": 90,
+    "carry_capacity": 40
+  },
+  "guard": {
+    "hp": 120,
+    "speed": 85,
+    "range": 160,
+    "ranged_dmg": 8,
+    "cooldown": 0.8
+  }
+}
+

@@ -1,0 +1,4 @@
+"""
+Core game systems package.
+"""
+

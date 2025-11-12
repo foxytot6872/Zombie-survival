@@ -1,0 +1,74 @@
+{
+  "farm": {
+    "cost": {
+      "wood": 60
+    },
+    "production": {
+      "food_per_min": 120
+    }
+  },
+  "sawmill": {
+    "cost": {
+      "wood": 50,
+      "iron": 10
+    },
+    "production": {
+      "wood_per_min": 120
+    }
+  },
+  "smelter": {
+    "cost": {
+      "wood": 40,
+      "iron": 40
+    },
+    "production": {
+      "iron_per_min": 120
+    }
+  },
+  "wall": {
+    "cost": {
+      "wood": 20,
+      "iron": 5
+    },
+    "base_hp": 280,
+    "build_time": 1.2
+  },
+  "hq": {
+    "cost": {
+      "wood": 0,
+      "iron": 0
+    },
+    "base_hp": 2000,
+    "build_time": 0.0
+  },
+  "gate": {
+    "cost": {
+      "wood": 30,
+      "iron": 10
+    },
+    "base_hp": 300,
+    "build_time": 2.0
+  },
+  "housing": {
+    "cost": {
+      "wood": 50,
+      "iron": 20
+    },
+    "base_hp": 150,
+    "build_time": 3.0
+  },
+  "turret_ballistic": {
+    "cost": {
+      "wood": 40,
+      "iron": 30
+    },
+    "base_hp": 220,
+    "build_time": 2.5,
+    "upgrade_cost_mult": 1.25
+  },
+  "upgrade_cost_mult": 1.25,
+  "repair_cost": {
+    "wood_per_hp": 0.2
+  }
+}
+

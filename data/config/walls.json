@@ -1,0 +1,18 @@
+{
+  "wall_wood": {
+    "base_hp": 250,
+    "build_time": 1.0,
+    "cost": {
+      "wood": 30
+    }
+  },
+  "wall_iron": {
+    "base_hp": 600,
+    "build_time": 0.8,
+    "upgrade_cost": {
+      "wood": 10,
+      "iron": 40
+    }
+  }
+}
+

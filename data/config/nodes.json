@@ -1,0 +1,20 @@
+{
+  "tree_patch": {
+    "resource": "wood",
+    "yield_total": 120,
+    "gather_per_tick": 6,
+    "tick_sec": 0.6
+  },
+  "scrap_pile": {
+    "resource": "iron",
+    "yield_total": 100,
+    "gather_per_tick": 5,
+    "tick_sec": 0.7
+  },
+  "daily_spawn": {
+    "trees": 4,
+    "scrap": 3,
+    "min_dist_from_wall_px": 96
+  }
+}
+

@@ -1,0 +1,46 @@
+{
+  "difficulty": {
+    "easy": 0.85,
+    "normal": 1.0,
+    "hard": 1.5
+  },
+  "nights": [
+    {
+      "mix": {
+        "walker": 12
+      }
+    },
+    {
+      "mix": {
+        "walker": 16,
+        "runner": 6
+      }
+    },
+    {
+      "mix": {
+        "walker": 20,
+        "runner": 8,
+        "brute": 2
+      }
+    },
+    {
+      "mix": {
+        "walker": 24,
+        "runner": 10,
+        "brute": 4,
+        "spitter": 2
+      }
+    }
+  ],
+  "increment": {
+    "per_night_mult": 1.12
+  },
+  "spawn": {
+    "interval_sec": 1.0,
+    "batch_size": 2
+  },
+  "day_duration": 30.0,
+  "summary_duration": 5.0,
+  "win_nights": 10
+}
+
