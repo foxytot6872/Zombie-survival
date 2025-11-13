@@ -157,7 +157,7 @@ except:
     gatling_image.fill((180, 160, 140))
     print("Warning: Gatling turret assets not found, using placeholder")
 
-# Zombie sprite sheet (32 frames, 48x48 each)
+# Zombie sprite sheets (32 frames, 48x48 each)
 zombie_sprite_sheet = load_image_or_placeholder(
     'asset/Zombie_Normal_Sheet.png',
     (48 * 32, 48),  # 32 frames * 48 pixels = 1536 pixels wide, 48 pixels tall
@@ -165,8 +165,24 @@ zombie_sprite_sheet = load_image_or_placeholder(
     "Zombie Normal sprite sheet"
 )
 
-# Set sprite sheet for BasicZombie class
+runner_sprite_sheet = load_image_or_placeholder(
+    'asset/Zombie_Runner_Sheet.png',
+    (48 * 32, 48),  # 32 frames * 48 pixels = 1536 pixels wide, 48 pixels tall
+    (200, 150, 50, 255),
+    "Zombie Runner sprite sheet"
+)
+
+brute_sprite_sheet = load_image_or_placeholder(
+    'asset/Zombie_Brute_Sheet.png',
+    (48 * 32, 48),  # 32 frames * 48 pixels = 1536 pixels wide, 48 pixels tall
+    (100, 30, 30, 255),
+    "Zombie Brute sprite sheet"
+)
+
+# Set sprite sheets for zombie classes
 BasicZombie.sprite_sheet = zombie_sprite_sheet
+RunnerZombie.sprite_sheet = runner_sprite_sheet
+BruteZombie.sprite_sheet = brute_sprite_sheet
 
 
 # HQ building image
@@ -214,35 +230,88 @@ if upgrade_panel_darken_sheet:
         frame = upgrade_panel_darken_sheet.subsurface(frame_rect)
         upgrade_panel_darken_frames.append(frame)
 
-# Grass tile images
-try:
-    grass_tile_sheet = pygame.image.load('asset/Grass_tile.png').convert_alpha()
-    grass_tile_width, grass_tile_height = grass_tile_sheet.get_size()
-    
-    # Use the same grass tile for all positions (no variations)
-    grass_tiles = []
-    if grass_tile_width >= 96 and grass_tile_height == 32:
-        # Image contains 3 horizontal tiles - use the first one for all
-        base_tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
-        grass_tiles = [base_tile, base_tile, base_tile]
-    elif grass_tile_width == 32 and grass_tile_height >= 96:
-        # Image contains 3 vertical tiles - use the first one for all
-        base_tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
-        grass_tiles = [base_tile, base_tile, base_tile]
-    elif grass_tile_width == 32 and grass_tile_height == 32:
-        # Single tile - use it for all positions
-        grass_tiles = [grass_tile_sheet, grass_tile_sheet, grass_tile_sheet]
-    else:
-        # Unknown format - extract first 32x32 tile and use for all
-        tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
-        grass_tiles = [tile, tile, tile]
-except Exception as e:
-    # Create placeholder grass tiles if file doesn't exist
-    print(f"Warning: Grass_tile.png not found or error loading: {e}, using placeholder")
-    # Use the same color for all grass tiles
-    tile = pygame.Surface((32, 32))
-    tile.fill((50, 100, 50))  # Single green color
-    grass_tiles = [tile, tile, tile]
+# Grass tile images (day and night variants)
+def load_grass_variants(sheet_path, default_color=(50, 100, 50)):
+    """Load grass tile variants from a sheet. Returns list of 3 variants."""
+    try:
+        import os
+        if not os.path.exists(sheet_path):
+            print(f"Warning: {sheet_path} does not exist, using placeholder")
+            placeholder = pygame.Surface((32, 32))
+            placeholder.fill(default_color)
+            return [placeholder, placeholder, placeholder]
+        
+        grass_sheet = pygame.image.load(sheet_path).convert_alpha()
+        sheet_width, sheet_height = grass_sheet.get_size()
+        print(f"Loaded {sheet_path}: {sheet_width}x{sheet_height}")
+        
+        variants = []
+        if sheet_width >= 96 and sheet_height == 32:
+            # Image contains 3 horizontal tiles (96x32 = 3*32x32)
+            print(f"  Detected horizontal layout: extracting 3 tiles")
+            for i in range(3):
+                variant = grass_sheet.subsurface((i * 32, 0, 32, 32))
+                variants.append(variant)
+        elif sheet_width == 32 and sheet_height >= 96:
+            # Image contains 3 vertical tiles (32x96 = 3*32x32)
+            print(f"  Detected vertical layout: extracting 3 tiles")
+            for i in range(3):
+                variant = grass_sheet.subsurface((0, i * 32, 32, 32))
+                variants.append(variant)
+        elif sheet_width == 32 and sheet_height == 32:
+            # Single tile - use it for all 3 variants
+            print(f"  Detected single tile: using for all 3 variants")
+            variants = [grass_sheet, grass_sheet, grass_sheet]
+        else:
+            # Try to extract tiles based on actual dimensions
+            print(f"  Unknown format {sheet_width}x{sheet_height}, attempting extraction")
+            # Try horizontal first
+            if sheet_width >= 32 and sheet_height >= 32:
+                num_horizontal = sheet_width // 32
+                if num_horizontal >= 3:
+                    for i in range(3):
+                        if i * 32 < sheet_width:
+                            variant = grass_sheet.subsurface((i * 32, 0, 32, 32))
+                            variants.append(variant)
+                # Try vertical if horizontal didn't work
+                elif sheet_height >= 96:
+                    for i in range(3):
+                        if i * 32 < sheet_height:
+                            variant = grass_sheet.subsurface((0, i * 32, 32, 32))
+                            variants.append(variant)
+                # Last resort: extract first 32x32 tile and use for all
+                if not variants:
+                    tile = grass_sheet.subsurface((0, 0, min(32, sheet_width), min(32, sheet_height)))
+                    # Scale to 32x32 if needed
+                    if tile.get_size() != (32, 32):
+                        tile = pygame.transform.scale(tile, (32, 32))
+                    variants = [tile, tile, tile]
+        
+        # Ensure we have exactly 3 variants
+        while len(variants) < 3:
+            if variants:
+                variants.append(variants[0])
+            else:
+                placeholder = pygame.Surface((32, 32))
+                placeholder.fill(default_color)
+                variants.append(placeholder)
+        
+        print(f"  Successfully loaded {len(variants)} variants")
+        return variants[:3]  # Return exactly 3
+    except Exception as e:
+        # Create placeholder grass tiles if file doesn't exist
+        import traceback
+        print(f"Warning: {sheet_path} error loading: {e}")
+        print(traceback.format_exc())
+        placeholder = pygame.Surface((32, 32))
+        placeholder.fill(default_color)
+        return [placeholder, placeholder, placeholder]
+
+# Load day grass tiles
+grass_tiles_day = load_grass_variants('asset/Grass_tile.png', (50, 100, 50))
+
+# Load night grass tiles
+grass_tiles_night = load_grass_variants('asset/Grassnight_tile.png', (30, 50, 30))
 
 ###################
 # Game state
@@ -1255,10 +1324,21 @@ def debug_instant_build():
     print("Debug: Completed all buildings")
 
 def debug_spawn_zombie_at_mouse(mouse_pos):
-    """Spawn a zombie at mouse position"""
-    zombie = BasicZombie(mouse_pos)
-    enemy_group.add(zombie)
-    print(f"Debug: Spawned zombie at {mouse_pos}")
+    """Spawn all types of zombies at mouse position (with small offset for visibility)"""
+    import random
+    zombie_types = [BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie]
+    
+    # Spawn all zombie types with small random offsets so they don't overlap
+    for i, zombie_class in enumerate(zombie_types):
+        # Add small random offset (0-40 pixels) so zombies are visible separately
+        offset_x = random.randint(-20, 20)
+        offset_y = random.randint(-20, 20)
+        spawn_pos = pygame.Vector2(mouse_pos[0] + offset_x, mouse_pos[1] + offset_y)
+        
+        zombie = zombie_class(spawn_pos)
+        enemy_group.add(zombie)
+    
+    print(f"Debug: Spawned all zombie types (5 total) near {mouse_pos}")
 
 def debug_clear_enemies():
     """Clear all enemies"""
@@ -1608,15 +1688,20 @@ while running:
     tiles_y = (c.SCREEN_HEIGHT + TILE - 1) // TILE  # Ceiling division to ensure full coverage
     
     # Draw grass tiles across the entire screen with variation
+    # Select day or night tiles based on wave manager state
+    is_night = wave_manager.state == WaveManager.STATE_NIGHT
+    current_grass_tiles = grass_tiles_night if is_night else grass_tiles_day
+    
     for y in range(tiles_y):
         for x in range(tiles_x):
             # Use a simple pattern to select which grass variant to use
             # This creates a somewhat random but consistent pattern across the map
             # Using modulo to cycle through variants
-            variant_index = (x * 7 + y * 11) % len(grass_tiles)
+            # The same variant_index is used for both day and night to maintain consistency
+            variant_index = (x * 7 + y * 11) % len(current_grass_tiles)
             tile_x = x * TILE
             tile_y = y * TILE
-            screen.blit(grass_tiles[variant_index], (tile_x, tile_y))
+            screen.blit(current_grass_tiles[variant_index], (tile_x, tile_y))
     
     # Day/night divider line removed
     # Overlay removed - using original texture without tinting
@@ -1814,8 +1899,8 @@ while running:
         if enemy.reached_bottom:
             should_remove = True
         elif not enemy.alive:
-            # For BasicZombie, wait for death animation to complete
-            if isinstance(enemy, BasicZombie):
+            # For zombies with sprite animations, wait for death animation to complete
+            if isinstance(enemy, (BasicZombie, RunnerZombie, BruteZombie)):
                 if hasattr(enemy, 'death_animation_complete') and enemy.death_animation_complete:
                     should_remove = True
             else:
@@ -2002,6 +2087,14 @@ while running:
     ###################
     for enemy in enemy_group:
         enemy.draw(screen)
+    
+    ###################
+    # Apply night blue tint overlay
+    ###################
+    if is_night:
+        night_overlay = pygame.Surface((c.SCREEN_WIDTH, c.SCREEN_HEIGHT), pygame.SRCALPHA)
+        night_overlay.fill((30, 40, 80, 80))  # Darkish blue tint with transparency
+        screen.blit(night_overlay, (0, 0))
     
     ###################
     # Draw HUD
