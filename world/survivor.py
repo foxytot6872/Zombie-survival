@@ -52,13 +52,17 @@ class Survivor(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=self.pos)
         
         # Sprite sheet and animation
-        self.idle_frames = []
-        self.run_frames = []
+        self.all_frames = []  # All 97 frames from the sheet
         self.current_frames = []
         self.frame_index = 0
         self.animation_timer = 0.0
-        self.animation_delay = 0.2  # seconds per frame
+        self.animation_delay = 0.15  # seconds per frame
         self.facing_right = True
+        self.direction = "s"  # Current direction: "s", "se", "ne", "n"
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.5  # How long to show hurt animation
+        self.sprite_scale = 1.2  # Scale factor for sprite (1.5x = 50% bigger)
         
         # Load sprite sheets
         self.load_sprite_sheets()
@@ -83,14 +87,13 @@ class Survivor(pygame.sprite.Sprite):
         self.flee_on_threat = True
     
     def load_sprite_sheets(self):
-        """Load survivor sprite sheets"""
+        """Load survivor sprite sheets - survival-Sheet.png with 97 frames (96x64 each)"""
         try:
-            # Try to load survival.png first (exported from survival.aseprite)
+            # Try to load survival-Sheet.png
             survival_paths = [
-                os.path.join('asset', 'survival.png'),
-                os.path.join('world', 'survival.png'),
-                'asset/survival.png',
-                'world/survival.png'
+                os.path.join('asset', 'survival-Sheet.png'),
+                os.path.join('asset', 'survival-Sheet.png'),
+                'asset/survival-Sheet.png',
             ]
             
             survival_sheet = None
@@ -102,31 +105,34 @@ class Survivor(pygame.sprite.Sprite):
                     except:
                         continue
             
-            # If survival.png exists, use it
+            # If survival-Sheet.png exists, use it
             if survival_sheet:
-                frame_width = 16
-                frame_height = 32
-                sheet_width = survival_sheet.get_width()
+                frame_width = 96
+                frame_height = 64
+                total_frames = 97
                 
-                # Extract idle frames (first 4 frames)
-                self.idle_frames = []
-                for i in range(4):
-                    if i * frame_width < sheet_width:
-                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                # Extract all 97 frames
+                self.all_frames = []
+                for i in range(total_frames):
+                    frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                    if frame_rect.right <= survival_sheet.get_width():
                         frame = survival_sheet.subsurface(frame_rect)
-                        self.idle_frames.append(frame)
+                        self.all_frames.append(frame)
+                    else:
+                        # Frame out of bounds - create placeholder
+                        placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                        placeholder.fill((255, 0, 255, 128))  # Magenta placeholder
+                        self.all_frames.append(placeholder)
                 
-                # Extract run frames (next 6 frames)
-                self.run_frames = []
-                for i in range(4, 10):
-                    if i * frame_width < sheet_width:
-                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
-                        frame = survival_sheet.subsurface(frame_rect)
-                        self.run_frames.append(frame)
-                
-                # Update image size to match sprite
-                self.image = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                # Scale frames and update image size to match scaled sprite
+                scaled_width = int(frame_width * self.sprite_scale)
+                scaled_height = int(frame_height * self.sprite_scale)
+                self.image = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
                 self.rect = self.image.get_rect(center=self.pos)
+                
+                # Set initial frames (idle-s)
+                if len(self.all_frames) >= 4:
+                    self.current_frames = self.all_frames[0:4]  # idle-s frames 1-4
             else:
                 # Fallback to existing sprite sheets
                 try:
@@ -136,56 +142,194 @@ class Survivor(pygame.sprite.Sprite):
                     frame_width = 16
                     frame_height = 32
                     
-                    # Extract frames from idle sheet (4 frames: 64/16 = 4)
-                    self.idle_frames = []
+                    # Extract frames from idle sheet (4 frames)
+                    idle_frames = []
                     for i in range(4):
                         frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
                         frame = idle_sheet.subsurface(frame_rect)
-                        self.idle_frames.append(frame)
+                        idle_frames.append(frame)
                     
-                    # Extract frames from run sheet (6 frames: 96/16 = 6)
-                    self.run_frames = []
+                    # Extract frames from run sheet (6 frames)
+                    run_frames = []
                     for i in range(6):
                         frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
                         frame = run_sheet.subsurface(frame_rect)
-                        self.run_frames.append(frame)
+                        run_frames.append(frame)
+                    
+                    # Store as all_frames for compatibility
+                    self.all_frames = idle_frames + run_frames
+                    self.current_frames = idle_frames
                     
                     # Update image size
                     self.image = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
                     self.rect = self.image.get_rect(center=self.pos)
                 except:
                     # If sprite sheets don't exist, frames will remain empty and fallback to circles
-                    pass
-            
-            # Set initial frames
-            if self.idle_frames:
-                self.current_frames = self.idle_frames
+                    self.all_frames = []
+                    self.current_frames = []
         except Exception as e:
             print(f"Warning: Could not load survivor sprites: {e}")
+            self.all_frames = []
+            self.current_frames = []
+    
+    def get_direction_from_velocity(self) -> str:
+        """Get direction string from velocity vector: 's', 'se', 'ne', 'n'"""
+        if self.velocity.length() < 0.1:
+            return self.direction  # Keep last direction when not moving
+        
+        # Normalize velocity
+        vel_norm = self.velocity.normalize()
+        angle = math.degrees(math.atan2(vel_norm.y, vel_norm.x))
+        
+        # Convert angle to direction
+        # -45 to 45: east (use se for right side)
+        # 45 to 135: south
+        # 135 to 225: west (use ne for left side, flipped)
+        # 225 to 315: north
+        # -135 to -45: north (wrapped)
+        
+        # Adjust angle to 0-360 range
+        if angle < 0:
+            angle += 360
+        
+        # Map to 4 directions
+        if 22.5 <= angle < 67.5:
+            return "se"  # Southeast
+        elif 67.5 <= angle < 112.5:
+            return "s"  # South
+        elif 112.5 <= angle < 157.5:
+            return "se"  # Southwest (use se, will be flipped)
+        elif 157.5 <= angle < 202.5:
+            return "s"  # West (use s, will be flipped)
+        elif 202.5 <= angle < 247.5:
+            return "ne"  # Northwest (use ne, will be flipped)
+        elif 247.5 <= angle < 292.5:
+            return "n"  # North
+        elif 292.5 <= angle < 337.5:
+            return "ne"  # Northeast
+        else:  # 337.5-360 or 0-22.5
+            return "se"  # East (use se)
     
     def update_animation(self, dt: float):
-        """Update animation frame"""
-        if not self.current_frames:
+        """Update animation frame based on state and direction"""
+        if not self.all_frames:
             return
         
-        # Determine which frames to use based on movement
-        is_moving = self.velocity.length() > 0.1
+        # Update hurt timer
+        if self.is_hurt:
+            self.hurt_timer += dt
+            if self.hurt_timer >= self.hurt_duration:
+                self.is_hurt = False
+                self.hurt_timer = 0.0
         
-        if is_moving and self.run_frames:
-            self.current_frames = self.run_frames
-            # Update facing direction
+        # Determine direction from velocity
+        self.direction = self.get_direction_from_velocity()
+        
+        # Determine which frames to use based on state
+        # Check if dead first
+        if not self.alive:
+            # Death animation (frames 65-77, 0-indexed: 64-76)
+            if len(self.all_frames) >= 77:
+                self.current_frames = self.all_frames[64:77]
+                # Don't loop death animation - stay on last frame
+                if self.frame_index >= len(self.current_frames):
+                    self.frame_index = len(self.current_frames) - 1
+        elif self.is_hurt:
+            # Hurt animation (frames 57-64, 0-indexed: 56-63)
+            if len(self.all_frames) >= 64:
+                self.current_frames = self.all_frames[56:64]
+        elif hasattr(self, 'state'):
+            # Check worker-specific states
+            if self.state == SurvivorState.GATHERING:
+                # Check if gathering wood or stone
+                if hasattr(self, 'target_node') and self.target_node:
+                    if hasattr(self.target_node, 'resource'):
+                        if self.target_node.resource == "wood":
+                            # Wood gathering (frames 78-87, 0-indexed: 77-86)
+                            if len(self.all_frames) >= 87:
+                                self.current_frames = self.all_frames[77:87]
+                        elif self.target_node.resource == "iron":
+                            # Stone gathering (frames 88-97, 0-indexed: 87-96)
+                            if len(self.all_frames) >= 97:
+                                self.current_frames = self.all_frames[87:97]
+                        else:
+                            # Default to wood gathering
+                            if len(self.all_frames) >= 87:
+                                self.current_frames = self.all_frames[77:87]
+                    else:
+                        # Default to wood gathering
+                        if len(self.all_frames) >= 87:
+                            self.current_frames = self.all_frames[77:87]
+                else:
+                    # Default to wood gathering
+                    if len(self.all_frames) >= 87:
+                        self.current_frames = self.all_frames[77:87]
+            elif self.state == SurvivorState.HAUL_TO_HQ or self.state == SurvivorState.DEPOSIT:
+                # Hauling (frames 49-56, 0-indexed: 48-55)
+                if len(self.all_frames) >= 56:
+                    self.current_frames = self.all_frames[48:56]
+            else:
+                # Idle or moving - use direction-based frames
+                is_moving = self.velocity.length() > 0.1
+                
+                if is_moving:
+                    # Run animations based on direction
+                    if self.direction == "s":
+                        # Run-s (frames 17-24, 0-indexed: 16-23)
+                        if len(self.all_frames) >= 24:
+                            self.current_frames = self.all_frames[16:24]
+                    elif self.direction == "se":
+                        # Run-se (frames 25-32, 0-indexed: 24-31)
+                        if len(self.all_frames) >= 32:
+                            self.current_frames = self.all_frames[24:32]
+                    elif self.direction == "ne":
+                        # Run-ne (frames 33-40, 0-indexed: 32-39)
+                        if len(self.all_frames) >= 40:
+                            self.current_frames = self.all_frames[32:40]
+                    else:  # "n"
+                        # Run-n (frames 41-48, 0-indexed: 40-47)
+                        if len(self.all_frames) >= 48:
+                            self.current_frames = self.all_frames[40:48]
+                else:
+                    # Idle animations based on direction
+                    if self.direction == "s":
+                        # Idle-s (frames 1-4, 0-indexed: 0-3)
+                        if len(self.all_frames) >= 4:
+                            self.current_frames = self.all_frames[0:4]
+                    elif self.direction == "se":
+                        # Idle-se (frames 5-8, 0-indexed: 4-7)
+                        if len(self.all_frames) >= 8:
+                            self.current_frames = self.all_frames[4:8]
+                    elif self.direction == "ne":
+                        # Idle-ne (frames 9-12, 0-indexed: 8-11)
+                        if len(self.all_frames) >= 12:
+                            self.current_frames = self.all_frames[8:12]
+                    else:  # "n"
+                        # Idle-n (frames 13-16, 0-indexed: 12-15)
+                        if len(self.all_frames) >= 16:
+                            self.current_frames = self.all_frames[12:16]
+        else:
+            # Fallback: use idle-s
+            if len(self.all_frames) >= 4:
+                self.current_frames = self.all_frames[0:4]
+        
+        # Update facing direction for horizontal flipping
+        if self.velocity.length() > 0.1:
             if self.velocity.x > 0:
                 self.facing_right = True
             elif self.velocity.x < 0:
                 self.facing_right = False
-        elif not is_moving and self.idle_frames:
-            self.current_frames = self.idle_frames
         
         # Update animation timer
-        self.animation_timer += dt
-        if self.animation_timer >= self.animation_delay:
-            self.animation_timer = 0.0
-            self.frame_index = (self.frame_index + 1) % len(self.current_frames)
+        if self.current_frames:
+            self.animation_timer += dt
+            if self.animation_timer >= self.animation_delay:
+                self.animation_timer = 0.0
+                # Don't loop death animation
+                if not self.alive and self.frame_index >= len(self.current_frames) - 1:
+                    pass  # Stay on last frame
+                else:
+                    self.frame_index = (self.frame_index + 1) % len(self.current_frames)
     
     def apply_separation(self, dt: float, neighbors):
         """Apply separation force to avoid overlapping with other survivors"""
@@ -352,9 +496,13 @@ class Survivor(pygame.sprite.Sprite):
             return
         
         self.hp -= amount
+        self.is_hurt = True
+        self.hurt_timer = 0.0
+        
         if self.hp <= 0:
             self.hp = 0
             self.alive = False
+            self.frame_index = 0  # Reset to start of death animation
             self.on_death()
     
     def on_death(self):
@@ -374,9 +522,17 @@ class Survivor(pygame.sprite.Sprite):
             # Draw sprite frame
             frame = self.current_frames[self.frame_index]
             
-            # Flip frame if facing left
-            if not self.facing_right:
+            # Flip frame if facing left (for se/ne directions)
+            # Note: For 8-directional sprites, we might need more complex flipping logic
+            # For now, flip se/ne when moving left
+            if not self.facing_right and self.direction in ("se", "ne"):
                 frame = pygame.transform.flip(frame, True, False)
+            
+            # Scale frame
+            if self.sprite_scale != 1.0:
+                scaled_width = int(frame.get_width() * self.sprite_scale)
+                scaled_height = int(frame.get_height() * self.sprite_scale)
+                frame = pygame.transform.scale(frame, (scaled_width, scaled_height))
             
             # Blit frame centered on image
             frame_rect = frame.get_rect()
