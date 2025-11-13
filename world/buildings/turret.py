@@ -14,41 +14,29 @@ class BallisticTurret(Building):
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
     
-    def __init__(self, grid_pos, sprite_sheet, base_image, tier=1, uid=None):
+    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
         # Initialize building first
         super().__init__(grid_pos, tier=tier, uid=uid)
         
         # Turret-specific attributes
         # ===== COOLDOWN ADJUSTMENT =====
-        # Animation has 8 frames, ANIMATION_DELAY = 150ms per frame (see constants.py)
-        # Full animation cycle = 8 frames * 150ms = 1200ms
-        # 
-        # Set cooldown to match animation cycle + delay between shots:
-        # - Animation duration: 1200ms (8 * 150ms)
-        # - Delay between shots: 500ms (0.5 seconds)
-        # - Total cooldown: 1200ms + 500ms = 1700ms
-        # 
-        # To adjust sync:
-        # 1. Change ANIMATION_DELAY in constants.py (affects animation speed)
-        # 2. Change shot_delay below (affects delay between shots)
-        # 3. Change cooldown below (total time between shots)
+        # Animation length is derived from the frame count and ANIMATION_DELAY.
+        # Adjust timing by tweaking ANIMATION_DELAY (animation speed) or shot_delay (pause between shots).
         self.shot_delay = 500  # milliseconds - delay after animation before next shot (0.5 seconds)
-        # Total cooldown = animation duration + delay between shots
-        # Animation: 8 frames * 150ms = 1200ms
-        # Delay: 500ms (0.5 seconds)
-        # Total: 1700ms between shots
-        self.cooldown = 1200 + self.shot_delay  # milliseconds - animation + delay (1700ms total)
+        self.cooldown = 0  # placeholder until animation frames are loaded
         self.range = 200  # pixels - increased for better gameplay
         self.damage = 10  # damage per shot
         self.projectile_speed = 400.0  # pixels per second
         self.angle = 0  # Current rotation angle in degrees
         self.target_angle = 0  # Target angle to rotate toward
         self.rotation_speed = 180  # degrees per second - how fast turret rotates
-        self.base_image = base_image
+        self.base_images = self._normalize_base_images(base_images)
+        self.base_image = self._get_base_image_for_tier(self.tier)
+        self.sprite_sheets = self._normalize_sprite_sheets(sprite_sheets)
+        self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
         self.selected = False
         
         # Animation state
-        self.sprite_sheet = sprite_sheet
         self.animation_list = self.load_image()
         self.frame_index = 0
         self.update_time = pygame.time.get_ticks()
@@ -58,6 +46,8 @@ class BallisticTurret(Building):
         
         # Store the current turret image
         self.turret_image = self.animation_list[self.frame_index]
+        self.animation_duration = len(self.animation_list) * c.ANIMATION_DELAY
+        self.cooldown = self.animation_duration + self.shot_delay  # milliseconds - animation + delay
         
         # Current target enemy
         self.target_enemy = None
@@ -66,14 +56,7 @@ class BallisticTurret(Building):
         self.projectile_group = None
         
         # Update rect to match base image size
-        base_rect = self.base_image.get_rect()
-        turret_rect = self.turret_image.get_rect()
-        self.rect = pygame.Rect(0, 0, max(base_rect.width, turret_rect.width), 
-                                max(base_rect.height, turret_rect.height))
-        self.rect.center = self.pos
-        
-        # Create range circle
-        self.create_range_circle()
+        self._refresh_rect()
     
     def create_range_circle(self):
         """Create a semi-transparent circle to show turret range"""
@@ -218,22 +201,6 @@ class BallisticTurret(Building):
         
         current_time = pygame.time.get_ticks()
         
-        # ===== ANIMATION TIMING ADJUSTMENT =====
-        # Animation has 8 frames (frames 0-7)
-        # ANIMATION_DELAY = 150ms per frame (defined in constants.py)
-        # Total animation time = 8 * 150 = 1200ms
-        # 
-        # To adjust animation sync with firing:
-        # 1. Change ANIMATION_DELAY in constants.py (line ~9):
-        #    - If animation is too fast: increase ANIMATION_DELAY (e.g., 180ms)
-        #    - If animation is too slow: decrease ANIMATION_DELAY (e.g., 120ms)
-        # 2. OR change cooldown above (line ~34):
-        #    - If animation finishes too early: increase cooldown (e.g., 1400ms)
-        #    - If animation finishes too late: decrease cooldown (e.g., 1000ms)
-        # 
-        # Recommended: Set cooldown = (ANIMATION_STEPS * ANIMATION_DELAY)
-        # Example: cooldown = 8 * 150 = 1200ms (matches animation duration)
-        # If you want delay between shots: cooldown > (ANIMATION_STEPS * ANIMATION_DELAY)
         if current_time - self.update_time >= c.ANIMATION_DELAY:
             self.update_time = current_time
             self.frame_index += 1
@@ -362,8 +329,108 @@ class BallisticTurret(Building):
             #     pygame.draw.line(surface, (255, 0, 0), self.pos, self.target_enemy.pos, 2)
     
     @staticmethod
-    def create_turret(grid_pos, sprite_sheet, base_image, turret_group, tier=1):
+    def create_turret(grid_pos, sprite_sheets, base_images, turret_group, tier=1):
         """Create a new turret at the given grid position"""
-        turret = BallisticTurret(grid_pos, sprite_sheet, base_image, tier=tier)
+        turret = BallisticTurret(grid_pos, sprite_sheets, base_images, tier=tier)
         turret_group.add(turret)
         return turret
+
+    @staticmethod
+    def _placeholder_base():
+        surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+        surface.fill((110, 110, 110))
+        return surface
+
+    def _normalize_base_images(self, base_images):
+        """Ensure we have a list of base images for each tier."""
+        placeholder = self._placeholder_base()
+
+        if isinstance(base_images, pygame.Surface):
+            bases = [base_images]
+        elif isinstance(base_images, dict):
+            bases = []
+            for tier in range(1, self.TIER_MAX + 1):
+                candidate = base_images.get(tier) or base_images.get(str(tier)) or base_images.get(f"tier_{tier}")
+                bases.append(candidate if isinstance(candidate, pygame.Surface) else placeholder)
+        elif isinstance(base_images, (list, tuple)):
+            bases = [img if isinstance(img, pygame.Surface) else placeholder for img in base_images]
+        else:
+            bases = []
+            if base_images:
+                bases.append(base_images if isinstance(base_images, pygame.Surface) else placeholder)
+
+        if not bases:
+            bases = [placeholder]
+
+        while len(bases) < self.TIER_MAX:
+            bases.append(bases[-1])
+
+        return bases
+
+    def _normalize_sprite_sheets(self, sprite_sheets):
+        """Ensure we have a list of sprite sheets per tier."""
+        placeholder = self._placeholder_sprite_sheet()
+
+        if isinstance(sprite_sheets, pygame.Surface):
+            sheets = [sprite_sheets]
+        elif isinstance(sprite_sheets, dict):
+            sheets = []
+            for tier in range(1, self.TIER_MAX + 1):
+                candidate = (sprite_sheets.get(tier) or sprite_sheets.get(str(tier))
+                             or sprite_sheets.get(f"tier_{tier}"))
+                sheets.append(candidate if isinstance(candidate, pygame.Surface) else placeholder)
+        elif isinstance(sprite_sheets, (list, tuple)):
+            sheets = [sheet if isinstance(sheet, pygame.Surface) else placeholder for sheet in sprite_sheets]
+        else:
+            sheets = []
+            if isinstance(sprite_sheets, pygame.Surface):
+                sheets.append(sprite_sheets)
+
+        if not sheets:
+            sheets = [placeholder]
+
+        while len(sheets) < self.TIER_MAX:
+            sheets.append(sheets[-1])
+
+        return sheets
+
+    @staticmethod
+    def _placeholder_sprite_sheet():
+        """Create a placeholder animation sheet with 4 frames."""
+        width = 32 * max(1, c.ANIMATION_STEPS)
+        surface = pygame.Surface((width, 32), pygame.SRCALPHA)
+        for i in range(c.ANIMATION_STEPS):
+            frame_rect = pygame.Rect(i * 32, 0, 32, 32)
+            color = (140, 140, 140, 255) if i % 2 == 0 else (90, 90, 90, 255)
+            surface.fill(color, frame_rect)
+        return surface
+
+    def _get_base_image_for_tier(self, tier: int):
+        index = max(0, min(tier - 1, len(self.base_images) - 1))
+        return self.base_images[index]
+
+    def _get_sprite_sheet_for_tier(self, tier: int):
+        index = max(0, min(tier - 1, len(self.sprite_sheets) - 1))
+        return self.sprite_sheets[index]
+
+    def _refresh_rect(self):
+        """Recalculate rect dimensions based on current base/turret images."""
+        base_rect = self.base_image.get_rect()
+        turret_rect = self.turret_image.get_rect()
+        center = self.rect.center if hasattr(self, "rect") else self.pos
+        self.rect = pygame.Rect(0, 0, max(base_rect.width, turret_rect.width),
+                                max(base_rect.height, turret_rect.height))
+        self.rect.center = center
+        self.create_range_circle()
+
+    def on_upgrade(self):
+        """Handle tier upgrades - swap base texture when available."""
+        super().on_upgrade()
+        self.base_image = self._get_base_image_for_tier(self.tier)
+        self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+        self.animation_list = self.load_image()
+        self.frame_index = 0
+        self.turret_image = self.animation_list[self.frame_index]
+        self.animation_duration = len(self.animation_list) * c.ANIMATION_DELAY
+        self.cooldown = self.animation_duration + self.shot_delay
+        self._refresh_rect()

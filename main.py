@@ -1,7 +1,7 @@
-import pygame
+﻿import pygame
 import json
 import constants as c
-from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Housing, Farm, Sawmill, Smelter
+from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Housing, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie
 from world.spawner import Spawner
 from world.projectile import Projectile
@@ -39,19 +39,54 @@ running = True
 GRID_WIDTH = c.SCREEN_WIDTH // TILE
 GRID_HEIGHT = c.SCREEN_HEIGHT // TILE
 
+
+def load_image_or_placeholder(path, size, fill_color=(100, 100, 100, 255), label="image"):
+    """Load an image from disk or return a colored placeholder surface."""
+    try:
+        return pygame.image.load(path).convert_alpha()
+    except Exception:
+        placeholder = pygame.Surface(size, pygame.SRCALPHA)
+        placeholder.fill(fill_color)
+        print(f"Warning: {label} missing at {path}, using placeholder")
+        return placeholder
+
+
 ###################
 # Load images
 ###################
 # Turret images
-try:
-    turret_base = pygame.image.load('asset/Base_lv1.png').convert_alpha()
-    turret_sheet = pygame.image.load('asset/Turret_lv1.png').convert_alpha()
-except:
-    # Create placeholder images if files don't exist
-    turret_base = pygame.Surface((32, 32))
-    turret_base.fill((100, 100, 100))
-    turret_sheet = pygame.Surface((32*8, 32))
-    turret_sheet.fill((150, 150, 150))
+turret_sheet_lv1 = load_image_or_placeholder(
+    'asset/Turret_lv1.png',
+    (32 * c.ANIMATION_STEPS, 32),
+    (150, 150, 150, 255),
+    "Ballistic turret sprite sheet Lv1"
+)
+turret_sheet_lv2 = load_image_or_placeholder(
+    'asset/Turret_lv2.png',
+    (32 * c.ANIMATION_STEPS, 32),
+    (160, 150, 150, 255),
+    "Ballistic turret sprite sheet Lv2"
+)
+turret_sprite_sheets = [turret_sheet_lv1, turret_sheet_lv2]
+turret_base_lv1 = load_image_or_placeholder(
+    'asset/Base_lv1.png',
+    (32, 32),
+    (100, 100, 100, 255),
+    "Ballistic turret base Lv1"
+)
+turret_base_lv2 = load_image_or_placeholder(
+    'asset/Base_lv2.png',
+    (32, 32),
+    (110, 110, 110, 255),
+    "Ballistic turret base Lv2"
+)
+turret_base_lv3 = load_image_or_placeholder(
+    'asset/Base_lv3.png',
+    (32, 32),
+    (120, 120, 120, 255),
+    "Ballistic turret base Lv3"
+)
+turret_base_images = [turret_base_lv1, turret_base_lv2, turret_base_lv3]
 
 # Gatling turret images (static image, not a sprite sheet)
 try:
@@ -212,6 +247,39 @@ class World:
             self.resources.iron += int(amount)
         elif resource == "food":
             self.resources.food += int(amount)
+    
+    def building_at(self, gx, gy):
+        """Get building at grid position (gx, gy), or None if no building there."""
+        if self.building_group is None:
+            return None
+        for building in self.building_group:
+            if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                building.grid_x == gx and building.grid_y == gy):
+                return building
+        return None
+    
+    def is_wall_at(self, gx, gy):
+        """Check if there's a wall at grid position (gx, gy)."""
+        b = self.building_at(gx, gy)
+        return bool(b) and getattr(b, "TYPE_ID", "").startswith("wall")
+    
+    def wall_tile_index_at(self, gx, gy):
+        """Get the tile index of a wall at grid position (gx, gy), or None."""
+        b = self.building_at(gx, gy)
+        if not b or not hasattr(b, "tile_index"):
+            return None
+        return b.tile_index
+    
+    def refresh_wall_and_neighbors(self, gx, gy):
+        """Refresh wall tile variants for the tile at (gx, gy) and its 4 neighbors."""
+        for nx, ny in ((gx, gy), (gx+1, gy), (gx-1, gy), (gx, gy+1), (gx, gy-1)):
+            b = self.building_at(nx, ny)
+            if b and hasattr(b, "refresh_wall_variant"):
+                b.refresh_wall_variant(self)
+    
+    def autotile_wall_and_neighbors(self, gx, gy):
+        """Alias for refresh_wall_and_neighbors (backwards compatibility)."""
+        self.refresh_wall_and_neighbors(gx, gy)
 
 # Initialize core systems first
 game_state_manager = GameStateManager()
@@ -405,19 +473,26 @@ def spawn_starting_layout():
     )
     
     # Import building classes
-    from world.buildings.wall import Wall
+    from world.buildings.wall_wood import WallWood
     from world.buildings.gate import Gate
     
     # Place walls (organic shape)
+    walls_placed = []
     for gx, gy in wall_positions:
         # Ensure position is valid
         if 0 <= gx < W_TILES and 0 <= gy < H_TILES:
-            w = Wall((gx, gy), tier=1)
+            w = WallWood((gx, gy), tier=1)
             w.state = BuildState.ACTIVE  # Start completed
             w.hp = w.max_hp
             w.progress = w.BUILD_TIME
+            w.world = world  # Set world reference
             building_group.add(w)
-            grid.set_footprint_blocked((gx, gy), Wall.FOOTPRINT, True)
+            grid.set_footprint_blocked((gx, gy), WallWood.FOOTPRINT, True)
+            walls_placed.append((gx, gy))
+    
+    # After all walls are placed, refresh all wall variants so they see their neighbors
+    for gx, gy in walls_placed:
+        world.autotile_wall_and_neighbors(gx, gy)
     
     # Place gate
     for gx, gy in gate_positions:
@@ -469,13 +544,13 @@ def spawn_starting_layout():
     pad_row = min(H_TILES - 1, max_wall_y + pad_off_y)
     
     # Use existing turret images (loaded at startup)
-    global turret_sheet, turret_base
+    global turret_sprite_sheets, turret_base_images
     
     # Main turrets near gate
     for dx in turret_cfg.get("x_offsets_from_gate", [-6, 6]):
         gx = start_cx + int(dx)
         if 0 <= gx < W_TILES and 0 <= pad_row < H_TILES:
-            t = BallisticTurret((gx, pad_row), turret_sheet, turret_base, tier=1)
+            t = BallisticTurret((gx, pad_row), turret_sprite_sheets, turret_base_images, tier=1)
             t.state = BuildState.ACTIVE
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
@@ -489,7 +564,7 @@ def spawn_starting_layout():
         t_x = start_cx + int(turret_def.get("x_offset", 0))
         t_y = pad_row + int(turret_def.get("y_offset", 0))
         if 0 <= t_x < W_TILES and 0 <= t_y < H_TILES:
-            t = BallisticTurret((t_x, t_y), turret_sheet, turret_base, tier=1)
+            t = BallisticTurret((t_x, t_y), turret_sprite_sheets, turret_base_images, tier=1)
             t.state = BuildState.ACTIVE
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
@@ -658,6 +733,14 @@ def upgrade_building(building):
             resources.iron -= upgrade_cost.iron
             resources.food -= upgrade_cost.food
             building.upgrade()
+            # If it's a wall, refresh neighbors after upgrade
+            if hasattr(building, 'on_upgrade') and callable(building.on_upgrade):
+                # on_upgrade will call autotile_wall_and_neighbors if world is set
+                if hasattr(building, 'world') and building.world:
+                    building.on_upgrade()
+                elif isinstance(building, (WallWood, WallIron)) and world:
+                    building.world = world
+                    building.on_upgrade()
             sound_system.play("upgrade")
             print(f"Upgraded {building.TYPE_ID} to tier {building.tier}")
 
@@ -793,9 +876,9 @@ buttons = {}
 # Building types with their button labels and colors
 # Note: HQ is not buildable - it spawns automatically at game start
 building_types = [
-    (BallisticTurret, "Ballistic", (150, 100, 100), turret_sheet, turret_base),
+    (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
     (GatlingTurret, "Gatling", (200, 150, 100), gatling_image, gatling_base),
-    (PiercerTurret, "Piercer", (150, 100, 150), turret_sheet, turret_base),
+    (PiercerTurret, "Piercer", (150, 100, 150), turret_sheet_lv1, turret_base_lv1),
     (Wall, "Wall", (120, 120, 120)),
     (Gate, "Gate", (100, 100, 100)),
     (Housing, "Housing", (150, 120, 100)),
@@ -918,7 +1001,13 @@ def draw_resources(screen, resources, font):
 def create_building(building_class, grid_pos, *args):
     """Create a building instance based on the building class."""
     # Check if it's a turret (needs sprite sheet and base image)
-    if building_class in (BallisticTurret, GatlingTurret, PiercerTurret):
+    if building_class is BallisticTurret:
+        if len(args) >= 2:
+            sprite_sheets, base_images = args[0], args[1]
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
+            turret_group.add(building)
+            return building
+    elif building_class in (GatlingTurret, PiercerTurret):
         if len(args) >= 2:
             sprite_sheet, base_image = args[0], args[1]
             building = building_class(grid_pos, sprite_sheet, base_image, tier=1)
@@ -1045,6 +1134,9 @@ while running:
         if old_state == BuildState.CONSTRUCTING and building.state == BuildState.ACTIVE:
             newly_active.append(building)
             sound_system.play("build_placed")
+            # If it's a wall, refresh neighbors when construction completes
+            if hasattr(building, 'on_place') and callable(building.on_place):
+                building.on_place(world)
         # Check if building was destroyed OR if HQ HP <= 0 (lose condition)
         if building.state == BuildState.DESTROYED:
             buildings_to_remove.append(building)
@@ -1075,8 +1167,13 @@ while running:
     
     # Remove destroyed buildings
     for building in buildings_to_remove:
+        # Store position before removing (for wall autotiling)
+        gx, gy = building.grid_x, building.grid_y
+        # Check if it's a wall (for autotiling neighbors)
+        is_wall = hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith('wall')
+        
         # Unblock grid tiles
-        grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
+        grid.set_footprint_blocked((gx, gy), building.FOOTPRINT, False)
         # Remove from groups
         building_group.remove(building)
         if building in turret_group:
@@ -1087,6 +1184,10 @@ while running:
         # Hide building panel if destroyed building was selected
         if building_panel.selected_building == building:
             building_panel.hide()
+        
+        # Refresh wall neighbors after removal (on_destroy should handle this, but ensure it happens)
+        if is_wall:
+            world.autotile_wall_and_neighbors(gx, gy)
     
     ###################
     # Update wave manager
@@ -1510,7 +1611,13 @@ while running:
                         building.state = BuildState.ACTIVE
                         building.hp = building.max_hp
                         building.progress = building.BUILD_TIME
+                        # Set world reference for walls
+                        if hasattr(building, 'world'):
+                            building.world = world
                         building.on_complete(world)
+                        # If it's a wall, refresh neighbors after placement
+                        if hasattr(building, 'on_place') and callable(building.on_place):
+                            building.on_place(world)
                         # Force unblock then block (in case of overlap)
                         grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, False)
                         grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, True)
@@ -1527,6 +1634,9 @@ while running:
                         
                         if building:
                             building_group.add(building)
+                            # Set world reference for walls
+                            if hasattr(building, 'world'):
+                                building.world = world
                             building.start_construction()
                             # Mark tiles as blocked
                             grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, True)

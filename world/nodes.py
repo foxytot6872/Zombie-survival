@@ -4,7 +4,8 @@ Resource nodes for external harvesting.
 import pygame
 import json
 import random
-from typing import Tuple, Optional, Dict
+import os
+from typing import Tuple, Optional, Dict, List
 from dataclasses import dataclass
 
 @dataclass
@@ -22,7 +23,7 @@ class Node(pygame.sprite.Sprite):
     YIELD_TOTAL: int = 100
     GATHER_PER_TICK: int = 5
     TICK_SEC: float = 0.6
-    RADIUS_PX: int = 18
+    RADIUS_PX: int = 20
     
     def __init__(self, pos: Tuple[float, float], config: Optional[NodeConfig] = None):
         super().__init__()
@@ -91,6 +92,40 @@ class Node(pygame.sprite.Sprite):
         # text_rect = text.get_rect(center=(self.pos.x, self.pos.y - 20))
         # surface.blit(text, text_rect)
 
+_TREE_TEXTURES: Optional[List[pygame.Surface]] = None
+_TREE_TEXTURE_PATH = os.path.join('asset', 'Tree_node.png')
+_TREE_TILE_SIZE = 32
+_TREE_SCALE = 1.25
+
+
+def _load_tree_textures() -> List[pygame.Surface]:
+    """Load and slice the tree node sprite sheet into individual variants."""
+    global _TREE_TEXTURES
+    if _TREE_TEXTURES is not None:
+        return _TREE_TEXTURES
+
+    try:
+        sheet = pygame.image.load(_TREE_TEXTURE_PATH).convert_alpha()
+    except pygame.error:
+        _TREE_TEXTURES = []
+        return _TREE_TEXTURES
+
+    width, height = sheet.get_size()
+    tile_w = tile_h = _TREE_TILE_SIZE
+    textures: List[pygame.Surface] = []
+
+    for top in range(0, height, tile_h):
+        for left in range(0, width, tile_w):
+            if left + tile_w > width or top + tile_h > height:
+                continue
+            tile_surface = pygame.Surface((tile_w, tile_h), pygame.SRCALPHA)
+            tile_surface.blit(sheet, (0, 0), pygame.Rect(left, top, tile_w, tile_h))
+            textures.append(tile_surface)
+
+    _TREE_TEXTURES = textures
+    return _TREE_TEXTURES
+
+
 class TreePatch(Node):
     """Tree patch node - yields wood"""
     TYPE_ID = "tree_patch"
@@ -98,13 +133,17 @@ class TreePatch(Node):
     YIELD_TOTAL = 120
     GATHER_PER_TICK = 6
     TICK_SEC = 0.6
+    RADIUS_PX = int(_TREE_TILE_SIZE * _TREE_SCALE / 2)
     
     def __init__(self, pos: Tuple[float, float], config: Optional[NodeConfig] = None):
         if config is None:
             # Load from config file
             config = self._load_config()
+        self._tree_texture = self._pick_tree_texture()
+        self._initial_yield = config.yield_total
         super().__init__(pos, config)
-        self._initial_yield = self.remaining
+        # Ensure rect uses the full sprite dimensions
+        self.rect = self.image.get_rect(center=self.pos)
     
     @classmethod
     def _load_config(cls) -> NodeConfig:
@@ -122,20 +161,40 @@ class TreePatch(Node):
         except:
             return NodeConfig("wood", 120, 6, 0.6)
     
+    @staticmethod
+    def _pick_tree_texture() -> Optional[pygame.Surface]:
+        """Select a random tree texture variant."""
+        textures = _load_tree_textures()
+        if not textures:
+            return None
+        texture = random.choice(textures)
+        if _TREE_SCALE != 1:
+            width, height = texture.get_size()
+            scaled_size = (int(width * _TREE_SCALE), int(height * _TREE_SCALE))
+            return pygame.transform.smoothscale(texture, scaled_size)
+        return texture
+
     def _update_image(self):
         """Update tree patch visual"""
         self.image.fill((0, 0, 0, 0))
-        
-        # Draw tree (green circle with brown trunk)
-        center = (self.radius_px, self.radius_px)
-        # Trunk
-        pygame.draw.rect(self.image, (80, 50, 30), 
-                        (self.radius_px - 3, self.radius_px + 5, 6, 8))
-        # Leaves
-        depletion_pct = self.remaining / self._initial_yield if hasattr(self, '_initial_yield') else 1.0
-        green = (50, int(150 * depletion_pct), 50)
-        pygame.draw.circle(self.image, green, center, self.radius_px)
-        pygame.draw.circle(self.image, (200, 200, 200), center, self.radius_px, 2)
+        base_texture = self._tree_texture
+        if base_texture:
+            tex_rect = base_texture.get_rect()
+            tex_rect.center = (self.radius_px, self.radius_px)
+            self.image.blit(base_texture, tex_rect)
+            # Darken sprite as resources deplete
+            if hasattr(self, '_initial_yield') and self._initial_yield > 0:
+                depletion_pct = max(0.0, min(1.0, self.remaining / self._initial_yield))
+                if depletion_pct < 1.0:
+                    shade = pygame.Surface(base_texture.get_size(), pygame.SRCALPHA)
+                    darkness = int(160 * (1 - depletion_pct))
+                    shade.fill((0, 0, 0, darkness))
+                    self.image.blit(shade, tex_rect)
+        else:
+            # Fallback to simple circle if texture not available
+            center = (self.radius_px, self.radius_px)
+            pygame.draw.circle(self.image, (80, 120, 60), center, self.radius_px)
+            pygame.draw.circle(self.image, (200, 200, 200), center, self.radius_px, 2)
 
 class ScrapPile(Node):
     """Scrap pile node - yields iron"""
