@@ -5,7 +5,8 @@ import pygame
 import json
 import math
 import random
-from typing import Tuple, Optional, Dict
+import os
+from typing import Tuple, Optional, Dict, List
 from enum import Enum
 
 class SurvivorState(Enum):
@@ -50,6 +51,18 @@ class Survivor(pygame.sprite.Sprite):
         self.image = pygame.Surface((24, 24), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=self.pos)
         
+        # Sprite sheet and animation
+        self.idle_frames = []
+        self.run_frames = []
+        self.current_frames = []
+        self.frame_index = 0
+        self.animation_timer = 0.0
+        self.animation_delay = 0.2  # seconds per frame
+        self.facing_right = True
+        
+        # Load sprite sheets
+        self.load_sprite_sheets()
+        
         # State
         self.alive = True
         self.state = SurvivorState.IDLE
@@ -68,6 +81,111 @@ class Survivor(pygame.sprite.Sprite):
         # Safe distance to enemies
         self.safe_distance_to_enemy_px = 160.0
         self.flee_on_threat = True
+    
+    def load_sprite_sheets(self):
+        """Load survivor sprite sheets"""
+        try:
+            # Try to load survival.png first (exported from survival.aseprite)
+            survival_paths = [
+                os.path.join('asset', 'survival.png'),
+                os.path.join('world', 'survival.png'),
+                'asset/survival.png',
+                'world/survival.png'
+            ]
+            
+            survival_sheet = None
+            for path in survival_paths:
+                if os.path.exists(path):
+                    try:
+                        survival_sheet = pygame.image.load(path).convert_alpha()
+                        break
+                    except:
+                        continue
+            
+            # If survival.png exists, use it
+            if survival_sheet:
+                frame_width = 16
+                frame_height = 32
+                sheet_width = survival_sheet.get_width()
+                
+                # Extract idle frames (first 4 frames)
+                self.idle_frames = []
+                for i in range(4):
+                    if i * frame_width < sheet_width:
+                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                        frame = survival_sheet.subsurface(frame_rect)
+                        self.idle_frames.append(frame)
+                
+                # Extract run frames (next 6 frames)
+                self.run_frames = []
+                for i in range(4, 10):
+                    if i * frame_width < sheet_width:
+                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                        frame = survival_sheet.subsurface(frame_rect)
+                        self.run_frames.append(frame)
+                
+                # Update image size to match sprite
+                self.image = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                self.rect = self.image.get_rect(center=self.pos)
+            else:
+                # Fallback to existing sprite sheets
+                try:
+                    idle_sheet = pygame.image.load('asset/16x32 Idle-Sheet.png').convert_alpha()
+                    run_sheet = pygame.image.load('asset/16x32 Run Cycle-Sheet.png').convert_alpha()
+                    
+                    frame_width = 16
+                    frame_height = 32
+                    
+                    # Extract frames from idle sheet (4 frames: 64/16 = 4)
+                    self.idle_frames = []
+                    for i in range(4):
+                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                        frame = idle_sheet.subsurface(frame_rect)
+                        self.idle_frames.append(frame)
+                    
+                    # Extract frames from run sheet (6 frames: 96/16 = 6)
+                    self.run_frames = []
+                    for i in range(6):
+                        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+                        frame = run_sheet.subsurface(frame_rect)
+                        self.run_frames.append(frame)
+                    
+                    # Update image size
+                    self.image = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                    self.rect = self.image.get_rect(center=self.pos)
+                except:
+                    # If sprite sheets don't exist, frames will remain empty and fallback to circles
+                    pass
+            
+            # Set initial frames
+            if self.idle_frames:
+                self.current_frames = self.idle_frames
+        except Exception as e:
+            print(f"Warning: Could not load survivor sprites: {e}")
+    
+    def update_animation(self, dt: float):
+        """Update animation frame"""
+        if not self.current_frames:
+            return
+        
+        # Determine which frames to use based on movement
+        is_moving = self.velocity.length() > 0.1
+        
+        if is_moving and self.run_frames:
+            self.current_frames = self.run_frames
+            # Update facing direction
+            if self.velocity.x > 0:
+                self.facing_right = True
+            elif self.velocity.x < 0:
+                self.facing_right = False
+        elif not is_moving and self.idle_frames:
+            self.current_frames = self.idle_frames
+        
+        # Update animation timer
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_delay:
+            self.animation_timer = 0.0
+            self.frame_index = (self.frame_index + 1) % len(self.current_frames)
     
     def apply_separation(self, dt: float, neighbors):
         """Apply separation force to avoid overlapping with other survivors"""
@@ -249,14 +367,28 @@ class Survivor(pygame.sprite.Sprite):
         """Draw survivor"""
         self.image.fill((0, 0, 0, 0))
         
-        # Draw based on role
-        if self.role == "worker":
-            color = (100, 150, 200)  # Blue for workers
-        else:  # guard
-            color = (200, 100, 100)  # Red for guards
-        
-        # Draw body
-        if self.alive:
+        if not self.alive:
+            # Dead survivor - draw grey circle
+            pygame.draw.circle(self.image, (80, 80, 80), (12, 12), 10)
+        elif self.current_frames and self.frame_index < len(self.current_frames):
+            # Draw sprite frame
+            frame = self.current_frames[self.frame_index]
+            
+            # Flip frame if facing left
+            if not self.facing_right:
+                frame = pygame.transform.flip(frame, True, False)
+            
+            # Blit frame centered on image
+            frame_rect = frame.get_rect()
+            frame_rect.center = (self.image.get_width() // 2, self.image.get_height() // 2)
+            self.image.blit(frame, frame_rect)
+        else:
+            # Fallback to circles if no sprites loaded
+            if self.role == "worker":
+                color = (100, 150, 200)  # Blue for workers
+            else:  # guard
+                color = (200, 100, 100)  # Red for guards
+            
             pygame.draw.circle(self.image, color, (12, 12), 10)
             pygame.draw.circle(self.image, (255, 255, 255), (12, 12), 10, 2)
             # Draw direction indicator
@@ -264,9 +396,6 @@ class Survivor(pygame.sprite.Sprite):
                 dir_normalized = self.velocity.normalize()
                 end_pos = pygame.Vector2(12, 12) + dir_normalized * 8
                 pygame.draw.line(self.image, (255, 255, 255), (12, 12), end_pos, 2)
-        else:
-            # Dead survivor (grey)
-            pygame.draw.circle(self.image, (80, 80, 80), (12, 12), 10)
         
         surface.blit(self.image, self.rect)
         
@@ -600,6 +729,9 @@ class Worker(Survivor):
                         self.state = SurvivorState.MOVE_TO_NODE
                         self.target_node = None
         
+        # Update animation
+        self.update_animation(dt)
+        
         # Move worker
         self.pos += self.velocity * dt
         self.rect.center = self.pos
@@ -697,6 +829,9 @@ class Guard(Survivor):
         else:
             # Day: idle at post
             self.move_toward(self.post_position, dt, world, stop_distance=16.0)
+        
+        # Update animation
+        self.update_animation(dt)
         
         # Move guard
         self.pos += self.velocity * dt

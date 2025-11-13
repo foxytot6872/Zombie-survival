@@ -48,7 +48,7 @@ class SpitterZombie(Enemy):
         
         surface.blit(self.image, self.rect)
     
-    def attack_building(self, building):
+    def attack_building(self, building, world=None):
         """Attack a building with ranged attack if far, melee if close"""
         if not building or not hasattr(building, 'take_damage'):
             return
@@ -75,7 +75,8 @@ class SpitterZombie(Enemy):
         elif distance <= 32:  # Close range - melee attack
             # Melee attack if close
             # Pass world for damage modifiers
-            world = getattr(self, 'world', None)
+            if world is None:
+                world = getattr(self, 'world', None)
             building.take_damage(self.damage, world)
         
         self.on_attack(building)
