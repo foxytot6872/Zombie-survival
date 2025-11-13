@@ -22,16 +22,13 @@ class PauseMenu:
         self.is_visible = False
         self.selected_option = 0
         self.options = [
-            "Resume",
-            "Save",
-            "Load",
+            "Restart",
             "Quit"
         ]
         
-        self.on_resume: Optional[Callable] = None
-        self.on_save: Optional[Callable] = None
-        self.on_load: Optional[Callable] = None
+        self.on_restart: Optional[Callable] = None
         self.on_quit: Optional[Callable] = None
+        self.on_resume: Optional[Callable] = None  # For ESC key to resume
     
     def show(self):
         """Show pause menu"""
@@ -68,12 +65,8 @@ class PauseMenu:
             elif event.key == pygame.K_RETURN or event.key == pygame.K_SPACE:
                 # Select option
                 option = self.options[self.selected_option]
-                if option == "Resume" and self.on_resume:
-                    self.on_resume()
-                elif option == "Save" and self.on_save:
-                    self.on_save()
-                elif option == "Load" and self.on_load:
-                    self.on_load()
+                if option == "Restart" and self.on_restart:
+                    self.on_restart()
                 elif option == "Quit" and self.on_quit:
                     self.on_quit()
                 return True
@@ -121,6 +114,6 @@ class PauseMenu:
         # Draw instructions
         inst_text = "Press ESC to Resume | Arrow Keys to Navigate | Enter to Select"
         inst_surface = self.font_medium.render(inst_text, True, (200, 200, 200))
-        inst_rect = inst_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 + 250))
+        inst_rect = inst_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 + 150))
         surface.blit(inst_surface, inst_rect)
 

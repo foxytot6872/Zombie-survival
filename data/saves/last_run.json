@@ -1,12 +1,12 @@
 {
   "version": "1.0",
   "wave_manager": {
-    "night": 3,
-    "day": 2,
+    "night": 4,
+    "day": 3,
     "state": "SUMMARY",
     "difficulty": "normal",
     "enemies_killed": 0,
-    "enemies_spawned": 23,
+    "enemies_spawned": 37,
     "timer": 0.0
   },
   "resources": {
@@ -28,42 +28,6 @@
       "progress": 0.0
     },
     {
-      "uid": "9202bc6a-df14-4919-a0df-9f6f7263ba34",
-      "type": "wall_wood",
-      "grid": [
-        23,
-        12
-      ],
-      "tier": 1,
-      "hp": 219,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "8f63ea66-c599-4830-933b-aa233d5f0ecd",
-      "type": "wall_wood",
-      "grid": [
-        24,
-        12
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "78731805-cd1a-40f7-b3b6-e7eab2dedbd2",
-      "type": "wall_wood",
-      "grid": [
-        25,
-        12
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
       "uid": "d93fdf41-d362-4224-8a3c-4b3da1648c8e",
       "type": "wall_wood",
       "grid": [
@@ -71,7 +35,7 @@
         12
       ],
       "tier": 1,
-      "hp": 250,
+      "hp": 199,
       "state": "active",
       "progress": 1.0
     },
@@ -179,7 +143,7 @@
         12
       ],
       "tier": 1,
-      "hp": 220,
+      "hp": 190,
       "state": "active",
       "progress": 1.0
     },
@@ -191,7 +155,7 @@
         12
       ],
       "tier": 1,
-      "hp": 139,
+      "hp": 8,
       "state": "active",
       "progress": 1.0
     },
@@ -203,7 +167,7 @@
         12
       ],
       "tier": 1,
-      "hp": 127,
+      "hp": 17,
       "state": "active",
       "progress": 1.0
     },
@@ -376,30 +340,6 @@
       "progress": 1.0
     },
     {
-      "uid": "d00c98c7-6243-4ef5-9955-9955dd67a10a",
-      "type": "wall_wood",
-      "grid": [
-        23,
-        13
-      ],
-      "tier": 1,
-      "hp": 225,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "04bc0416-ca0d-458e-af59-f85e15d680ec",
-      "type": "wall_wood",
-      "grid": [
-        23,
-        14
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
       "uid": "b7b586e4-6983-413d-a951-89cfef55591d",
       "type": "wall_wood",
       "grid": [
@@ -407,7 +347,7 @@
         15
       ],
       "tier": 1,
-      "hp": 250,
+      "hp": 235,
       "state": "active",
       "progress": 1.0
     },
@@ -455,7 +395,7 @@
         13
       ],
       "tier": 1,
-      "hp": 210,
+      "hp": 153,
       "state": "active",
       "progress": 1.0
     },
@@ -539,7 +479,7 @@
         10
       ],
       "tier": 1,
-      "hp": 220,
+      "hp": 184,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
@@ -552,7 +492,7 @@
         10
       ],
       "tier": 1,
-      "hp": 217,
+      "hp": 186,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
@@ -565,7 +505,7 @@
         10
       ],
       "tier": 1,
-      "hp": 220,
+      "hp": 138,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
@@ -604,7 +544,7 @@
         16
       ],
       "tier": 1,
-      "hp": 220,
+      "hp": 190,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"

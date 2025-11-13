@@ -23,6 +23,7 @@ from ui.building_panel import BuildingPanel
 from ui.hud import HUD
 from ui.research_button import ResearchButton
 from ui.research_panel import ResearchPanel
+from ui.start_screen import StartScreen
 from world.research import ResearchManager
 # Nodes and survivors
 from world.nodes import TreePatch, ScrapPile, spawn_daily_nodes
@@ -218,54 +219,30 @@ try:
     grass_tile_sheet = pygame.image.load('asset/Grass_tile.png').convert_alpha()
     grass_tile_width, grass_tile_height = grass_tile_sheet.get_size()
     
-    # Extract 3 variants if the image contains multiple tiles
-    # If image is 96x32 (3 tiles), extract each 32x32 tile
-    # If image is 32x32 (single tile), use it and create variations
+    # Use the same grass tile for all positions (no variations)
     grass_tiles = []
     if grass_tile_width >= 96 and grass_tile_height == 32:
-        # Image contains 3 horizontal tiles
-        for i in range(3):
-            tile = grass_tile_sheet.subsurface((i * 32, 0, 32, 32))
-            grass_tiles.append(tile)
+        # Image contains 3 horizontal tiles - use the first one for all
+        base_tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
+        grass_tiles = [base_tile, base_tile, base_tile]
     elif grass_tile_width == 32 and grass_tile_height >= 96:
-        # Image contains 3 vertical tiles
-        for i in range(3):
-            tile = grass_tile_sheet.subsurface((0, i * 32, 32, 32))
-            grass_tiles.append(tile)
+        # Image contains 3 vertical tiles - use the first one for all
+        base_tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
+        grass_tiles = [base_tile, base_tile, base_tile]
     elif grass_tile_width == 32 and grass_tile_height == 32:
-        # Single tile - use it and create 2 variations by slightly modifying brightness
-        base_tile = grass_tile_sheet
-        grass_tiles.append(base_tile)
-        
-        # Create variation 1: slightly darker
-        variation1 = base_tile.copy()
-        dark_overlay = pygame.Surface((32, 32), pygame.SRCALPHA)
-        dark_overlay.fill((0, 0, 0, 15))  # Subtle dark overlay
-        variation1.blit(dark_overlay, (0, 0))
-        grass_tiles.append(variation1)
-        
-        # Create variation 2: slightly brighter/lighter
-        variation2 = base_tile.copy()
-        light_overlay = pygame.Surface((32, 32), pygame.SRCALPHA)
-        light_overlay.fill((10, 15, 10, 10))  # Subtle light green overlay
-        variation2.blit(light_overlay, (0, 0), special_flags=pygame.BLEND_RGBA_ADD)
-        grass_tiles.append(variation2)
+        # Single tile - use it for all positions
+        grass_tiles = [grass_tile_sheet, grass_tile_sheet, grass_tile_sheet]
     else:
-        # Unknown format - extract first 32x32 tile and create variations
+        # Unknown format - extract first 32x32 tile and use for all
         tile = grass_tile_sheet.subsurface((0, 0, 32, 32))
-        grass_tiles.append(tile)
-        grass_tiles.append(tile)  # Use same for now
-        grass_tiles.append(tile)  # Use same for now
+        grass_tiles = [tile, tile, tile]
 except Exception as e:
     # Create placeholder grass tiles if file doesn't exist
     print(f"Warning: Grass_tile.png not found or error loading: {e}, using placeholder")
-    grass_tiles = []
-    for i in range(3):
-        tile = pygame.Surface((32, 32))
-        # Create 3 slightly different shades of green
-        shade = 30 + (i * 5)
-        tile.fill((shade, 50 + (i * 3), shade))
-        grass_tiles.append(tile)
+    # Use the same color for all grass tiles
+    tile = pygame.Surface((32, 32))
+    tile.fill((50, 100, 50))  # Single green color
+    grass_tiles = [tile, tile, tile]
 
 ###################
 # Game state
@@ -415,6 +392,8 @@ class World:
 
 # Initialize core systems first
 game_state_manager = GameStateManager()
+# Start in menu state
+game_state_manager.set_state(GameState.MENU)
 save_system = SaveSystem()
 sound_system = SoundSystem()
 
@@ -448,6 +427,7 @@ day_event_manager = DayEventManager(world)
 world.day_events = day_event_manager
 game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames)
 
 # Initialize research UI
@@ -1184,10 +1164,16 @@ def resume_game():
     game_state_manager.resume()
     pause_menu.hide()
 
-pause_menu.on_resume = resume_game
-pause_menu.on_save = save_game
-pause_menu.on_load = load_game
+pause_menu.on_restart = restart_game
 pause_menu.on_quit = quit_game
+pause_menu.on_resume = resume_game  # For ESC key in pause menu
+
+def start_game():
+    """Start the game from menu"""
+    game_state_manager.set_state(GameState.PLAYING)
+    start_screen.hide()
+
+start_screen.on_start = start_game
 
 # Building panel callbacks (will be set up in game loop)
 def upgrade_building(building):
@@ -1597,6 +1583,24 @@ while running:
         fps_counter = 0
         fps_timer = 0.0
     
+    # Handle start screen (menu state)
+    if game_state_manager.get_state() == GameState.MENU:
+        # Update start screen animation
+        start_screen.update(dt)
+        
+        # Draw start screen
+        start_screen.draw(screen)
+        
+        # Handle events for start screen
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            else:
+                start_screen.handle_event(event)
+        
+        pygame.display.flip()
+        continue
+    
     # Fill screen with background
     # Draw grass tile map background
     # Calculate how many tiles we need to cover the screen
@@ -1615,11 +1619,7 @@ while running:
             screen.blit(grass_tiles[variant_index], (tile_x, tile_y))
     
     # Day/night divider line removed
-    split_y_px = grid.get_split_y_px()
-    # Draw semi-transparent overlay to distinguish zones
-    overlay = pygame.Surface((c.SCREEN_WIDTH, split_y_px), pygame.SRCALPHA)
-    overlay.fill((0, 0, 0, 20))  # Very subtle darkening for upper zone (night/danger zone)
-    screen.blit(overlay, (0, 0))
+    # Overlay removed - using original texture without tinting
     
     # Draw gate icon/banner on gate columns (if gate exists)
     try:
@@ -1629,7 +1629,7 @@ while running:
             # Get gate center position (use first gate)
             gate_building = gate_buildings[0]
             gate_center_x_px = gate_building.pos.x
-            gate_pixel_y = split_y_px - 25  # Above the divider line
+            gate_pixel_y = gate_building.pos.y - 25  # Above the gate
             # Draw simple "GATE" text banner
             gate_font = pygame.font.Font(None, 20)
             gate_text = gate_font.render("GATE", True, (200, 200, 100))
@@ -2055,6 +2055,12 @@ while running:
         game_over_screen.draw(screen)
     
     ###################
+    # Draw start screen (should not be visible during gameplay, but just in case)
+    ###################
+    if start_screen.is_visible:
+        start_screen.draw(screen)
+    
+    ###################
     # Draw preview when in build mode
     ###################
     if build_mode and selected_building_type:
@@ -2340,6 +2346,11 @@ while running:
         
         # Handle keyboard input
         if event.type == pygame.KEYDOWN:
+            # Handle start screen (menu state)
+            if game_state_manager.get_state() == GameState.MENU:
+                if start_screen.handle_event(event):
+                    continue
+            
             # Handle research panel ESC key
             if research_panel.handle_key(event.key):
                 continue
@@ -2409,6 +2420,7 @@ while running:
                         pause_menu.hide()
                     else:
                         game_state_manager.pause()
+                        pause_menu.show()
                     continue
             
             # Handle debug actions (only when debug mode is active and not paused/over)

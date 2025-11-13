@@ -198,7 +198,7 @@ class Enemy(pygame.sprite.Sprite):
                 
                 # Attack building
                 if self.attack_timer >= self.attack_cooldown:
-                    self.attack_building(self.target_building, world)
+                    self.attack_building(self.target_building, world=world)
                     self.attack_timer = 0.0
                 
                 # Reset stuck detection when attacking
