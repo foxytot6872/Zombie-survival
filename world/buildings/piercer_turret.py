@@ -16,12 +16,14 @@ class PiercerTurret(Building):
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
     
-    def __init__(self, grid_pos, sprite_sheet, base_image, tier=1, uid=None):
+    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
         super().__init__(grid_pos, tier=tier, uid=uid)
         
         # Piercer-specific attributes
-        self.cooldown = 2000  # milliseconds - slow firing
-        self.range = 250  # pixels - longer range
+        self.base_cooldown = 2000  # milliseconds - slow firing
+        self.cooldown = self.base_cooldown  # Will be modified by day events
+        self.base_range = 250  # pixels - longer range
+        self.range = self.base_range  # Will be modified by day events
         self.damage = 25  # damage per shot - high damage
         self.projectile_speed = 600.0  # pixels per second - very fast projectiles
         self.pierce = True  # Pierces through enemies
@@ -29,26 +31,28 @@ class PiercerTurret(Building):
         self.angle = 0
         self.target_angle = 0
         self.rotation_speed = 120  # degrees per second - slower rotation
-        self.base_image = base_image
+        self.base_images = self._normalize_base_images(base_images)
+        self.base_image = self._get_base_image_for_tier(self.tier)
+        self.sprite_sheets = self._normalize_sprite_sheets(sprite_sheets)
+        self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
         self.selected = False
         
         # Animation state
-        self.sprite_sheet = sprite_sheet
         self.animation_list = self.load_image()
         self.frame_index = 0
+        self.animation_delay = 200  # milliseconds per frame - slower for railgun (was 150)
         self.update_time = pygame.time.get_ticks()
         self.last_shot = pygame.time.get_ticks()
         self.is_shooting = False
         self.animation_playing = False
+        self.projectile_fired = False  # Track if projectile was fired this animation cycle
         self.target_enemy = None
+        self.pending_target = None  # Target to fire at when animation reaches last frame
         
         self.turret_image = self.animation_list[self.frame_index]
         
-        base_rect = self.base_image.get_rect()
-        turret_rect = self.turret_image.get_rect()
-        self.rect = pygame.Rect(0, 0, max(base_rect.width, turret_rect.width),
-                                max(base_rect.height, turret_rect.height))
-        self.rect.center = self.pos
+        # Update rect to match base image size
+        self._refresh_rect()
         
         self.create_range_circle()
         self.projectile_group = None
@@ -62,11 +66,13 @@ class PiercerTurret(Building):
         self.range_rect.center = self.rect.center
     
     def load_image(self):
-        """Load animation frames"""
-        size = self.sprite_sheet.get_height()
+        """Load animation frames - railgun has 8 frames, 64x64 each"""
+        frame_size = self.sprite_sheet.get_height()  # 64 for railgun
+        sheet_width = self.sprite_sheet.get_width()
+        num_frames = sheet_width // frame_size  # Calculate frames from sheet width (8 frames)
         animation_list = []
-        for x in range(c.ANIMATION_STEPS):
-            temp_img = self.sprite_sheet.subsurface(x*size, 0, size, size)
+        for x in range(num_frames):
+            temp_img = self.sprite_sheet.subsurface(x * frame_size, 0, frame_size, frame_size)
             animation_list.append(temp_img)
         return animation_list
     
@@ -147,40 +153,49 @@ class PiercerTurret(Building):
         return angle_diff <= tolerance
     
     def shoot(self, target_enemy):
-        """Shoot at target with piercing projectile"""
+        """Start shooting animation - projectile will fire on last frame"""
         if target_enemy and target_enemy.alive:
             current_time = pygame.time.get_ticks()
             self.is_shooting = True
             self.animation_playing = True
             self.frame_index = 0
+            self.projectile_fired = False  # Reset flag for new animation cycle
             self.update_time = current_time
             self.last_shot = current_time
-            
-            if self.projectile_group is not None:
-                # Create piercing projectile
-                projectile = PiercingProjectile(
-                    start_pos=(self.pos.x, self.pos.y),
-                    target_pos=(target_enemy.pos.x, target_enemy.pos.y),
-                    speed=self.projectile_speed,
-                    damage=self.damage,
-                    pierce_count=self.pierce_count,
-                    enemy_group=self.enemy_group
-                )
-                self.projectile_group.add(projectile)
+            # Store target for when we fire on last frame
+            self.pending_target = target_enemy
     
     def play_shooting_animation(self, dt):
-        """Play shooting animation"""
+        """Play shooting animation - fire projectile on last frame"""
         if not self.is_shooting or not self.animation_playing:
             return
         
         current_time = pygame.time.get_ticks()
-        if current_time - self.update_time >= c.ANIMATION_DELAY:
+        if current_time - self.update_time >= self.animation_delay:
             self.update_time = current_time
             self.frame_index += 1
             
+            # Fire projectile exactly when we reach the last frame
+            if self.frame_index == len(self.animation_list) - 1 and not self.projectile_fired:
+                # We just advanced to the last frame, fire the projectile
+                if hasattr(self, 'pending_target') and self.pending_target and self.pending_target.alive:
+                    if self.projectile_group is not None:
+                        projectile = PiercingProjectile(
+                            start_pos=(self.pos.x, self.pos.y),
+                            target_pos=(self.pending_target.pos.x, self.pending_target.pos.y),
+                            speed=self.projectile_speed,
+                            damage=self.damage,
+                            pierce_count=self.pierce_count,
+                            enemy_group=self.enemy_group
+                        )
+                        self.projectile_group.add(projectile)
+                    self.projectile_fired = True
+            
+            # Animation completed - reset to first frame
             if self.frame_index >= len(self.animation_list):
                 self.frame_index = 0
                 self.animation_playing = False
+                self.pending_target = None  # Clear pending target after animation completes
         
         self.frame_index = min(self.frame_index, len(self.animation_list) - 1)
         self.turret_image = self.animation_list[self.frame_index]
@@ -193,6 +208,25 @@ class PiercerTurret(Building):
     
     def update(self, dt: float, world=None):
         """Update turret"""
+        # Apply turret fire rate modifier from day events
+        if world and hasattr(world, 'modifiers'):
+            fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
+            self.cooldown = int(self.base_cooldown * fire_rate_mult)
+            
+            # Apply turret range modifier from day events
+            range_mult = world.modifiers.get("turret_range_mult", 1.0)
+            new_range = int(self.base_range * range_mult)
+            if new_range != self.range:
+                self.range = new_range
+                # Recreate range circle if range changed
+                self.range_image = pygame.Surface((self.range * 2, self.range * 2), pygame.SRCALPHA)
+                pygame.draw.circle(self.range_image, (150, 100, 100, 100), (self.range, self.range), self.range)
+                self.range_rect = self.range_image.get_rect()
+                self.range_rect.center = self.rect.center  # Update position to match turret
+        else:
+            self.cooldown = self.base_cooldown
+            self.range = self.base_range
+        
         super().update(dt, world)
         
         if self.state == BuildState.ACTIVE:
@@ -280,6 +314,108 @@ class PiercerTurret(Building):
         """Update range circle position"""
         self.range_rect.center = self.rect.center
 
+    @staticmethod
+    def _placeholder_base():
+        """Create a placeholder base image"""
+        surface = pygame.Surface((32, 32), pygame.SRCALPHA)
+        surface.fill((120, 100, 100))
+        return surface
+
+    def _normalize_base_images(self, base_images):
+        """Ensure we have a list of base images for each tier."""
+        placeholder = self._placeholder_base()
+
+        if isinstance(base_images, pygame.Surface):
+            bases = [base_images]
+        elif isinstance(base_images, dict):
+            bases = []
+            for tier in range(1, self.TIER_MAX + 1):
+                candidate = base_images.get(tier) or base_images.get(str(tier)) or base_images.get(f"tier_{tier}")
+                bases.append(candidate if isinstance(candidate, pygame.Surface) else placeholder)
+        elif isinstance(base_images, (list, tuple)):
+            bases = [img if isinstance(img, pygame.Surface) else placeholder for img in base_images]
+        else:
+            bases = []
+            if base_images:
+                bases.append(base_images if isinstance(base_images, pygame.Surface) else placeholder)
+
+        if not bases:
+            bases = [placeholder]
+
+        while len(bases) < self.TIER_MAX:
+            bases.append(bases[-1])
+
+        return bases
+
+    def _get_base_image_for_tier(self, tier: int):
+        """Get the base image for the given tier (1-indexed)."""
+        index = max(0, min(tier - 1, len(self.base_images) - 1))
+        return self.base_images[index]
+
+    @staticmethod
+    def _placeholder_sprite_sheet():
+        """Create a placeholder animation sheet with 8 frames, 64x64 each."""
+        frame_size = 64  # Railgun turret uses 64x64 frames
+        width = frame_size * c.ANIMATION_STEPS  # 8 frames * 64 = 512
+        surface = pygame.Surface((width, frame_size), pygame.SRCALPHA)
+        for i in range(c.ANIMATION_STEPS):
+            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
+            color = (150, 100, 100, 255) if i % 2 == 0 else (100, 70, 70, 255)
+            surface.fill(color, frame_rect)
+        return surface
+
+    def _normalize_sprite_sheets(self, sprite_sheets):
+        """Ensure we have a list of sprite sheets per tier."""
+        placeholder = self._placeholder_sprite_sheet()
+
+        if isinstance(sprite_sheets, pygame.Surface):
+            sheets = [sprite_sheets]
+        elif isinstance(sprite_sheets, dict):
+            sheets = []
+            for tier in range(1, self.TIER_MAX + 1):
+                candidate = (sprite_sheets.get(tier) or sprite_sheets.get(str(tier))
+                           or sprite_sheets.get(f"tier_{tier}"))
+                sheets.append(candidate if isinstance(candidate, pygame.Surface) else placeholder)
+        elif isinstance(sprite_sheets, (list, tuple)):
+            sheets = [sheet if isinstance(sheet, pygame.Surface) else placeholder for sheet in sprite_sheets]
+        else:
+            sheets = []
+            if isinstance(sprite_sheets, pygame.Surface):
+                sheets.append(sprite_sheets)
+
+        if not sheets:
+            sheets = [placeholder]
+
+        while len(sheets) < self.TIER_MAX:
+            sheets.append(sheets[-1])
+
+        return sheets
+
+    def _get_sprite_sheet_for_tier(self, tier: int):
+        """Get the sprite sheet for the given tier (1-indexed)."""
+        index = max(0, min(tier - 1, len(self.sprite_sheets) - 1))
+        return self.sprite_sheets[index]
+
+    def _refresh_rect(self):
+        """Recalculate rect dimensions based on current base/turret images."""
+        base_rect = self.base_image.get_rect()
+        turret_rect = self.turret_image.get_rect()
+        center = self.rect.center if hasattr(self, "rect") else self.pos
+        self.rect = pygame.Rect(0, 0, max(base_rect.width, turret_rect.width),
+                                max(base_rect.height, turret_rect.height))
+        self.rect.center = center
+        self.create_range_circle()
+
+    def on_upgrade(self):
+        """Handle tier upgrades - swap base texture and sprite sheet when available."""
+        super().on_upgrade()
+        self.base_image = self._get_base_image_for_tier(self.tier)
+        self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+        self.animation_list = self.load_image()
+        self.frame_index = 0
+        self.turret_image = self.animation_list[self.frame_index]
+        self._refresh_rect()
+
 
 # Piercing projectile class
 class PiercingProjectile(Projectile):
@@ -310,6 +446,7 @@ class PiercingProjectile(Projectile):
                 if enemy.alive and enemy not in self.pierced_enemies:
                     if self.rect.colliderect(enemy.rect):
                         # Hit enemy
+                        # Piercer damage (world not needed for enemy damage)
                         enemy.take_damage(self.damage)
                         self.pierced_enemies.add(enemy)
                         self.hit = True

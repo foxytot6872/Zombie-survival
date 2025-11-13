@@ -51,9 +51,11 @@ class Enemy(pygame.sprite.Sprite):
         # State
         self.alive = True
         self.reached_bottom = False
+        self.coins_dropped = False  # Track if coins were already dropped
         
         # Targeting and combat
         self.target_building = None
+        self.target_survivor = None  # Can target survivors too
         self.attack_timer = 0.0  # Time since last attack
         self.is_attacking = False
         
@@ -107,7 +109,15 @@ class Enemy(pygame.sprite.Sprite):
         if world and hasattr(world, 'projectile_group'):
             self.projectile_group = world.projectile_group
         
-        # Find target building if we don't have one or current target is destroyed
+        # Check if current survivor target is still valid
+        if self.target_survivor is not None:
+            if not self.target_survivor.alive:
+                self.target_survivor = None
+            elif world and hasattr(world, 'survivor_group'):
+                if self.target_survivor not in world.survivor_group:
+                    self.target_survivor = None
+        
+        # Find target building or survivor if we don't have one or current target is destroyed
         building_group = None
         if world and hasattr(world, 'building_group'):
             building_group = world.building_group
@@ -129,11 +139,51 @@ class Enemy(pygame.sprite.Sprite):
                     self.target_building = None
             
             # Choose target if no target or need to retarget
-            if self.target_building is None:
+            if self.target_building is None and self.target_survivor is None:
                 self.choose_target(world)
         
-        # Move toward target or straight down
-        if self.target_building and self.target_building in building_group:
+        # Move toward target (survivor or building) or straight down
+        # Prioritize survivors if we have one as target
+        if self.target_survivor and self.target_survivor.alive:
+            # Check if we're in attack range (account for zombie radius)
+            distance = (self.pos - self.target_survivor.pos).length()
+            attack_distance = self.attack_range + self.ZOMBIE_RADIUS
+            
+            if distance <= attack_distance:
+                # Stop moving and attack
+                self.velocity = pygame.Vector2(0, 0)
+                self.is_attacking = True
+                
+                # Attack survivor
+                if self.attack_timer >= self.attack_cooldown:
+                    self.attack_survivor(self.target_survivor, world)
+                    self.attack_timer = 0.0
+                
+                # Reset stuck detection when attacking
+                self.time_since_progress = 0.0
+            else:
+                # Move toward survivor
+                self.is_attacking = False
+                direction = (self.target_survivor.pos - self.pos)
+                if direction.length() > 0:
+                    direction = direction.normalize()
+                    self.velocity = direction * self.speed
+                
+                # Check stuck detection (progress toward target)
+                progress_distance = (self.pos - self.last_progress_check_pos).length()
+                if progress_distance < self.STUCK_PROGRESS_THRESHOLD:
+                    self.time_since_progress += dt
+                else:
+                    # Made progress - reset timer
+                    self.time_since_progress = 0.0
+                    self.last_progress_check_pos = pygame.Vector2(self.pos)
+                
+                # Retarget if stuck for too long
+                if self.time_since_progress > self.STUCK_TIME_THRESHOLD:
+                    self.target_survivor = None
+                    self.time_since_progress = 0.0
+                    # Will retarget next frame
+        elif self.target_building and self.target_building in building_group:
             # Check if we're in attack range (account for zombie radius)
             distance = (self.pos - self.target_building.pos).length()
             attack_distance = self.attack_range + self.ZOMBIE_RADIUS
@@ -148,7 +198,7 @@ class Enemy(pygame.sprite.Sprite):
                 
                 # Attack building
                 if self.attack_timer >= self.attack_cooldown:
-                    self.attack_building(self.target_building)
+                    self.attack_building(self.target_building, world)
                     self.attack_timer = 0.0
                 
                 # Reset stuck detection when attacking
@@ -202,13 +252,47 @@ class Enemy(pygame.sprite.Sprite):
             self.on_reach_bottom()
     
     def choose_target(self, world):
-        """Choose target building using distance + slot availability scoring"""
+        """Choose target (survivor or building) using distance + priority scoring"""
+        # First, check for survivors (zombies ALWAYS prioritize survivors over buildings)
+        survivor_group = None
+        if world and hasattr(world, 'survivor_group'):
+            survivor_group = world.survivor_group
+        
+        best_survivor = None
+        best_survivor_score = float('inf')
+        
+        if survivor_group:
+            for survivor in survivor_group:
+                if not survivor.alive:
+                    continue
+                
+                distance = (self.pos - survivor.pos).length()
+                # Always consider all survivors (no distance limit)
+                # Score survivors (lower is better) - prefer closer survivors
+                score = distance
+                if score < best_survivor_score:
+                    best_survivor_score = score
+                    best_survivor = survivor
+        
+        # If we found any survivor, target it (survivors are always priority)
+        if best_survivor:
+            # Release building slot if we had one
+            if self.target_building and hasattr(self.target_building, 'release_attack_slot'):
+                self.target_building.release_attack_slot()
+            self.target_building = None
+            self.target_survivor = best_survivor
+            self.last_progress_check_pos = pygame.Vector2(self.pos)
+            self.time_since_progress = 0.0
+            return
+        
+        # No survivors found, target buildings instead
         building_group = None
         if world and hasattr(world, 'building_group'):
             building_group = world.building_group
         
         if not building_group:
             self.target_building = None
+            self.target_survivor = None
             return
         
         # Get all active buildings
@@ -224,6 +308,7 @@ class Enemy(pygame.sprite.Sprite):
         
         if not candidates:
             self.target_building = None
+            self.target_survivor = None
             return
         
         # Score each candidate building
@@ -284,6 +369,7 @@ class Enemy(pygame.sprite.Sprite):
                 if self.target_building and hasattr(self.target_building, 'release_attack_slot'):
                     self.target_building.release_attack_slot()
                 self.target_building = best_building
+                self.target_survivor = None  # Clear survivor target
                 # Reset stuck detection when retargeting
                 self.last_progress_check_pos = pygame.Vector2(self.pos)
                 self.time_since_progress = 0.0
@@ -296,13 +382,18 @@ class Enemy(pygame.sprite.Sprite):
                     # Try to claim slot on closest
                     if closest.request_attack_slot():
                         self.target_building = closest
+                        self.target_survivor = None  # Clear survivor target
                         self.last_progress_check_pos = pygame.Vector2(self.pos)
                         self.time_since_progress = 0.0
                     else:
                         # No slot available, but target anyway
                         self.target_building = closest
+                        self.target_survivor = None  # Clear survivor target
                         self.last_progress_check_pos = pygame.Vector2(self.pos)
                         self.time_since_progress = 0.0
+        else:
+            self.target_building = None
+            self.target_survivor = None
     
     def find_nearest_building(self, building_group):
         """Legacy method - now uses choose_target instead"""
@@ -325,12 +416,19 @@ class Enemy(pygame.sprite.Sprite):
         
         return nearest_building
     
-    def attack_building(self, building):
+    def attack_building(self, building, world=None):
         """Attack a building, dealing damage"""
         if building and hasattr(building, 'take_damage'):
             # Melee attack by default
-            building.take_damage(self.damage)
+            building.take_damage(self.damage, world)
             self.on_attack(building)
+    
+    def attack_survivor(self, survivor, world=None):
+        """Attack a survivor, dealing damage"""
+        if survivor and survivor.alive and hasattr(survivor, 'take_damage'):
+            # Melee attack
+            survivor.take_damage(self.damage)
+            self.on_attack_survivor(survivor)
     
     def take_damage(self, amount: int):
         """Apply damage to enemy"""
@@ -344,6 +442,8 @@ class Enemy(pygame.sprite.Sprite):
             # Release attack slot on death
             if self.target_building and hasattr(self.target_building, 'release_attack_slot'):
                 self.target_building.release_attack_slot()
+            # Clear survivor target
+            self.target_survivor = None
             self.on_death()
     
     def heal(self, amount: int):
@@ -371,6 +471,10 @@ class Enemy(pygame.sprite.Sprite):
     
     def on_attack(self, building):
         """Called when enemy attacks a building"""
+        pass
+    
+    def on_attack_survivor(self, survivor):
+        """Called when enemy attacks a survivor"""
         pass
     
     def draw(self, surface: pygame.Surface):

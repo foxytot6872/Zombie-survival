@@ -57,7 +57,7 @@ class Spawner:
         if "batch_size" in spawn_config:
             self.batch_size = spawn_config["batch_size"]
     
-    def update(self, dt: float, enemy_group: pygame.sprite.Group):
+    def update(self, dt: float, enemy_group: pygame.sprite.Group, world=None):
         """Update spawner and spawn enemies if needed"""
         if not self.active or self.done:
             return
@@ -68,15 +68,21 @@ class Spawner:
             self.active = False
             return
         
+        # Apply zombie spawn rate modifier from day events
+        effective_interval = self.spawn_interval
+        if world and hasattr(world, 'modifiers'):
+            spawn_mult = world.modifiers.get("zombie_spawn_mult", 1.0)
+            effective_interval = self.spawn_interval / spawn_mult  # Lower interval = faster spawning
+        
         # Update spawn timer
         self.spawn_timer += dt
         
         # Spawn batch if interval elapsed
-        if self.spawn_timer >= self.spawn_interval:
-            self._spawn_batch(enemy_group)
+        if self.spawn_timer >= effective_interval:
+            self._spawn_batch(enemy_group, world)
             self.spawn_timer = 0.0
     
-    def _spawn_batch(self, enemy_group: pygame.sprite.Group):
+    def _spawn_batch(self, enemy_group: pygame.sprite.Group, world=None):
         """Spawn a batch of enemies"""
         batch_count = 0
         
@@ -101,6 +107,18 @@ class Spawner:
                     spawn_pos = (spawn_x, self.spawn_y - batch_count * 20)  # Stagger vertically
                     
                     enemy = enemy_class(spawn_pos)
+                    
+                    # Apply day event modifiers to enemy
+                    if world and hasattr(world, 'modifiers'):
+                        # Apply speed modifier
+                        speed_mult = world.modifiers.get("zombie_speed_mult", 1.0)
+                        enemy.speed *= speed_mult
+                        
+                        # Apply HP modifier
+                        hp_mult = world.modifiers.get("zombie_hp_mult", 1.0)
+                        enemy.max_hp = int(enemy.max_hp * hp_mult)
+                        enemy.hp = enemy.max_hp  # Set current HP to max
+                    
                     enemy_group.add(enemy)
                     
                     self.spawned_counts[enemy_type] += 1

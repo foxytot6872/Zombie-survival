@@ -24,7 +24,8 @@ class BallisticTurret(Building):
         # Adjust timing by tweaking ANIMATION_DELAY (animation speed) or shot_delay (pause between shots).
         self.shot_delay = 500  # milliseconds - delay after animation before next shot (0.5 seconds)
         self.cooldown = 0  # placeholder until animation frames are loaded
-        self.range = 200  # pixels - increased for better gameplay
+        self.base_range = 200  # pixels - increased for better gameplay
+        self.range = self.base_range  # Will be modified by day events
         self.damage = 10  # damage per shot
         self.projectile_speed = 400.0  # pixels per second
         self.angle = 0  # Current rotation angle in degrees
@@ -47,7 +48,8 @@ class BallisticTurret(Building):
         # Store the current turret image
         self.turret_image = self.animation_list[self.frame_index]
         self.animation_duration = len(self.animation_list) * c.ANIMATION_DELAY
-        self.cooldown = self.animation_duration + self.shot_delay  # milliseconds - animation + delay
+        self.base_cooldown = self.animation_duration + self.shot_delay  # milliseconds - animation + delay
+        self.cooldown = self.base_cooldown  # Will be modified by day events
         
         # Current target enemy
         self.target_enemy = None
@@ -229,6 +231,25 @@ class BallisticTurret(Building):
     
     def update(self, dt: float, world=None):
         """Update turret - building logic first, then turret-specific logic"""
+        # Apply turret fire rate modifier from day events
+        if world and hasattr(world, 'modifiers'):
+            fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
+            self.cooldown = int(self.base_cooldown * fire_rate_mult)
+            
+            # Apply turret range modifier from day events
+            range_mult = world.modifiers.get("turret_range_mult", 1.0)
+            new_range = int(self.base_range * range_mult)
+            if new_range != self.range:
+                self.range = new_range
+                # Recreate range circle if range changed
+                self.range_image = pygame.Surface((self.range * 2, self.range * 2), pygame.SRCALPHA)
+                pygame.draw.circle(self.range_image, (100, 100, 100, 100), (self.range, self.range), self.range)
+                self.range_rect = self.range_image.get_rect()
+                self.update_range_position()  # Update position to match turret
+        else:
+            self.cooldown = self.base_cooldown
+            self.range = self.base_range
+        
         # Call parent update for construction/production
         super().update(dt, world)
         

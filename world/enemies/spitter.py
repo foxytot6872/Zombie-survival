@@ -74,7 +74,9 @@ class SpitterZombie(Enemy):
                 self.projectile_group.add(projectile)
         elif distance <= 32:  # Close range - melee attack
             # Melee attack if close
-            building.take_damage(self.damage)
+            # Pass world for damage modifiers
+            world = getattr(self, 'world', None)
+            building.take_damage(self.damage, world)
         
         self.on_attack(building)
 

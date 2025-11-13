@@ -1,0 +1,23 @@
+{
+    "sawmill_unlock": {
+        "name": "Unlock Sawmill",
+        "cost_coins": 25,
+        "unlocks": ["sawmill"]
+    },
+    "smelter_unlock": {
+        "name": "Unlock Smelter",
+        "cost_coins": 40,
+        "unlocks": ["smelter"]
+    },
+    "turret_t2": {
+        "name": "Tier 2 Turret",
+        "cost_coins": 60,
+        "unlocks": ["turret_lv2"]
+    },
+    "railgun_turret": {
+        "name": "Railgun Turret",
+        "cost_coins": 100,
+        "unlocks": ["railgun_turret"]
+    }
+}
+

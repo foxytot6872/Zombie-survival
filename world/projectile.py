@@ -60,6 +60,8 @@ class Projectile(pygame.sprite.Sprite):
                 for enemy in enemy_group:
                     if enemy.alive and self.rect.colliderect(enemy.rect):
                         # Hit enemy
+                        # Pass world for modifiers if available
+                        world = getattr(self, 'world', None)
                         enemy.take_damage(self.damage)
                         self.hit = True
                         self.active = False
@@ -73,7 +75,9 @@ class Projectile(pygame.sprite.Sprite):
                         self.rect.colliderect(building.rect)):
                         # Hit building
                         if hasattr(building, 'take_damage'):
-                            building.take_damage(self.damage)
+                            # Pass world for damage modifiers
+                            world = getattr(self, 'world', None)
+                            building.take_damage(self.damage, world)
                         self.hit = True
                         self.active = False
                         return

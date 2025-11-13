@@ -1,7 +1,7 @@
 ﻿import pygame
 import json
 import constants as c
-from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Housing, Farm, Sawmill, Smelter, WallWood, WallIron
+from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie
 from world.spawner import Spawner
 from world.projectile import Projectile
@@ -15,11 +15,15 @@ from core.wave_manager import WaveManager
 from core.game_state import GameState, GameStateManager
 from core.save_system import SaveSystem
 from core.sound import SoundSystem
+from core.day_events import DayEventManager
 # UI components
 from ui.game_over import GameOverScreen
 from ui.pause_menu import PauseMenu
 from ui.building_panel import BuildingPanel
 from ui.hud import HUD
+from ui.research_button import ResearchButton
+from ui.research_panel import ResearchPanel
+from world.research import ResearchManager
 # Nodes and survivors
 from world.nodes import TreePatch, ScrapPile, spawn_daily_nodes
 from world.survivor import Worker, Guard
@@ -55,19 +59,26 @@ def load_image_or_placeholder(path, size, fill_color=(100, 100, 100, 255), label
 # Load images
 ###################
 # Turret images
+frame_width = 32 * c.ANIMATION_STEPS
 turret_sheet_lv1 = load_image_or_placeholder(
     'asset/Turret_lv1.png',
-    (32 * c.ANIMATION_STEPS, 32),
+    (frame_width, 32),
     (150, 150, 150, 255),
     "Ballistic turret sprite sheet Lv1"
 )
 turret_sheet_lv2 = load_image_or_placeholder(
     'asset/Turret_lv2.png',
-    (32 * c.ANIMATION_STEPS, 32),
+    (frame_width, 32),
     (160, 150, 150, 255),
     "Ballistic turret sprite sheet Lv2"
 )
-turret_sprite_sheets = [turret_sheet_lv1, turret_sheet_lv2]
+turret_sheet_lv3 = load_image_or_placeholder(
+    'asset/Turret_lv3.png',
+    (frame_width, 32),
+    (170, 150, 150, 255),
+    "Ballistic turret sprite sheet Lv3"
+)
+turret_sprite_sheets = [turret_sheet_lv1, turret_sheet_lv2, turret_sheet_lv3]
 turret_base_lv1 = load_image_or_placeholder(
     'asset/Base_lv1.png',
     (32, 32),
@@ -88,6 +99,51 @@ turret_base_lv3 = load_image_or_placeholder(
 )
 turret_base_images = [turret_base_lv1, turret_base_lv2, turret_base_lv3]
 
+# Railgun (Piercer) turret base images
+railgun_base_lv1 = load_image_or_placeholder(
+    'asset/Railgunbase_lv1.png',
+    (32, 32),
+    (120, 100, 100, 255),
+    "Railgun turret base Lv1"
+)
+railgun_base_lv2 = load_image_or_placeholder(
+    'asset/Railgunbase_lv2.png',
+    (32, 32),
+    (130, 110, 110, 255),
+    "Railgun turret base Lv2"
+)
+railgun_base_lv3 = load_image_or_placeholder(
+    'asset/Railgunbase_lv3.png',
+    (32, 32),
+    (140, 120, 120, 255),
+    "Railgun turret base Lv3"
+)
+railgun_base_images = [railgun_base_lv1, railgun_base_lv2, railgun_base_lv3]
+
+# Railgun (Piercer) turret sprite sheets (8 frames, 64x64 each)
+railgun_frame_size = 64
+railgun_sheet_width = railgun_frame_size * c.ANIMATION_STEPS  # 8 frames * 64 = 512
+railgun_sheet_lv1 = load_image_or_placeholder(
+    'asset/Railgunturret_lv1.png',
+    (railgun_sheet_width, railgun_frame_size),
+    (150, 100, 100, 255),
+    "Railgun turret sprite sheet Lv1"
+)
+railgun_sheet_lv2 = load_image_or_placeholder(
+    'asset/Railgunturret_lv2.png',
+    (railgun_sheet_width, railgun_frame_size),
+    (150, 100, 100, 255),
+    "Railgun turret sprite sheet Lv2"
+)
+railgun_sheet_lv3 = load_image_or_placeholder(
+    'asset/Railgunturret_lv3.png',
+    (railgun_sheet_width, railgun_frame_size),
+    (150, 100, 100, 255),
+    "Railgun turret sprite sheet Lv3"
+)
+# Use lv1 for tier 1, lv2 for tier 2, and lv1 for tier 3 until lv3 is added
+railgun_sprite_sheets = [railgun_sheet_lv1, railgun_sheet_lv2, railgun_sheet_lv3]
+
 # Gatling turret images (static image, not a sprite sheet)
 try:
     gatling_base = pygame.image.load('asset/Gatling_Base_lv1.png').convert_alpha()
@@ -99,6 +155,63 @@ except:
     gatling_image = pygame.Surface((32, 32), pygame.SRCALPHA)
     gatling_image.fill((180, 160, 140))
     print("Warning: Gatling turret assets not found, using placeholder")
+
+# Zombie sprite sheet (32 frames, 48x48 each)
+zombie_sprite_sheet = load_image_or_placeholder(
+    'asset/Zombie_Normal_Sheet.png',
+    (48 * 32, 48),  # 32 frames * 48 pixels = 1536 pixels wide, 48 pixels tall
+    (100, 150, 100, 255),
+    "Zombie Normal sprite sheet"
+)
+
+# Set sprite sheet for BasicZombie class
+BasicZombie.sprite_sheet = zombie_sprite_sheet
+
+
+# HQ building image
+hq_image = load_image_or_placeholder(
+    'asset/base.png',
+    (64, 64),  # 2x2 tile building
+    (50, 100, 150, 255),
+    "HQ building image"
+)
+
+# Set image for HQ class
+HQ.building_image = hq_image
+
+# Upgrade panel image - extract 3 frames (384x386 each)
+upgrade_panel_sheet = load_image_or_placeholder(
+    'asset/upgrade_1-2_panel.png',
+    (384 * 3, 386),  # 3 frames * 384 pixels = 1152 pixels wide, 386 pixels tall
+    (100, 100, 100, 255),
+    "Upgrade panel sprite sheet"
+)
+# Extract 3 frames from the sheet
+upgrade_panel_frames = []
+if upgrade_panel_sheet:
+    frame_width = 384
+    frame_height = 386
+    for i in range(3):
+        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+        frame = upgrade_panel_sheet.subsurface(frame_rect)
+        upgrade_panel_frames.append(frame)
+
+# Upgrade panel darkened image - extract 3 frames (384x386 each)
+upgrade_panel_darken_sheet = load_image_or_placeholder(
+    'asset/upgrade_1-2_panel_darken.png',
+    (384 * 3, 386),  # 3 frames * 384 pixels = 1152 pixels wide, 386 pixels tall
+    (100, 100, 100, 255),
+    "Upgrade panel darkened sprite sheet"
+)
+# Extract 3 frames from the darkened sheet
+upgrade_panel_darken_frames = []
+if upgrade_panel_darken_sheet:
+    frame_width = 384
+    frame_height = 386
+    for i in range(3):
+        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+        frame = upgrade_panel_darken_sheet.subsurface(frame_rect)
+        upgrade_panel_darken_frames.append(frame)
 
 # Grass tile images
 try:
@@ -232,6 +345,25 @@ class World:
         self.sound_system = sound_system
         self.wave_manager = wave_manager
         self.pathfinding = pathfinding
+        
+        # Day event modifiers (initialized to neutral values)
+        self.modifiers = {
+            "resource_prod_mult": 1.0,
+            "coin_drop_mult": 1.0,
+            "build_cost_mult": 1.0,
+            "turret_fire_rate_mult": 1.0,
+            "building_damage_taken_mult": 1.0,
+            "zombie_spawn_mult": 1.0,
+            "zombie_speed_mult": 1.0,
+            "zombie_hp_mult": 1.0,
+            "turret_range_mult": 1.0,
+            "node_spawn_bonus": False,
+            "lightning_storm": False,
+        }
+        
+        # Day event manager (will be set after initialization)
+        self.day_events = None
+        self.hud = None
         self.nodes = node_group if node_group else pygame.sprite.Group()
         self.survivor_group = survivor_group if survivor_group else pygame.sprite.Group()
     
@@ -297,6 +429,10 @@ survivor_group = pygame.sprite.Group()
 # Initialize world (wave_manager will be added after initialization)
 world = World(resources, grid, enemy_group=enemy_group, projectile_group=projectile_group, building_group=building_group, sound_system=sound_system, pathfinding=pathfinding, node_group=node_group, survivor_group=survivor_group)
 
+# Initialize research system (needed before building buttons)
+research_manager = ResearchManager(world)
+world.research = research_manager
+
 # Initialize wave manager
 wave_manager = WaveManager(world, waves_config, difficulty="normal")
 # Update world with wave_manager reference
@@ -304,9 +440,19 @@ world.wave_manager = wave_manager
 
 # Initialize UI components
 hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+# Set HUD reference in world for day events
+world.hud = hud
+
+# Initialize day event manager
+day_event_manager = DayEventManager(world)
+world.day_events = day_event_manager
 game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames)
+
+# Initialize research UI
+research_panel = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+research_button = ResearchButton(10, 10, 120, 40, research_panel.toggle)
 
 # Set UI callbacks
 def load_startup_cfg():
@@ -444,89 +590,54 @@ def create_organic_wall_shape(cfg_wall, start_cx, wall_row, W_TILES, H_TILES):
     return wall_positions, gate_positions
 
 def spawn_starting_layout():
-    """Spawn starting layout: HQ behind wall, organic north wall, gate, and turrets"""
+    """Spawn starting layout: HQ in center, walls surrounding it, gate, and turrets outside"""
     global building_group, grid, turret_group, world
     
-    cfg = load_startup_cfg()
     TILE = grid.TILE
     W_TILES = grid.width
     H_TILES = grid.height
     
-    # Update grid's upper_fraction if specified in config
-    if "upper_fraction" in cfg:
-        grid.upper_fraction = cfg["upper_fraction"]
-    
-    # --- Compute split row (tile index) ---
-    split_y_px = grid.get_split_y_px()
-    split_row = grid.px_to_tile(split_y_px)
-    
-    # --- North wall line (near split) ---
-    wall_cfg = cfg.get("north_wall", {})
-    y_off = int(wall_cfg.get("y_offset_tiles", 1))
-    wall_row = max(0, min(H_TILES - 1, split_row - 1 - y_off))  # 1 tile above split by default
-    
-    start_cx = W_TILES // 2
-    
-    # Create organic wall shape
-    wall_positions, gate_positions = create_organic_wall_shape(
-        wall_cfg, start_cx, wall_row, W_TILES, H_TILES
-    )
+    # Center of screen
+    center_x = W_TILES // 2
+    center_y = H_TILES // 2
     
     # Import building classes
     from world.buildings.wall_wood import WallWood
     from world.buildings.gate import Gate
     
-    # Place walls (organic shape)
-    walls_placed = []
-    for gx, gy in wall_positions:
-        # Ensure position is valid
-        if 0 <= gx < W_TILES and 0 <= gy < H_TILES:
-            w = WallWood((gx, gy), tier=1)
-            w.state = BuildState.ACTIVE  # Start completed
-            w.hp = w.max_hp
-            w.progress = w.BUILD_TIME
-            w.world = world  # Set world reference
-            building_group.add(w)
-            grid.set_footprint_blocked((gx, gy), WallWood.FOOTPRINT, True)
-            walls_placed.append((gx, gy))
+    # --- Wall compound dimensions (15x8 rectangle) ---
+    compound_width = 15  # 15 tiles wide
+    compound_height = 8  # 8 tiles high
     
-    # After all walls are placed, refresh all wall variants so they see their neighbors
-    for gx, gy in walls_placed:
-        world.autotile_wall_and_neighbors(gx, gy)
+    # Center the compound on screen
+    compound_left = center_x - compound_width // 2
+    compound_right = compound_left + compound_width - 1
+    compound_top = center_y - compound_height // 2
+    compound_bottom = compound_top + compound_height - 1
     
-    # Place gate
-    for gx, gy in gate_positions:
-        if 0 <= gx < W_TILES and 0 <= gy < H_TILES:
-            g = Gate((gx, gy), tier=1)
-            g.state = BuildState.ACTIVE  # Start completed
-            g.hp = g.max_hp
-            g.progress = g.BUILD_TIME
-            building_group.add(g)
-            grid.set_footprint_blocked((gx, gy), Gate.FOOTPRINT, True)
+    # Ensure compound fits on screen (adjust if needed, but keep symmetric)
+    if compound_left < 2:
+        offset = 2 - compound_left
+        compound_left += offset
+        compound_right += offset
+    if compound_right >= W_TILES - 2:
+        offset = (W_TILES - 2) - compound_right
+        compound_left += offset
+        compound_right += offset
+    if compound_top < 2:
+        offset = 2 - compound_top
+        compound_top += offset
+        compound_bottom += offset
+    if compound_bottom >= H_TILES - 2:
+        offset = (H_TILES - 2) - compound_bottom
+        compound_top += offset
+        compound_bottom += offset
     
-    # Find the southernmost wall position (for HQ placement behind wall)
-    if wall_positions:
-        max_wall_y = max(gy for _, gy in wall_positions)
-        if gate_positions:
-            max_wall_y = max(max_wall_y, max(gy for _, gy in gate_positions))
-    else:
-        max_wall_y = wall_row
-    
-    print(f"North wall placed (organic shape) with {len(wall_positions)} segments")
-    print(f"Gate placed at {len(gate_positions)} tiles, max wall Y: {max_wall_y}")
-    
-    # --- HQ placement (behind wall) ---
-    hq_cfg = cfg.get("hq", {})
-    behind_offset = int(hq_cfg.get("behind_wall_offset_tiles", 8))
-    center_x_offset = int(hq_cfg.get("center_x_offset_tiles", 0))
-    
+    # --- HQ placement (centered in compound) ---
+    # Place HQ in the center of the compound
     hq_w, hq_h = HQ.FOOTPRINT
-    hq_gx = start_cx + center_x_offset - hq_w // 2
-    hq_gy = max_wall_y + behind_offset
-    
-    # Ensure HQ fits on screen
-    hq_gy = min(H_TILES - hq_h, hq_gy)
-    hq_gx = max(0, min(W_TILES - hq_w, hq_gx))
+    hq_gx = compound_left + (compound_width - hq_w) // 2
+    hq_gy = compound_top + (compound_height - hq_h) // 2
     
     hq = HQ((hq_gx, hq_gy), tier=1)
     building_group.add(hq)
@@ -536,44 +647,151 @@ def spawn_starting_layout():
     if 'world' in globals():
         world.hq = hq
     
-    print(f"HQ spawned at grid position ({hq_gx}, {hq_gy}) - behind wall")
+    print(f"HQ spawned at grid position ({hq_gx}, {hq_gy}) - center")
+    print(f"Compound: left={compound_left}, right={compound_right}, top={compound_top}, bottom={compound_bottom}")
     
-    # --- Turret pads (behind wall, symmetric) ---
-    turret_cfg = cfg.get("turret_pads", {})
-    pad_off_y = int(turret_cfg.get("behind_wall_offset_tiles", 3))
-    pad_row = min(H_TILES - 1, max_wall_y + pad_off_y)
+    # --- Place walls surrounding HQ ---
+    walls_placed = []
     
-    # Use existing turret images (loaded at startup)
+    # Top wall
+    for gx in range(compound_left, compound_right + 1):
+        if 0 <= gx < W_TILES and 0 <= compound_top < H_TILES:
+            w = WallWood((gx, compound_top), tier=1)
+            w.state = BuildState.ACTIVE
+            w.hp = w.max_hp
+            w.progress = w.BUILD_TIME
+            w.world = world
+            building_group.add(w)
+            grid.set_footprint_blocked((gx, compound_top), WallWood.FOOTPRINT, True)
+            walls_placed.append((gx, compound_top))
+    
+    # Bottom wall
+    for gx in range(compound_left, compound_right + 1):
+        if 0 <= gx < W_TILES and 0 <= compound_bottom < H_TILES:
+            w = WallWood((gx, compound_bottom), tier=1)
+            w.state = BuildState.ACTIVE
+            w.hp = w.max_hp
+            w.progress = w.BUILD_TIME
+            w.world = world
+            building_group.add(w)
+            grid.set_footprint_blocked((gx, compound_bottom), WallWood.FOOTPRINT, True)
+            walls_placed.append((gx, compound_bottom))
+    
+    # Left wall (excluding corners already placed)
+    for gy in range(compound_top + 1, compound_bottom):
+        if 0 <= compound_left < W_TILES and 0 <= gy < H_TILES:
+            w = WallWood((compound_left, gy), tier=1)
+            w.state = BuildState.ACTIVE
+            w.hp = w.max_hp
+            w.progress = w.BUILD_TIME
+            w.world = world
+            building_group.add(w)
+            grid.set_footprint_blocked((compound_left, gy), WallWood.FOOTPRINT, True)
+            walls_placed.append((compound_left, gy))
+    
+    # Right wall (excluding corners already placed)
+    for gy in range(compound_top + 1, compound_bottom):
+        if 0 <= compound_right < W_TILES and 0 <= gy < H_TILES:
+            w = WallWood((compound_right, gy), tier=1)
+            w.state = BuildState.ACTIVE
+            w.hp = w.max_hp
+            w.progress = w.BUILD_TIME
+            w.world = world
+            building_group.add(w)
+            grid.set_footprint_blocked((compound_right, gy), WallWood.FOOTPRINT, True)
+            walls_placed.append((compound_right, gy))
+    
+    # After all walls are placed, refresh all wall variants so they see their neighbors
+    for gx, gy in walls_placed:
+        world.autotile_wall_and_neighbors(gx, gy)
+    
+    print(f"Walls placed: {len(walls_placed)} segments forming compound")
+    
+    # --- Place gate (bottom side, center) ---
+    gate_gx = center_x
+    gate_gy = compound_bottom
+    if 0 <= gate_gx < W_TILES and 0 <= gate_gy < H_TILES:
+        # Remove wall at gate position if it exists
+        for gx, gy in walls_placed[:]:
+            if gx == gate_gx and gy == gate_gy:
+                # Find and remove the wall building
+                for building in building_group:
+                    if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                        building.grid_x == gate_gx and building.grid_y == gate_gy and
+                        isinstance(building, WallWood)):
+                        building_group.remove(building)
+                        grid.set_footprint_blocked((gate_gx, gate_gy), WallWood.FOOTPRINT, False)
+                        walls_placed.remove((gate_gx, gate_gy))
+                        break
+        
+        g = Gate((gate_gx, gate_gy), tier=1)
+        g.state = BuildState.ACTIVE
+        g.hp = g.max_hp
+        g.progress = g.BUILD_TIME
+        building_group.add(g)
+        grid.set_footprint_blocked((gate_gx, gate_gy), Gate.FOOTPRINT, True)
+        print(f"Gate placed at ({gate_gx}, {gate_gy})")
+    
+    # --- Place turrets outside walls ---
     global turret_sprite_sheets, turret_base_images
     
-    # Main turrets near gate
-    for dx in turret_cfg.get("x_offsets_from_gate", [-6, 6]):
-        gx = start_cx + int(dx)
-        if 0 <= gx < W_TILES and 0 <= pad_row < H_TILES:
-            t = BallisticTurret((gx, pad_row), turret_sprite_sheets, turret_base_images, tier=1)
+    # Turret positions outside the compound (one tile away from walls)
+    turret_offset = 2  # tiles outside the wall
+    
+    # Top turrets
+    for dx in [-3, 0, 3]:
+        turret_gx = center_x + dx
+        turret_gy = compound_top - turret_offset
+        if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
+            t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
             t.state = BuildState.ACTIVE
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
             building_group.add(t)
             turret_group.add(t)
-            grid.set_footprint_blocked((gx, pad_row), BallisticTurret.FOOTPRINT, True)
-            print(f"Turret placed at ({gx}, {pad_row})")
+            grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
+            print(f"Turret placed at ({turret_gx}, {turret_gy}) - top")
     
-    # Additional turrets (if configured)
-    for turret_def in turret_cfg.get("additional_turrets", []):
-        t_x = start_cx + int(turret_def.get("x_offset", 0))
-        t_y = pad_row + int(turret_def.get("y_offset", 0))
-        if 0 <= t_x < W_TILES and 0 <= t_y < H_TILES:
-            t = BallisticTurret((t_x, t_y), turret_sprite_sheets, turret_base_images, tier=1)
+    # Bottom turrets (avoid gate area)
+    for dx in [-4, 4]:
+        turret_gx = center_x + dx
+        turret_gy = compound_bottom + turret_offset
+        if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
+            t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
             t.state = BuildState.ACTIVE
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
             building_group.add(t)
             turret_group.add(t)
-            grid.set_footprint_blocked((t_x, t_y), BallisticTurret.FOOTPRINT, True)
-            print(f"Additional turret placed at ({t_x}, {t_y})")
+            grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
+            print(f"Turret placed at ({turret_gx}, {turret_gy}) - bottom")
     
-    print(f"Starting layout spawned: HQ at ({hq_gx}, {hq_gy}), organic wall with gate, turrets behind wall")
+    # Side turrets
+    turret_gx = compound_left - turret_offset
+    turret_gy = center_y
+    if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
+        t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
+        t.state = BuildState.ACTIVE
+        t.hp = t.max_hp
+        t.progress = t.BUILD_TIME
+        building_group.add(t)
+        turret_group.add(t)
+        grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
+        print(f"Turret placed at ({turret_gx}, {turret_gy}) - left")
+    
+    turret_gx = compound_right + turret_offset
+    turret_gy = center_y
+    if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
+        t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
+        t.state = BuildState.ACTIVE
+        t.hp = t.max_hp
+        t.progress = t.BUILD_TIME
+        building_group.add(t)
+        turret_group.add(t)
+        grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
+        print(f"Turret placed at ({turret_gx}, {turret_gy}) - right")
+    
+    print(f"Starting layout spawned: HQ at center ({hq_gx}, {hq_gy}), walls surrounding, gate at bottom, turrets outside")
     
     # Update pathfinding building group reference (after all buildings are placed)
     if 'pathfinding' in globals():
@@ -608,8 +826,8 @@ def spawn_initial_workers():
     print(f"Spawned {3} workers near HQ")
 
 def spawn_daily_resource_nodes():
-    """Spawn daily resource nodes in upper zone"""
-    global node_group, world, grid
+    """Spawn daily resource nodes in clusters around the starting structure"""
+    global node_group, world, grid, building_group
     
     # Load nodes config
     try:
@@ -623,15 +841,272 @@ def spawn_daily_resource_nodes():
             "daily_spawn": {"trees": 4, "scrap": 3, "min_dist_from_wall_px": 96}
         }
     
-    # Define upper zone (top 1/3 of screen)
-    upper_zone_rect = pygame.Rect(0, 0, c.SCREEN_WIDTH, c.SCREEN_HEIGHT // 3)
+    # Find HQ and calculate actual compound bounds from walls
+    hq_pos = None
+    compound_bounds = None
+    TILE = 32
     
-    # Spawn nodes
-    new_nodes = spawn_daily_nodes(world, nodes_config, upper_zone_rect, grid)
+    # Find walls to determine compound bounds
+    wall_positions = []
+    for building in building_group:
+        if isinstance(building, HQ):
+            hq_pos = (building.grid_x, building.grid_y)
+        # Check for walls (WallWood, WallIron, or Wall)
+        from world.buildings.wall_wood import WallWood
+        from world.buildings.wall_iron import WallIron
+        if isinstance(building, (WallWood, WallIron, Wall)):
+            if hasattr(building, 'grid_x') and hasattr(building, 'grid_y'):
+                wall_positions.append((building.grid_x, building.grid_y))
+    
+    if not hq_pos:
+        # Fallback to upper zone if HQ not found
+        upper_zone_rect = pygame.Rect(0, 0, c.SCREEN_WIDTH, c.SCREEN_HEIGHT // 3)
+        new_nodes = spawn_daily_nodes(world, nodes_config, upper_zone_rect, grid)
+        for node in new_nodes:
+            node_group.add(node)
+        print(f"Spawned {len(new_nodes)} resource nodes in upper zone (fallback)")
+        return
+    
+    # Calculate compound bounds from walls (in grid coordinates)
+    if wall_positions:
+        min_wall_x = min(gx for gx, gy in wall_positions)
+        max_wall_x = max(gx for gx, gy in wall_positions)
+        min_wall_y = min(gy for gx, gy in wall_positions)
+        max_wall_y = max(gy for gx, gy in wall_positions)
+        
+        # Add padding to get outside the walls
+        compound_bounds = {
+            'left': min_wall_x - 1,
+            'right': max_wall_x + 1,
+            'top': min_wall_y - 1,
+            'bottom': max_wall_y + 1
+        }
+    else:
+        # Fallback: estimate from HQ
+        for building in building_group:
+            if isinstance(building, HQ):
+                compound_bounds = {
+                    'left': building.grid_x - 8,
+                    'right': building.grid_x + building.FOOTPRINT[0] + 8,
+                    'top': building.grid_y - 8,
+                    'bottom': building.grid_y + building.FOOTPRINT[1] + 8
+                }
+                break
+    
+    # Get daily spawn config
+    daily_spawn = nodes_config.get("daily_spawn", {"trees": 4, "scrap": 3, "min_dist_from_wall_px": 96})
+    num_trees = daily_spawn.get("trees", 4)
+    num_scrap = daily_spawn.get("scrap", 3)
+    
+    # Apply node spawn bonus from day events
+    if hasattr(world, 'modifiers') and world.modifiers.get("node_spawn_bonus", False):
+        num_trees += 2  # Bonus trees
+        num_scrap += 2  # Bonus scrap
+    
+    # Load node configs
+    tree_config = None
+    scrap_config = None
+    try:
+        tree_data = nodes_config.get("tree_patch", {})
+        from world.nodes import NodeConfig
+        tree_config = NodeConfig(
+            resource=tree_data.get("resource", "wood"),
+            yield_total=tree_data.get("yield_total", 120),
+            gather_per_tick=tree_data.get("gather_per_tick", 6),
+            tick_sec=tree_data.get("tick_sec", 0.6)
+        )
+        scrap_data = nodes_config.get("scrap_pile", {})
+        scrap_config = NodeConfig(
+            resource=scrap_data.get("resource", "iron"),
+            yield_total=scrap_data.get("yield_total", 100),
+            gather_per_tick=scrap_data.get("gather_per_tick", 5),
+            tick_sec=scrap_data.get("tick_sec", 0.7)
+        )
+    except:
+        pass
+    
+    new_nodes = []
+    
+    # Define cluster areas around the compound (4 quadrants + corners)
+    # Each cluster will have nodes of the same type
+    # Convert grid positions to pixel positions for cluster centers
+    cluster_distance = 10  # tiles from compound edge
+    cluster_areas = [
+        # Top-left cluster (trees) - in pixels
+        {'center_px': ((compound_bounds['left'] - cluster_distance) * TILE, 
+                       (compound_bounds['top'] - cluster_distance) * TILE), 
+         'radius_px': 80, 'type': 'tree'},
+        # Top-right cluster (scrap)
+        {'center_px': ((compound_bounds['right'] + cluster_distance) * TILE, 
+                       (compound_bounds['top'] - cluster_distance) * TILE), 
+         'radius_px': 80, 'type': 'scrap'},
+        # Bottom-left cluster (scrap)
+        {'center_px': ((compound_bounds['left'] - cluster_distance) * TILE, 
+                       (compound_bounds['bottom'] + cluster_distance) * TILE), 
+         'radius_px': 80, 'type': 'scrap'},
+        # Bottom-right cluster (trees)
+        {'center_px': ((compound_bounds['right'] + cluster_distance) * TILE, 
+                       (compound_bounds['bottom'] + cluster_distance) * TILE), 
+         'radius_px': 80, 'type': 'tree'},
+    ]
+    
+    # Spawn nodes in clusters
+    import random
+    from world.nodes import TreePatch, ScrapPile
+    
+    trees_spawned = 0
+    scrap_spawned = 0
+    
+    for cluster in cluster_areas:
+        cluster_x_px, cluster_y_px = cluster['center_px']
+        radius_px = cluster['radius_px']
+        cluster_type = cluster['type']
+        
+        # Determine how many nodes to spawn in this cluster
+        if cluster_type == 'tree' and trees_spawned < num_trees:
+            nodes_in_cluster = min(2, num_trees - trees_spawned)  # 2 nodes per tree cluster
+        elif cluster_type == 'scrap' and scrap_spawned < num_scrap:
+            nodes_in_cluster = min(2, num_scrap - scrap_spawned)  # 2 nodes per scrap cluster
+        else:
+            continue
+        
+        for _ in range(nodes_in_cluster):
+            # Try to find a valid position in the cluster (in pixels)
+            for attempt in range(30):
+                offset_x_px = random.randint(-radius_px, radius_px)
+                offset_y_px = random.randint(-radius_px, radius_px)
+                node_x_px = cluster_x_px + offset_x_px
+                node_y_px = cluster_y_px + offset_y_px
+                
+                # Convert to grid for collision checking
+                node_gx = int(node_x_px // TILE)
+                node_gy = int(node_y_px // TILE)
+                
+                # Ensure position is valid and not too close to compound
+                if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                    not grid.is_blocked(node_gx, node_gy) and
+                    (node_gx < compound_bounds['left'] - 2 or node_gx > compound_bounds['right'] + 2 or
+                     node_gy < compound_bounds['top'] - 2 or node_gy > compound_bounds['bottom'] + 2)):
+                    
+                    # Check distance from existing nodes (using pixel positions)
+                    too_close = False
+                    node_pos = pygame.Vector2(node_x_px, node_y_px)
+                    min_node_dist = 96  # 3 tiles in pixels
+                    for existing_node in list(node_group) + new_nodes:
+                        if hasattr(existing_node, 'pos'):
+                            dist = (node_pos - existing_node.pos).length()
+                            if dist < min_node_dist:
+                                too_close = True
+                                break
+                    
+                    if not too_close:
+                        # Spawn the node using pixel position
+                        # Note: TreePatch automatically picks a random texture variant on creation
+                        if cluster_type == 'tree' and tree_config:
+                            node = TreePatch((node_x_px, node_y_px), tree_config)
+                            new_nodes.append(node)
+                            trees_spawned += 1
+                            break
+                        elif cluster_type == 'scrap' and scrap_config:
+                            node = ScrapPile((node_x_px, node_y_px), scrap_config)
+                            new_nodes.append(node)
+                            scrap_spawned += 1
+                            break
+    
+    # Add remaining nodes randomly around the compound if we didn't spawn enough
+    if trees_spawned < num_trees:
+        remaining = num_trees - trees_spawned
+        for _ in range(remaining * 20):  # Try multiple times
+            if trees_spawned >= num_trees:
+                break
+            # Random position around compound (in pixels)
+            side = random.choice(['top', 'bottom', 'left', 'right'])
+            if side == 'top':
+                node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
+                                           (compound_bounds['right'] + 10) * TILE)
+                node_y_px = (compound_bounds['top'] - random.randint(5, 15)) * TILE
+            elif side == 'bottom':
+                node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
+                                           (compound_bounds['right'] + 10) * TILE)
+                node_y_px = (compound_bounds['bottom'] + random.randint(5, 15)) * TILE
+            elif side == 'left':
+                node_x_px = (compound_bounds['left'] - random.randint(5, 15)) * TILE
+                node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
+                                           (compound_bounds['bottom'] + 10) * TILE)
+            else:  # right
+                node_x_px = (compound_bounds['right'] + random.randint(5, 15)) * TILE
+                node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
+                                           (compound_bounds['bottom'] + 10) * TILE)
+            
+            node_gx = int(node_x_px // TILE)
+            node_gy = int(node_y_px // TILE)
+            
+            if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                not grid.is_blocked(node_gx, node_gy)):
+                # Check distance from existing nodes (using pixel positions)
+                too_close = False
+                node_pos = pygame.Vector2(node_x_px, node_y_px)
+                min_node_dist = 96  # 3 tiles in pixels
+                for existing_node in list(node_group) + new_nodes:
+                    if hasattr(existing_node, 'pos'):
+                        dist = (node_pos - existing_node.pos).length()
+                        if dist < min_node_dist:
+                            too_close = True
+                            break
+                if not too_close and tree_config:
+                    # TreePatch automatically uses random texture variant
+                    node = TreePatch((node_x_px, node_y_px), tree_config)
+                    new_nodes.append(node)
+                    trees_spawned += 1
+    
+    if scrap_spawned < num_scrap:
+        remaining = num_scrap - scrap_spawned
+        for _ in range(remaining * 20):
+            if scrap_spawned >= num_scrap:
+                break
+            side = random.choice(['top', 'bottom', 'left', 'right'])
+            if side == 'top':
+                node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
+                                           (compound_bounds['right'] + 10) * TILE)
+                node_y_px = (compound_bounds['top'] - random.randint(5, 15)) * TILE
+            elif side == 'bottom':
+                node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
+                                           (compound_bounds['right'] + 10) * TILE)
+                node_y_px = (compound_bounds['bottom'] + random.randint(5, 15)) * TILE
+            elif side == 'left':
+                node_x_px = (compound_bounds['left'] - random.randint(5, 15)) * TILE
+                node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
+                                           (compound_bounds['bottom'] + 10) * TILE)
+            else:
+                node_x_px = (compound_bounds['right'] + random.randint(5, 15)) * TILE
+                node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
+                                           (compound_bounds['bottom'] + 10) * TILE)
+            
+            node_gx = int(node_x_px // TILE)
+            node_gy = int(node_y_px // TILE)
+            
+            if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                not grid.is_blocked(node_gx, node_gy)):
+                # Check distance from existing nodes (using pixel positions)
+                too_close = False
+                node_pos = pygame.Vector2(node_x_px, node_y_px)
+                min_node_dist = 96  # 3 tiles in pixels
+                for existing_node in list(node_group) + new_nodes:
+                    if hasattr(existing_node, 'pos'):
+                        dist = (node_pos - existing_node.pos).length()
+                        if dist < min_node_dist:
+                            too_close = True
+                            break
+                if not too_close and scrap_config:
+                    node = ScrapPile((node_x_px, node_y_px), scrap_config)
+                    new_nodes.append(node)
+                    scrap_spawned += 1
+    
+    # Add all nodes to the group
     for node in new_nodes:
         node_group.add(node)
     
-    print(f"Spawned {len(new_nodes)} resource nodes in upper zone")
+    print(f"Spawned {len(new_nodes)} resource nodes in clusters around compound ({trees_spawned} trees, {scrap_spawned} scrap)")
 
 def restart_game():
     """Restart game"""
@@ -842,6 +1317,32 @@ def debug_complete_all_buildings():
             count += 1
     print(f"Debug: Completed {count} buildings")
 
+def debug_add_coins():
+    """Add +100 coins"""
+    resources.add_coins(100)
+    print("Debug: Added +100 coins")
+
+def debug_unlock_all_research():
+    """Unlock all research items"""
+    if world.research:
+        for key in world.research.research_defs.keys():
+            if not world.research.is_research_purchased(key):
+                world.research.unlock(key)
+        rebuild_building_buttons()
+        print("Debug: Unlocked all research")
+
+def debug_roll_day_event():
+    """Force roll a new day event"""
+    if world.day_events:
+        world.day_events.roll_new_day_event(wave_manager.day)
+        print("Debug: Rolled new day event")
+
+def debug_clear_day_event():
+    """Clear current day event and reset modifiers"""
+    if world.day_events:
+        world.day_events.clear_event()
+        print("Debug: Cleared day event, modifiers reset")
+
 # Register debug actions
 debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources)
 debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build)
@@ -851,7 +1352,12 @@ debug_system.register_action(pygame.K_F5, "Clear All Buildings", debug_clear_bui
 debug_system.register_action(pygame.K_F6, "Toggle Spawner", debug_toggle_spawner)
 debug_system.register_action(pygame.K_F7, "Kill All Enemies", debug_kill_all_enemies)
 debug_system.register_action(pygame.K_F8, "Complete All Buildings", debug_complete_all_buildings)
-# F9: Skip to night, F10: Skip to summary, F11: Cycle difficulty (handled in event loop)
+# Additional debug actions (using number keys)
+debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins)
+debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research)
+debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event)
+# F9-F11: Wave skipping (handled in event loop)
+# F12: Toggle debug mode (handled in event loop)
 
 ###################
 # Helper functions for buttons
@@ -869,8 +1375,11 @@ def create_button_image(text, color=(100, 150, 100), width=100, height=40):
 ###################
 # Create buttons for all buildings
 ###################
-button_y_start = 10
-button_spacing = 45
+# Building buttons will be horizontal at bottom left
+button_x_start = 10
+button_spacing = 105  # Width (100) + spacing (5)
+button_width = 100
+button_height = 40
 buttons = {}
 
 # Building types with their button labels and colors
@@ -878,24 +1387,51 @@ buttons = {}
 building_types = [
     (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
     (GatlingTurret, "Gatling", (200, 150, 100), gatling_image, gatling_base),
-    (PiercerTurret, "Piercer", (150, 100, 150), turret_sheet_lv1, turret_base_lv1),
+    (PiercerTurret, "Piercer", (150, 100, 150), railgun_sprite_sheets, railgun_base_images),
     (Wall, "Wall", (120, 120, 120)),
     (Gate, "Gate", (100, 100, 100)),
-    (Housing, "Housing", (150, 120, 100)),
     (Farm, "Farm", (100, 150, 100)),
     (Sawmill, "Sawmill", (139, 90, 43)),
     (Smelter, "Smelter", (150, 150, 150)),
 ]
 
-for i, (building_class, label, color, *args) in enumerate(building_types):
-    button_img = create_button_image(label, color)
-    button = Button(10, button_y_start + i * button_spacing, button_img)
-    buttons[building_class] = {
-        'button': button,
-        'label': label,
-        'color': color,
-        'args': args
-    }
+# Mapping of building classes to research unlock keys
+building_to_research = {
+    Sawmill: "sawmill",
+    Smelter: "smelter",
+    PiercerTurret: "railgun_turret",
+}
+
+# Store all building types for potential unlocking later
+all_building_types = building_types.copy()
+
+def rebuild_building_buttons():
+    """Rebuild building buttons based on current research unlocks."""
+    global buttons, button_index
+    buttons = {}
+    button_index = 0
+    
+    for building_class, label, color, *args in all_building_types:
+        # Check if building requires research unlock
+        research_key = building_to_research.get(building_class)
+        if research_key and not research_manager.is_unlocked(research_key):
+            continue  # Skip this building if not unlocked
+        
+        button_img = create_button_image(label, color, button_width, button_height)
+        # Position buttons horizontally at bottom left
+        button_x = button_x_start + button_index * button_spacing
+        button_y = c.SCREEN_HEIGHT - button_height - 10  # 10px from bottom
+        button = Button(button_x, button_y, button_img)
+        buttons[building_class] = {
+            'button': button,
+            'label': label,
+            'color': color,
+            'args': args
+        }
+        button_index += 1
+
+# Initial button creation
+rebuild_building_buttons()
 
 ###################
 # Helper functions
@@ -979,24 +1515,31 @@ def select_building(mouse_pos, building_group):
     return False
 
 def draw_resources(screen, resources, font):
-    """Draw resource display."""
-    y_offset = 10
-    x_offset = 400
+    """Draw resource display (including coins) at bottom-right."""
     line_height = 25
+    padding = 10
     
     texts = [
         f"Wood: {int(resources.wood)}",
         f"Iron: {int(resources.iron)}",
-        f"Food: {int(resources.food)}"
+        f"Food: {int(resources.food)}",
+        f"Coins: {int(resources.coins)}"
     ]
     
+    # Calculate position from bottom-right
+    total_height = len(texts) * line_height + line_height  # +1 for enemy count
+    start_y = c.SCREEN_HEIGHT - total_height - padding
+    x_offset = c.SCREEN_WIDTH - 200  # 200px from right edge
+    
     for i, text in enumerate(texts):
-        text_surface = font.render(text, True, (255, 255, 255))
-        screen.blit(text_surface, (x_offset, y_offset + i * line_height))
+        # Use gold color for coins
+        color = (255, 215, 0) if "Coins" in text else (255, 255, 255)
+        text_surface = font.render(text, True, color)
+        screen.blit(text_surface, (x_offset, start_y + i * line_height))
     
     # Draw enemy count
     enemy_text = font.render(f"Zombies: {len(enemy_group)}", True, (255, 0, 0))
-    screen.blit(enemy_text, (x_offset, y_offset + len(texts) * line_height))
+    screen.blit(enemy_text, (x_offset, start_y + len(texts) * line_height))
 
 def create_building(building_class, grid_pos, *args):
     """Create a building instance based on the building class."""
@@ -1007,7 +1550,13 @@ def create_building(building_class, grid_pos, *args):
             building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
             turret_group.add(building)
             return building
-    elif building_class in (GatlingTurret, PiercerTurret):
+    elif building_class is PiercerTurret:
+        if len(args) >= 2:
+            sprite_sheets, base_images = args[0], args[1]
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
+            turret_group.add(building)
+            return building
+    elif building_class is GatlingTurret:
         if len(args) >= 2:
             sprite_sheet, base_image = args[0], args[1]
             building = building_class(grid_pos, sprite_sheet, base_image, tier=1)
@@ -1065,9 +1614,8 @@ while running:
             tile_y = y * TILE
             screen.blit(grass_tiles[variant_index], (tile_x, tile_y))
     
-    # Draw day/night divider line (subtle)
+    # Day/night divider line removed
     split_y_px = grid.get_split_y_px()
-    pygame.draw.line(screen, (40, 50, 40), (0, split_y_px), (c.SCREEN_WIDTH, split_y_px), 2)
     # Draw semi-transparent overlay to distinguish zones
     overlay = pygame.Surface((c.SCREEN_WIDTH, split_y_px), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 20))  # Very subtle darkening for upper zone (night/danger zone)
@@ -1209,12 +1757,18 @@ while running:
         # Track previous state to detect transitions
         if not hasattr(wave_manager, '_prev_state'):
             wave_manager._prev_state = wave_manager.state
+            # Roll day event on first day
+            if wave_manager.state == WaveManager.STATE_DAY and world.day_events:
+                world.day_events.roll_new_day_event(wave_manager.day)
         
         # Check for state transitions
         if wave_manager._prev_state != wave_manager.state:
             # State changed
             if wave_manager.state == WaveManager.STATE_DAY:
-                # Just started day - spawn daily nodes
+                # Just started day - roll random day event
+                if world.day_events:
+                    world.day_events.roll_new_day_event(wave_manager.day)
+                # Spawn daily nodes
                 spawn_daily_resource_nodes()
             elif wave_manager.state == WaveManager.STATE_NIGHT:
                 # Just started night
@@ -1237,7 +1791,7 @@ while running:
     ###################
     # Update spawner (only during night)
     if wave_manager.state == WaveManager.STATE_NIGHT:
-        zombie_spawner.update(dt, enemy_group)
+        zombie_spawner.update(dt, enemy_group, world)
         # Update enemies spawned count
         wave_manager.enemies_spawned = zombie_spawner.spawn_count
     
@@ -1254,9 +1808,50 @@ while running:
         if was_alive and not enemy.alive and enemy.hp <= 0:
             wave_manager.enemies_killed += 1
             sound_system.play("enemy_death")
-        # Mark enemies that reached bottom or died for removal
-        if enemy.reached_bottom or not enemy.alive:
+        
+        # Check if enemy should be removed
+        should_remove = False
+        if enemy.reached_bottom:
+            should_remove = True
+        elif not enemy.alive:
+            # For BasicZombie, wait for death animation to complete
+            if isinstance(enemy, BasicZombie):
+                if hasattr(enemy, 'death_animation_complete') and enemy.death_animation_complete:
+                    should_remove = True
+            else:
+                # For other enemy types, remove immediately when dead
+                should_remove = True
+        
+        if should_remove:
             enemies_to_remove.append(enemy)
+    
+    # Drop coins when enemies are removed (ensures coins are always dropped)
+    for enemy in enemies_to_remove:
+        # Initialize coins_dropped if not present (for backwards compatibility)
+        if not hasattr(enemy, 'coins_dropped'):
+            enemy.coins_dropped = False
+        
+        if not enemy.coins_dropped and enemy.hp <= 0:  # Only drop coins if killed (not if reached bottom)
+            # Drop coins based on enemy difficulty/type
+            base_reward = 2
+            if hasattr(enemy, 'TYPE_ID'):
+                # Different enemy types give different rewards
+                type_rewards = {
+                    "walker": 2,
+                    "runner": 3,
+                    "brute": 5,
+                    "spitter": 4,
+                    "swarmling": 1
+                }
+                coin_reward = type_rewards.get(enemy.TYPE_ID, base_reward)
+            else:
+                coin_reward = base_reward
+            
+            # Apply coin drop modifier from day events
+            coin_mult = world.modifiers.get("coin_drop_mult", 1.0) if hasattr(world, 'modifiers') else 1.0
+            coin_reward = int(coin_reward * coin_mult)
+            resources.add_coins(coin_reward)
+            enemy.coins_dropped = True
     
     # Build spatial grid for separation AFTER enemies have moved
     # Cell size: 64 pixels (2x2 tiles)
@@ -1439,7 +2034,13 @@ while running:
     # Draw building panel
     ###################
     if building_panel.is_visible:
-        building_panel.draw(screen, resources)
+        building_panel.draw(screen, resources, mouse_pos)
+    
+    ###################
+    # Draw research UI
+    ###################
+    research_button.draw(screen)
+    research_panel.draw(screen)
     
     ###################
     # Draw pause menu
@@ -1460,9 +2061,20 @@ while running:
         grid_pos = pixel_to_grid(mouse_pos)
         can_place = can_place_building(selected_building_type, grid_pos, grid)
         
-        # Check if we have enough resources
+        # Check if we have enough resources (with day event modifiers)
         cost = selected_building_type.get_cost()
-        if resources.wood < cost.wood or resources.iron < cost.iron or resources.food < cost.food:
+        # Apply build cost modifier from day events
+        if hasattr(world, 'modifiers'):
+            cost_mult = world.modifiers.get("build_cost_mult", 1.0)
+            effective_wood = int(cost.wood * cost_mult)
+            effective_iron = int(cost.iron * cost_mult)
+            effective_food = int(cost.food * cost_mult)
+        else:
+            effective_wood = cost.wood
+            effective_iron = cost.iron
+            effective_food = cost.food
+        
+        if resources.wood < effective_wood or resources.iron < effective_iron or resources.food < effective_food:
             can_place = False
         
         draw_preview(screen, grid_pos, can_place, selected_building_type.FOOTPRINT)
@@ -1491,8 +2103,52 @@ while running:
         debug_system.update_info("Spawner", "ON" if zombie_spawner.active else "OFF")
         debug_system.update_info("Wave State", wave_manager.state)  
         debug_system.update_info("Day", wave_manager.day)
+        debug_system.update_info("Night", wave_manager.night)
+        debug_system.update_info("Coins", resources.coins)
         grid_pos_debug = pixel_to_grid(mouse_pos)
         debug_system.update_info("Grid Pos", f"({grid_pos_debug[0]}, {grid_pos_debug[1]})")
+        
+        # Research info
+        if world.research:
+            unlocked_count = len(world.research.unlocked)
+            purchased_count = len(world.research.purchased)
+            debug_system.update_info("Research Unlocked", f"{unlocked_count} items")
+            debug_system.update_info("Research Purchased", f"{purchased_count} items")
+        
+        # Day event info
+        if world.day_events and world.day_events.current_event:
+            event_name = world.day_events.current_event.get("name", "None")
+            debug_system.update_info("Day Event", event_name)
+        else:
+            debug_system.update_info("Day Event", "None")
+        
+        # Modifiers info
+        if hasattr(world, 'modifiers'):
+            mods = []
+            if world.modifiers.get("resource_prod_mult", 1.0) != 1.0:
+                mods.append(f"Prod: {world.modifiers['resource_prod_mult']:.2f}x")
+            if world.modifiers.get("coin_drop_mult", 1.0) != 1.0:
+                mods.append(f"Coins: {world.modifiers['coin_drop_mult']:.2f}x")
+            if world.modifiers.get("build_cost_mult", 1.0) != 1.0:
+                mods.append(f"Cost: {world.modifiers['build_cost_mult']:.2f}x")
+            if world.modifiers.get("turret_fire_rate_mult", 1.0) != 1.0:
+                mods.append(f"Fire: {world.modifiers['turret_fire_rate_mult']:.2f}x")
+            if world.modifiers.get("building_damage_taken_mult", 1.0) != 1.0:
+                mods.append(f"Dmg: {world.modifiers['building_damage_taken_mult']:.2f}x")
+            if world.modifiers.get("zombie_spawn_mult", 1.0) != 1.0:
+                mods.append(f"Spawn: {world.modifiers['zombie_spawn_mult']:.2f}x")
+            if world.modifiers.get("zombie_speed_mult", 1.0) != 1.0:
+                mods.append(f"ZSpeed: {world.modifiers['zombie_speed_mult']:.2f}x")
+            if world.modifiers.get("zombie_hp_mult", 1.0) != 1.0:
+                mods.append(f"ZHP: {world.modifiers['zombie_hp_mult']:.2f}x")
+            if world.modifiers.get("turret_range_mult", 1.0) != 1.0:
+                mods.append(f"Range: {world.modifiers['turret_range_mult']:.2f}x")
+            if world.modifiers.get("node_spawn_bonus", False):
+                mods.append("NodeBonus")
+            if world.modifiers.get("lightning_storm", False):
+                mods.append("Lightning")
+            if mods:
+                debug_system.update_info("Modifiers", ", ".join(mods))
     
     ###################
     # Draw debug overlay
@@ -1526,6 +2182,16 @@ while running:
                 if keys[pygame.K_F3]:
                     debug_spawn_zombie_at_mouse(mouse_pos)
                     continue
+            
+            # Handle research panel clicks (must be before other UI to close panel)
+            if research_panel.handle_click(mouse_pos):
+                # Rebuild buttons in case a research was unlocked
+                rebuild_building_buttons()
+                continue
+            
+            # Handle research button click
+            if research_button.handle_click(mouse_pos):
+                continue
             
             # Handle building panel clicks (upgrade/repair/sell)
             if building_panel.is_visible:
@@ -1626,8 +2292,8 @@ while running:
                         selected_building_type = None
                         sound_system.play("build_placed")
                 elif can_place:
-                    # Try to pay cost
-                    if selected_building_type.pay_cost(resources):
+                    # Try to pay cost (with day event modifiers)
+                    if selected_building_type.pay_cost(resources, world):
                         # Create building
                         button_data = buttons[selected_building_type]
                         building = create_building(selected_building_type, grid_pos, *button_data['args'])
@@ -1658,6 +2324,13 @@ while running:
         
         # Handle right-click to dismiss panel and deselect building
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Right mouse button
+            # Cancel build mode on right-click
+            if build_mode and selected_building_type:
+                build_mode = False
+                selected_building_type = None
+                deselect_building()
+                print("Build mode cancelled (right-click)")
+                continue
             # Skip if game over or paused
             if game_over_screen.is_visible or game_state_manager.is_paused():
                 continue
@@ -1667,6 +2340,9 @@ while running:
         
         # Handle keyboard input
         if event.type == pygame.KEYDOWN:
+            # Handle research panel ESC key
+            if research_panel.handle_key(event.key):
+                continue
             # F12: Toggle debug mode (works even when paused/over - always accessible)
             if event.key == pygame.K_F12:
                 debug_system.toggle()

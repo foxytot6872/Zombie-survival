@@ -62,7 +62,7 @@ class HUD:
     
     def draw(self, surface: pygame.Surface):
         """Draw HUD"""
-        # Draw day/night indicator (top-left)
+        # Draw day/night indicator (top-right)
         state_text = f"Day {self.day} - Night {self.night}"
         if self.state == "DAY":
             state_text += " (Day)"
@@ -75,7 +75,8 @@ class HUD:
             state_color = (200, 200, 200)
         
         state_surface = self.font_large.render(state_text, True, state_color)
-        surface.blit(state_surface, (10, 10))
+        state_rect = state_surface.get_rect(topright=(self.screen_width - 10, 10))
+        surface.blit(state_surface, state_rect)
         
         # Draw HQ HP (top-center, important!)
         hq_hp_pct = self.hq_hp / self.hq_max_hp if self.hq_max_hp > 0 else 0.0
@@ -105,11 +106,12 @@ class HUD:
         # Border
         pygame.draw.rect(surface, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
         
-        # Draw wave info (below day/night)
+        # Draw wave info (top-right, below day/night)
         if self.wave_info:
-            wave_text = f"Enemies: {self.wave_info.get('enemies_spawned', 0)} / {self.wave_info.get('total_to_spawn', 0)}"
+            wave_text = f"Zombies: {self.wave_info.get('enemies_spawned', 0)} / {self.wave_info.get('total_to_spawn', 0)}"
             wave_surface = self.font_medium.render(wave_text, True, (255, 255, 255))
-            surface.blit(wave_surface, (10, 60))
+            wave_rect = wave_surface.get_rect(topright=(self.screen_width - 10, state_rect.bottom + 5))
+            surface.blit(wave_surface, wave_rect)
         
         # Draw event banner (top-center, fades in/out)
         if self.event_visible:

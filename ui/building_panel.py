@@ -8,12 +8,14 @@ from world.building import Building, BuildState
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None):
         """
         Initialize building panel.
         Args:
             screen_width: Screen width in pixels
             screen_height: Screen height in pixels
+            upgrade_panel_frames: List of 3 frames for upgrade progress panel
+            upgrade_panel_darken_frames: List of 3 darkened frames for upgrade progress panel
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -26,6 +28,10 @@ class BuildingPanel:
         self.panel_rect = pygame.Rect(0, 0, 300, 400)
         self.panel_rect.bottomright = (screen_width - 10, screen_height - 10)
         self.button_rects = {}  # Store button rects for click detection
+        
+        self.upgrade_panel_frames = upgrade_panel_frames if upgrade_panel_frames else []
+        self.upgrade_panel_darken_frames = upgrade_panel_darken_frames if upgrade_panel_darken_frames else []
+        self.upgrade_panel_rect = None  # Will be set when drawing
         
         self.on_upgrade: Optional[Callable] = None
         self.on_repair: Optional[Callable] = None
@@ -67,7 +73,7 @@ class BuildingPanel:
         
         return None
     
-    def draw(self, surface: pygame.Surface, resources):
+    def draw(self, surface: pygame.Surface, resources, mouse_pos=None):
         """Draw building panel"""
         if not self.is_visible or not self.selected_building:
             return
@@ -110,92 +116,115 @@ class BuildingPanel:
         tier_text = f"Tier: {building.tier} / {building.TIER_MAX}"
         tier_surface = self.font_medium.render(tier_text, True, (255, 255, 255))
         surface.blit(tier_surface, (self.panel_rect.x + 10, y_offset))
-        y_offset += line_height + 20
+        y_offset += line_height - 25  # Reduced spacing to move upgrade panel up
         
         # Buttons (store rects for click detection)
-        button_height = 40
-        button_spacing = 10
         self.button_rects = {}
         
-        # Upgrade button
+        # Upgrade panel using progress frames
         # Check if this is a wood wall that can be upgraded to iron
         from world.buildings.wall_wood import WallWood
         can_upgrade_to_iron = isinstance(building, WallWood) and building.state == BuildState.ACTIVE
+        can_upgrade_tier = building.tier < building.TIER_MAX and building.state == BuildState.ACTIVE
         
-        if can_upgrade_to_iron:
-            # Special upgrade for wood wall → iron wall
-            upgrade_cost = self._get_wall_upgrade_cost()
+        # Show upgrade panel if can upgrade and progress < 3 (not yet at tier upgrade)
+        # Initialize upgrade_progress if not set (backwards compatibility)
+        if not hasattr(building, 'upgrade_progress'):
+            building.upgrade_progress = 0
+        
+        if (can_upgrade_to_iron or can_upgrade_tier) and self.upgrade_panel_frames and building.upgrade_progress < 3:
+            # Calculate upgrade cost and affordability (per progress step)
+            if can_upgrade_to_iron:
+                upgrade_cost = self._get_wall_upgrade_cost()
+            else:
+                upgrade_cost = self._get_upgrade_cost(building)
+            
             can_afford = (resources.wood >= upgrade_cost.wood and
                          resources.iron >= upgrade_cost.iron and
                          resources.food >= upgrade_cost.food)
-            upgrade_rect = pygame.Rect(self.panel_rect.x + 10, y_offset, self.panel_rect.width - 20, button_height)
-            upgrade_color = (100, 200, 100) if can_afford else (100, 100, 100)
-            pygame.draw.rect(surface, upgrade_color, upgrade_rect)
-            pygame.draw.rect(surface, (255, 255, 255), upgrade_rect, 2)
-            upgrade_text = f"Upgrade → Iron"
-            upgrade_text_surface = self.font_medium.render(upgrade_text, True, (255, 255, 255))
-            text_rect = upgrade_text_surface.get_rect(center=upgrade_rect.center)
-            surface.blit(upgrade_text_surface, text_rect)
-            self.button_rects["upgrade_to_iron"] = upgrade_rect
-            y_offset += button_height + button_spacing
-        elif building.tier < building.TIER_MAX and building.state == BuildState.ACTIVE:
-            # Regular tier upgrade
-            upgrade_rect = pygame.Rect(self.panel_rect.x + 10, y_offset, self.panel_rect.width - 20, button_height)
-            upgrade_cost = self._get_upgrade_cost(building)
-            can_afford = (resources.wood >= upgrade_cost.wood and
-                         resources.iron >= upgrade_cost.iron and
-                         resources.food >= upgrade_cost.food)
-            upgrade_color = (100, 200, 100) if can_afford else (100, 100, 100)
-            pygame.draw.rect(surface, upgrade_color, upgrade_rect)
-            pygame.draw.rect(surface, (255, 255, 255), upgrade_rect, 2)
-            upgrade_text = f"Upgrade (Tier {building.tier + 1})"
-            upgrade_text_surface = self.font_medium.render(upgrade_text, True, (255, 255, 255))
-            text_rect = upgrade_text_surface.get_rect(center=upgrade_rect.center)
-            surface.blit(upgrade_text_surface, text_rect)
-            self.button_rects["upgrade"] = upgrade_rect
-            y_offset += button_height + button_spacing
-        
-        # Repair button
-        if building.hp < building.max_hp and building.state == BuildState.ACTIVE:
-            repair_rect = pygame.Rect(self.panel_rect.x + 10, y_offset, self.panel_rect.width - 20, button_height)
-            repair_cost = self._get_repair_cost(building)
-            can_afford = (resources.wood >= repair_cost.wood and
-                         resources.iron >= repair_cost.iron and
-                         resources.food >= repair_cost.food)
-            repair_color = (200, 200, 100) if can_afford else (100, 100, 100)
-            pygame.draw.rect(surface, repair_color, repair_rect)
-            pygame.draw.rect(surface, (255, 255, 255), repair_rect, 2)
-            repair_text = f"Repair ({repair_cost.wood} wood)"
-            repair_text_surface = self.font_medium.render(repair_text, True, (255, 255, 255))
-            text_rect = repair_text_surface.get_rect(center=repair_rect.center)
-            surface.blit(repair_text_surface, text_rect)
-            self.button_rects["repair"] = repair_rect
-            y_offset += button_height + button_spacing
-        
-        # Sell button (not available for HQ)
-        if building.state == BuildState.ACTIVE:
-            # Check if this is HQ - don't show sell button for HQ
-            from world.buildings.hq import HQ
-            if not isinstance(building, HQ):
-                sell_rect = pygame.Rect(self.panel_rect.x + 10, y_offset, self.panel_rect.width - 20, button_height)
-                sell_color = (200, 100, 100)
-                pygame.draw.rect(surface, sell_color, sell_rect)
-                pygame.draw.rect(surface, (255, 255, 255), sell_rect, 2)
-                sell_text = "Sell (60% refund)"
-                sell_text_surface = self.font_medium.render(sell_text, True, (255, 255, 255))
-                text_rect = sell_text_surface.get_rect(center=sell_rect.center)
-                surface.blit(sell_text_surface, text_rect)
-                self.button_rects["sell"] = sell_rect
+            
+            # Select frame based on upgrade progress (0, 1, 2)
+            frame_index = min(building.upgrade_progress, len(self.upgrade_panel_frames) - 1)
+            
+            # Get a frame to calculate dimensions (we'll choose the right one later)
+            temp_frame = self.upgrade_panel_frames[frame_index] if frame_index < len(self.upgrade_panel_frames) else self.upgrade_panel_frames[0]
+            
+            # Scale frame to fit panel if needed (max width is panel width - 20 for padding)
+            max_width = self.panel_rect.width - 20
+            original_width = temp_frame.get_width()
+            original_height = temp_frame.get_height()
+            
+            scale_factor = 1.0
+            if original_width > max_width:
+                scale_factor = max_width / original_width
+                new_width = int(original_width * scale_factor)
+                new_height = int(original_height * scale_factor)
+            else:
+                new_width = original_width
+                new_height = original_height
+            
+            # Position upgrade panel
+            upgrade_panel_x = self.panel_rect.x + (self.panel_rect.width - new_width) // 2
+            upgrade_panel_y = y_offset
+            
+            # Calculate clickable area position on screen
+            # Define clickable area in original image coordinates: (62, 216) to (318, 332)
+            clickable_left_original = 62
+            clickable_top_original = 216
+            clickable_width_original = 318 - 62  # 256
+            clickable_height_original = 332 - 216  # 116
+            
+            # Scale clickable area to match scaled image
+            clickable_left_scaled = int(clickable_left_original * scale_factor)
+            clickable_top_scaled = int(clickable_top_original * scale_factor)
+            clickable_width_scaled = int(clickable_width_original * scale_factor)
+            clickable_height_scaled = int(clickable_height_original * scale_factor)
+            
+            # Calculate clickable area position on screen
+            clickable_x = upgrade_panel_x + clickable_left_scaled
+            clickable_y = upgrade_panel_y + clickable_top_scaled
+            
+            # Store clickable area rect for click detection (not the full panel)
+            self.upgrade_panel_rect = pygame.Rect(clickable_x, clickable_y, clickable_width_scaled, clickable_height_scaled)
+            
+            # Check if mouse is hovering over the upgrade panel
+            is_hovering = False
+            if mouse_pos:
+                is_hovering = self.upgrade_panel_rect.collidepoint(mouse_pos)
+            
+            # Choose which frame set to use (normal or darkened)
+            # Use darkened frames if can't afford or hovering
+            use_darkened = not can_afford or is_hovering
+            if use_darkened and self.upgrade_panel_darken_frames and frame_index < len(self.upgrade_panel_darken_frames):
+                original_frame = self.upgrade_panel_darken_frames[frame_index]
+            else:
+                original_frame = self.upgrade_panel_frames[frame_index] if frame_index < len(self.upgrade_panel_frames) else self.upgrade_panel_frames[0]
+            
+            # Scale the chosen frame
+            if scale_factor != 1.0:
+                current_frame = pygame.transform.smoothscale(original_frame, (new_width, new_height))
+            else:
+                current_frame = original_frame
+            
+            # Draw upgrade panel frame
+            surface.blit(current_frame, (upgrade_panel_x, upgrade_panel_y))
+            if can_upgrade_to_iron:
+                self.button_rects["upgrade_to_iron"] = self.upgrade_panel_rect
+            else:
+                self.button_rects["upgrade"] = self.upgrade_panel_rect
     
     def _get_upgrade_cost(self, building: Building):
-        """Get upgrade cost for building"""
+        """Get upgrade cost for building (per progress step, not per tier)"""
         from world.building import Cost
         base_cost = building.COST
+        # Cost increases with tier, but is per progress step (1/3 of tier upgrade cost)
         upgrade_mult = 1.25  # 25% increase per tier
+        tier_cost_mult = upgrade_mult * building.tier
+        # Divide by 3 since it takes 3 upgrades to reach next tier
         return Cost(
-            wood=int(base_cost.wood * upgrade_mult * building.tier),
-            iron=int(base_cost.iron * upgrade_mult * building.tier),
-            food=int(base_cost.food * upgrade_mult * building.tier)
+            wood=int(base_cost.wood * tier_cost_mult / 3),
+            iron=int(base_cost.iron * tier_cost_mult / 3),
+            food=int(base_cost.food * tier_cost_mult / 3)
         )
     
     def _get_repair_cost(self, building: Building):

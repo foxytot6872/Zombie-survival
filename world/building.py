@@ -122,6 +122,7 @@ class Building(pygame.sprite.Sprite):
         self.tier = tier
         self.state = BuildState.CONSTRUCTING
         self.progress = 0.0
+        self.upgrade_progress = 0  # 0-3, where 3 upgrades = tier increase
         # Store as instance attributes (may differ from class defaults due to config)
         self.BUILD_TIME = build_time if isinstance(build_time, (int, float)) else self.BUILD_TIME
         self.BASE_HP = base_hp if isinstance(base_hp, int) else self.BASE_HP
@@ -181,14 +182,26 @@ class Building(pygame.sprite.Sprite):
         return cost if isinstance(cost, Cost) else cls.COST
 
     @classmethod
-    def pay_cost(cls, resources) -> bool:
-        """Try deducting resources; return True if success."""
+    def pay_cost(cls, resources, world=None) -> bool:
+        """Try deducting resources; return True if success (with day event modifiers)."""
         c = cls.get_cost()
-        if (resources.wood < c.wood or resources.iron < c.iron or resources.food < c.food):
+        
+        # Apply build cost modifier from day events
+        if world and hasattr(world, 'modifiers'):
+            cost_mult = world.modifiers.get("build_cost_mult", 1.0)
+            effective_wood = int(c.wood * cost_mult)
+            effective_iron = int(c.iron * cost_mult)
+            effective_food = int(c.food * cost_mult)
+        else:
+            effective_wood = c.wood
+            effective_iron = c.iron
+            effective_food = c.food
+        
+        if (resources.wood < effective_wood or resources.iron < effective_iron or resources.food < effective_food):
             return False
-        resources.wood -= c.wood
-        resources.iron -= c.iron
-        resources.food -= c.food
+        resources.wood -= effective_wood
+        resources.iron -= effective_iron
+        resources.food -= effective_food
         return True
 
     def refund_cost(self, resources, ratio: float = 1.0):
@@ -218,13 +231,19 @@ class Building(pygame.sprite.Sprite):
             # passive production tick (resources teleport to stockpile)
             if world and hasattr(world, "resources"):
                 p = self._current_production()
-                world.resources.wood += p.wood_per_min * dt/60.0
-                world.resources.iron += p.iron_per_min * dt/60.0
-                world.resources.food += p.food_per_min * dt/60.0
+                # Apply resource production modifier from day events
+                prod_mult = world.modifiers.get("resource_prod_mult", 1.0) if hasattr(world, 'modifiers') else 1.0
+                world.resources.wood += p.wood_per_min * dt/60.0 * prod_mult
+                world.resources.iron += p.iron_per_min * dt/60.0 * prod_mult
+                world.resources.food += p.food_per_min * dt/60.0 * prod_mult
 
-    def take_damage(self, amount: int):
+    def take_damage(self, amount: int, world=None):
         if self.state not in (BuildState.CONSTRUCTING, BuildState.ACTIVE):
             return
+        # Apply building damage taken modifier from day events
+        if world and hasattr(world, 'modifiers'):
+            damage_mult = world.modifiers.get("building_damage_taken_mult", 1.0)
+            amount = int(amount * damage_mult)
         self.hp -= amount
         if self.hp <= 0:
             self.hp = 0
@@ -235,11 +254,24 @@ class Building(pygame.sprite.Sprite):
         self.hp = min(self.max_hp, self.hp + amount)
 
     def upgrade(self) -> bool:
+        """Upgrade building - increments progress, increases tier when progress reaches 3"""
         if self.tier >= self.TIER_MAX:
             return False
-        self.tier += 1
-        self.max_hp = int(self.BASE_HP * (1 + 0.15*(self.tier-1)))
-        self.on_upgrade()
+        
+        # Initialize upgrade_progress if not set (backwards compatibility)
+        if not hasattr(self, 'upgrade_progress'):
+            self.upgrade_progress = 0
+        
+        # Increment upgrade progress
+        self.upgrade_progress += 1
+        
+        # When progress reaches 3, actually upgrade the tier
+        if self.upgrade_progress >= 3:
+            self.tier += 1
+            self.upgrade_progress = 0  # Reset progress for next tier
+            self.max_hp = int(self.BASE_HP * (1 + 0.15*(self.tier-1)))
+            self.on_upgrade()
+        
         return True
 
     # ----- Hooks -----

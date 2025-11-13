@@ -60,6 +60,11 @@ class Survivor(pygame.sprite.Sprite):
         self.path_recalc_timer = 0.0
         self.path_recalc_interval = 0.5  # Recalculate path every 0.5 seconds
         
+        # Pathfinding
+        self.current_path = []  # List of (grid_x, grid_y) positions
+        self.path_target = None  # Target position for pathfinding
+        self.path_index = 0  # Current index in path
+        
         # Safe distance to enemies
         self.safe_distance_to_enemy_px = 160.0
         self.flee_on_threat = True
@@ -113,20 +118,105 @@ class Survivor(pygame.sprite.Sprite):
         return False
     
     def move_toward(self, target_pos: pygame.Vector2, dt: float, world=None, stop_distance: float = 8.0):
-        """Move toward target position"""
+        """Move toward target position using pathfinding if available"""
         direction = target_pos - self.pos
         distance = direction.length()
         
         if distance <= stop_distance:
             self.velocity = pygame.Vector2(0, 0)
+            self.current_path = []
+            self.path_target = None
             return True  # Reached target
         
-        # Normalize direction and set velocity
-        if direction.length() > 0:
-            direction = direction.normalize()
-            self.velocity = direction * self.speed
+        # Use pathfinding if available
+        if world and hasattr(world, 'pathfinding') and world.pathfinding:
+            # Check if we need to recalculate path
+            need_recalc = False
+            if self.path_target is None or (target_pos - self.path_target).length() > 32:
+                need_recalc = True
+            elif self.path_recalc_timer >= self.path_recalc_interval:
+                need_recalc = True
+                self.path_recalc_timer = 0.0
+            
+            # Recalculate path if needed
+            if need_recalc or not self.current_path or self.path_index >= len(self.current_path):
+                # Convert positions to grid coordinates
+                from world.map import Grid
+                grid = world.pathfinding.grid
+                start_grid = (grid.px_to_tile(int(self.pos.x)), grid.px_to_tile(int(self.pos.y)))
+                target_grid = (grid.px_to_tile(int(target_pos.x)), grid.px_to_tile(int(target_pos.y)))
+                
+                # Find path
+                path = world.pathfinding.find_path(start_grid, target_grid)
+                if path and len(path) > 1:
+                    self.current_path = path
+                    self.path_index = 1  # Start at index 1 (skip start position)
+                    self.path_target = target_pos
+                else:
+                    # No path found - fall back to direct movement
+                    self.current_path = []
+                    self.path_index = 0
+                    self.path_target = None
+            
+            # Follow path if we have one
+            if self.current_path and self.path_index < len(self.current_path):
+                # Get next waypoint in path
+                next_waypoint_grid = self.current_path[self.path_index]
+                grid = world.pathfinding.grid
+                next_waypoint_px = pygame.Vector2(
+                    grid.tile_to_px(next_waypoint_grid[0]) + grid.TILE // 2,
+                    grid.tile_to_px(next_waypoint_grid[1]) + grid.TILE // 2
+                )
+                
+                # Move toward waypoint
+                waypoint_dir = next_waypoint_px - self.pos
+                waypoint_dist = waypoint_dir.length()
+                
+                if waypoint_dist <= 8.0:  # Reached waypoint
+                    self.path_index += 1
+                    if self.path_index >= len(self.current_path):
+                        # Reached end of path - check if we're close enough to target
+                        if distance <= stop_distance:
+                            self.velocity = pygame.Vector2(0, 0)
+                            self.current_path = []
+                            self.path_target = None
+                            return True
+                        else:
+                            # Need to recalculate
+                            self.current_path = []
+                            self.path_index = 0
+                    else:
+                        # Continue to next waypoint
+                        next_waypoint_grid = self.current_path[self.path_index]
+                        next_waypoint_px = pygame.Vector2(
+                            grid.tile_to_px(next_waypoint_grid[0]) + grid.TILE // 2,
+                            grid.tile_to_px(next_waypoint_grid[1]) + grid.TILE // 2
+                        )
+                        waypoint_dir = next_waypoint_px - self.pos
+                        waypoint_dist = waypoint_dir.length()
+                
+                if waypoint_dir.length() > 0:
+                    direction = waypoint_dir.normalize()
+                    self.velocity = direction * self.speed
+                else:
+                    self.velocity = pygame.Vector2(0, 0)
+            else:
+                # No path - fall back to direct movement
+                if direction.length() > 0:
+                    direction = direction.normalize()
+                    self.velocity = direction * self.speed
+                else:
+                    self.velocity = pygame.Vector2(0, 0)
         else:
-            self.velocity = pygame.Vector2(0, 0)
+            # No pathfinding - use direct movement
+            if direction.length() > 0:
+                direction = direction.normalize()
+                self.velocity = direction * self.speed
+            else:
+                self.velocity = pygame.Vector2(0, 0)
+        
+        # Update pathfinding timer
+        self.path_recalc_timer += dt
         
         # Check progress for stuck detection
         progress_distance = (self.pos - self.last_progress_check_pos).length()
