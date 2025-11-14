@@ -2,9 +2,9 @@
 import json
 import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
-from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie
+from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
 from world.spawner import Spawner
-from world.projectile import Projectile
+from world.projectile import Projectile, ArrowProjectile
 from world.debug import DebugSystem
 from button import Button
 from world.map import Grid
@@ -223,6 +223,50 @@ BasicZombie.sprite_sheet = zombie_sprite_sheet
 RunnerZombie.sprite_sheet = runner_sprite_sheet
 BruteZombie.sprite_sheet = brute_sprite_sheet
 
+# Skeleton sprite sheet (40 frames, 48x48 each)
+skeleton_sprite_sheet = load_image_or_placeholder(
+    'asset/NormalSkeleton_Sheet.png',
+    (48 * 40, 48),  # 40 frames * 48 pixels = 1920 pixels wide, 48 pixels tall
+    (200, 200, 200, 255),
+    "Skeleton sprite sheet"
+)
+
+# Set sprite sheet for Skeleton class
+Skeleton.sprite_sheet = skeleton_sprite_sheet
+
+# Archer Skeleton sprite sheet (34 frames, 48x48 each)
+archer_skeleton_sprite_sheet = load_image_or_placeholder(
+    'asset/ArcherSkeleton_Sheet.png',
+    (48 * 34, 48),  # 34 frames * 48 pixels = 1632 pixels wide, 48 pixels tall
+    (200, 200, 200, 255),
+    "Archer Skeleton sprite sheet"
+)
+
+# Set sprite sheet for ArcherSkeleton class
+ArcherSkeleton.sprite_sheet = archer_skeleton_sprite_sheet
+
+# Arrow Projectile sprite sheet (4 frames, 16x16 each)
+arrow_projectile_sheet = load_image_or_placeholder(
+    'asset/ArrowProjectile.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (255, 255, 0, 255),
+    "Arrow Projectile sprite sheet"
+)
+
+# Set sprite sheet for ArrowProjectile class
+ArrowProjectile.sprite_sheet = arrow_projectile_sheet
+
+# Warrior Skeleton sprite sheet (46 frames, 48x48 each)
+warrior_skeleton_sprite_sheet = load_image_or_placeholder(
+    'asset/WarriorSkeleton_Sheet.png',
+    (48 * 46, 48),  # 46 frames * 48 pixels = 2208 pixels wide, 48 pixels tall
+    (200, 200, 200, 255),
+    "Warrior Skeleton sprite sheet"
+)
+
+# Set sprite sheet for WarriorSkeleton class
+WarriorSkeleton.sprite_sheet = warrior_skeleton_sprite_sheet
+
 
 # HQ building image
 hq_image = load_image_or_placeholder(
@@ -235,7 +279,7 @@ hq_image = load_image_or_placeholder(
 # Set image for HQ class
 HQ.building_image = hq_image
 
-# Upgrade panel image - extract 3 frames (384x386 each)
+# Upgrade panel image - extract 3 frames (384x386 each) - for upgrade progress indicator
 upgrade_panel_sheet = load_image_or_placeholder(
     'asset/upgrade_1-2_panel.png',
     (384 * 3, 386),  # 3 frames * 384 pixels = 1152 pixels wide, 386 pixels tall
@@ -268,6 +312,39 @@ if upgrade_panel_darken_sheet:
         frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
         frame = upgrade_panel_darken_sheet.subsurface(frame_rect)
         upgrade_panel_darken_frames.append(frame)
+
+# New upgrade panel sheet for building detail panel background - extract 3 frames (497x742 each)
+building_panel_sheet = load_image_or_placeholder(
+    'asset/upgrade_panel_Sheet.png',
+    (497 * 3, 742),  # 3 frames * 497 pixels = 1491 pixels wide, 742 pixels tall
+    (50, 50, 50, 255),
+    "Building detail panel background sheet"
+)
+# Extract 3 frames from the sheet
+building_panel_frames = []
+if building_panel_sheet:
+    frame_width = 497
+    frame_height = 742
+    for i in range(3):
+        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+        if frame_rect.right <= building_panel_sheet.get_width():
+            frame = building_panel_sheet.subsurface(frame_rect)
+            building_panel_frames.append(frame)
+        else:
+            # If frame doesn't exist, use first frame as fallback
+            if building_panel_frames:
+                building_panel_frames.append(building_panel_frames[0])
+            else:
+                # Create placeholder if no frames available
+                placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                placeholder.fill((50, 50, 50, 255))
+                building_panel_frames.append(placeholder)
+else:
+    # Create placeholder frames if sheet not loaded
+    for i in range(3):
+        placeholder = pygame.Surface((497, 742), pygame.SRCALPHA)
+        placeholder.fill((50, 50, 50, 255))
+        building_panel_frames.append(placeholder)
 
 # Grass tile images (day and night variants)
 def load_grass_variants(sheet_path, default_color=(50, 100, 50)):
@@ -392,7 +469,10 @@ enemy_factory = {
     "runner": RunnerZombie,
     "brute": BruteZombie,
     "spitter": SpitterZombie,
-    "swarmling": SwarmlingZombie
+    "swarmling": SwarmlingZombie,
+    "skeleton": Skeleton,
+    "archer_skeleton": ArcherSkeleton,
+    "warrior_skeleton": WarriorSkeleton
 }
 
 # Enemy spawner (updated to support wave-based spawning)
@@ -536,7 +616,7 @@ world.day_events = day_event_manager
 game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames)
+building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, building_panel_frames)
 
 # Initialize research UI
 research_panel = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
@@ -1363,21 +1443,21 @@ def debug_instant_build():
     print("Debug: Completed all buildings")
 
 def debug_spawn_zombie_at_mouse(mouse_pos):
-    """Spawn all types of zombies at mouse position (with small offset for visibility)"""
+    """Spawn all types of enemies at mouse position (with small offset for visibility)"""
     import random
-    zombie_types = [BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie]
+    enemy_types = [BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton]
     
-    # Spawn all zombie types with small random offsets so they don't overlap
-    for i, zombie_class in enumerate(zombie_types):
-        # Add small random offset (0-40 pixels) so zombies are visible separately
+    # Spawn all enemy types with small random offsets so they don't overlap
+    for i, enemy_class in enumerate(enemy_types):
+        # Add small random offset (0-40 pixels) so enemies are visible separately
         offset_x = random.randint(-20, 20)
         offset_y = random.randint(-20, 20)
         spawn_pos = pygame.Vector2(mouse_pos[0] + offset_x, mouse_pos[1] + offset_y)
         
-        zombie = zombie_class(spawn_pos)
-        enemy_group.add(zombie)
+        enemy = enemy_class(spawn_pos)
+        enemy_group.add(enemy)
     
-    print(f"Debug: Spawned all zombie types (5 total) near {mouse_pos}")
+    print(f"Debug: Spawned all enemy types (8 total) near {mouse_pos}")
 
 def debug_clear_enemies():
     """Clear all enemies"""
@@ -1938,8 +2018,8 @@ while running:
         if enemy.reached_bottom:
             should_remove = True
         elif not enemy.alive:
-            # For zombies with sprite animations, wait for death animation to complete
-            if isinstance(enemy, (BasicZombie, RunnerZombie, BruteZombie)):
+            # For enemies with sprite animations, wait for death animation to complete
+            if isinstance(enemy, (BasicZombie, RunnerZombie, BruteZombie, Skeleton, ArcherSkeleton, WarriorSkeleton)):
                 if hasattr(enemy, 'death_animation_complete') and enemy.death_animation_complete:
                     should_remove = True
             else:
@@ -1965,7 +2045,10 @@ while running:
                     "runner": 3,
                     "brute": 5,
                     "spitter": 4,
-                    "swarmling": 1
+                    "swarmling": 1,
+                    "skeleton": 3,
+                    "archer_skeleton": 4,
+                    "warrior_skeleton": 5
                 }
                 coin_reward = type_rewards.get(enemy.TYPE_ID, base_reward)
             else:
@@ -2083,9 +2166,13 @@ while running:
     ###################
     projectiles_to_remove = []
     for projectile in projectile_group:
-        # Update projectile (check collisions with enemies and buildings)
-        # Projectiles automatically check correct target type (enemy or building)
-        projectile.update(dt, enemy_group, building_group)
+        # Update projectile (check collisions with enemies, buildings, and survivors)
+        # Projectiles automatically check correct target type (enemy, building, or survivor)
+        # ArrowProjectile supports survivor_group parameter, others ignore it
+        if isinstance(projectile, ArrowProjectile):
+            projectile.update(dt, enemy_group, building_group, survivor_group)
+        else:
+            projectile.update(dt, enemy_group, building_group)
         if not projectile.active:
             projectiles_to_remove.append(projectile)
     

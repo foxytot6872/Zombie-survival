@@ -46,6 +46,7 @@ class GatlingTurret(Building):
             self._load_base_animation_for_tier(self.tier)
             self.base_image = self._get_base_image_for_tier(self.tier)
             # Set current sprite sheet for this tier (like other turrets do)
+            # IMPORTANT: Always get the sprite sheet for the current tier
             self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
             turret_sheet = self.sprite_sheet
         elif base_image is not None:
@@ -79,7 +80,32 @@ class GatlingTurret(Building):
         self.base_is_animated = False
         
         # Load animation frames from sprite sheet (same logic as other turrets)
-        if hasattr(self, 'sprite_sheet') and self.sprite_sheet is not None:
+        # Make sure we use the correct tier's sprite sheet
+        if hasattr(self, 'sprite_sheets') and self.sprite_sheets:
+            # Always ensure sprite_sheet is set to the correct tier before loading
+            self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+            if self.sprite_sheet is not None:
+                self.animation_list = self.load_image()
+                # Set up windup/firing/winddown frames from animation_list
+                if len(self.animation_list) >= 9:
+                    self.animation_frames = self.animation_list
+                    self.windup_frames = self.animation_list[0:4]
+                    self.firing_frames = self.animation_list[4:9]
+                    self.winddown_frames = self.animation_list[3::-1]
+                    self.is_animated = True
+                    # Initialize animation state to idle with first frame (same as tier 1)
+                    self.animation_state = "idle"
+                    self.frame_index = 0
+                    self.animation_timer = 0.0
+                    self.turret_image = self.animation_list[0] if self.animation_list else None
+                    self.current_frames = [self.animation_list[0]] if self.animation_list else []
+                    print(f"Gatling turret (tier {self.tier}) loaded {len(self.animation_list)} animation frames with windup/winddown")
+                else:
+                    print(f"Warning: Gatling turret (tier {self.tier}) expected 9 frames but got {len(self.animation_list)}")
+            else:
+                print(f"Warning: Gatling turret (tier {self.tier}) sprite_sheet is None")
+        elif hasattr(self, 'sprite_sheet') and self.sprite_sheet is not None:
+            # Fallback: if sprite_sheet is set directly (old way)
             self.animation_list = self.load_image()
             # Set up windup/firing/winddown frames from animation_list
             if len(self.animation_list) >= 9:
@@ -88,8 +114,12 @@ class GatlingTurret(Building):
                 self.firing_frames = self.animation_list[4:9]
                 self.winddown_frames = self.animation_list[3::-1]
                 self.is_animated = True
-                self.turret_image = self.animation_list[self.frame_index]
-                self.current_frames = [self.animation_list[0]]
+                # Initialize animation state to idle with first frame (same as tier 1)
+                self.animation_state = "idle"
+                self.frame_index = 0
+                self.animation_timer = 0.0
+                self.turret_image = self.animation_list[0] if self.animation_list else None
+                self.current_frames = [self.animation_list[0]] if self.animation_list else []
         elif turret_sheet is not None:
             # Old way: load from turret_sheet parameter
             sheet_width = turret_sheet.get_width()
@@ -553,7 +583,10 @@ class GatlingTurret(Building):
         if not hasattr(self, 'sprite_sheets') or not self.sprite_sheets:
             return None
         index = max(0, min(tier - 1, len(self.sprite_sheets) - 1))
-        return self.sprite_sheets[index]
+        sprite_sheet = self.sprite_sheets[index]
+        if sprite_sheet is None:
+            print(f"Warning: Gatling turret tier {tier} sprite sheet at index {index} is None (total sheets: {len(self.sprite_sheets)})")
+        return sprite_sheet
     
     def load_image(self):
         """Load animation frames from sprite sheet (same pattern as other turrets, 96x96 per frame, 9 frames total)"""
@@ -683,6 +716,8 @@ class GatlingTurret(Building):
         """Handle tier upgrades - swap base texture and sprite sheet when available (same logic as other turrets)."""
         super().on_upgrade()
         
+        print(f"Gatling turret upgrading to tier {self.tier}")
+        
         # Update base image for new tier (reload animation if tier 3)
         if hasattr(self, 'base_images'):
             self._load_base_animation_for_tier(self.tier)
@@ -691,20 +726,27 @@ class GatlingTurret(Building):
         # Update sprite sheet and reload animation for new tier (same logic as other turrets)
         if hasattr(self, 'sprite_sheets') and self.sprite_sheets:
             self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
-            # Reload animation frames from new sprite sheet (same as other turrets)
-            self.animation_list = self.load_image()
-            # Set up windup/firing/winddown frames from animation_list
-            if len(self.animation_list) >= 9:
-                self.animation_frames = self.animation_list
-                self.windup_frames = self.animation_list[0:4]
-                self.firing_frames = self.animation_list[4:9]
-                self.winddown_frames = self.animation_list[3::-1]
-                self.is_animated = True
-            # Reset animation state
-            self.frame_index = 0
-            self.animation_timer = 0.0
-            self.animation_state = "idle"
-            if self.animation_list and len(self.animation_list) > 0:
-                self.turret_image = self.animation_list[self.frame_index]
-                self.current_frames = [self.animation_list[0]]
+            if self.sprite_sheet is None:
+                print(f"Warning: Gatling turret tier {self.tier} sprite_sheet is None after upgrade")
+            else:
+                # Reload animation frames from new sprite sheet (same as other turrets)
+                self.animation_list = self.load_image()
+                # Set up windup/firing/winddown frames from animation_list (same as tier 1)
+                if len(self.animation_list) >= 9:
+                    self.animation_frames = self.animation_list
+                    self.windup_frames = self.animation_list[0:4]
+                    self.firing_frames = self.animation_list[4:9]
+                    self.winddown_frames = self.animation_list[3::-1]
+                    self.is_animated = True
+                    # Reset animation state to idle with first frame (same as tier 1)
+                    self.animation_state = "idle"
+                    self.frame_index = 0
+                    self.animation_timer = 0.0
+                    self.turret_image = self.animation_list[0] if self.animation_list else None
+                    self.current_frames = [self.animation_list[0]] if self.animation_list else []
+                    print(f"Gatling turret upgraded to tier {self.tier}, loaded {len(self.animation_list)} animation frames with windup/winddown")
+                else:
+                    print(f"Warning: Gatling turret tier {self.tier} expected 9 frames but got {len(self.animation_list)}")
+        else:
+            print(f"Warning: Gatling turret tier {self.tier} has no sprite_sheets attribute or sprite_sheets is empty")
 

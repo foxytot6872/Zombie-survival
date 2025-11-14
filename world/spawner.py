@@ -31,10 +31,12 @@ class Spawner:
         self.total_to_spawn = 0
         self.batch_size = 2  # Enemies per spawn batch
         
-        # Spawn area (top of screen)
+        # Spawn area (all edges of screen)
         self.spawn_y = 0
         self.spawn_x_min = 0
         self.spawn_x_max = c.SCREEN_WIDTH
+        self.spawn_y_min = 0
+        self.spawn_y_max = c.SCREEN_HEIGHT
     
     def begin(self, recipe: Dict[str, int], spawn_config: Dict):
         """
@@ -83,7 +85,7 @@ class Spawner:
             self.spawn_timer = 0.0
     
     def _spawn_batch(self, enemy_group: pygame.sprite.Group, world=None):
-        """Spawn a batch of enemies"""
+        """Spawn a batch of enemies from random edges"""
         batch_count = 0
         
         # Spawn enemies from recipe (iterate through all types to ensure balanced spawning)
@@ -102,9 +104,8 @@ class Spawner:
                 if enemy_type in self.enemy_factory:
                     enemy_class = self.enemy_factory[enemy_type]
                     
-                    # Spawn enemy
-                    spawn_x = random.uniform(self.spawn_x_min + 50, self.spawn_x_max - 50)
-                    spawn_pos = (spawn_x, self.spawn_y - batch_count * 20)  # Stagger vertically
+                    # Spawn enemy from random edge (top, bottom, left, right)
+                    spawn_pos = self._get_random_edge_spawn_position(batch_count)
                     
                     enemy = enemy_class(spawn_pos)
                     
@@ -125,8 +126,38 @@ class Spawner:
                     self.spawn_count += 1
                     batch_count += 1
     
+    def _get_random_edge_spawn_position(self, offset: int = 0):
+        """
+        Get a random spawn position on one of the four screen edges.
+        Args:
+            offset: Offset for staggering multiple spawns
+        Returns:
+            Tuple (x, y) spawn position
+        """
+        edge = random.choice(["top", "bottom", "left", "right"])
+        margin = 50  # Margin from screen edge
+        
+        if edge == "top":
+            # Spawn from top edge
+            spawn_x = random.uniform(self.spawn_x_min + margin, self.spawn_x_max - margin)
+            spawn_y = self.spawn_y_min - offset * 20  # Stagger vertically above screen
+        elif edge == "bottom":
+            # Spawn from bottom edge
+            spawn_x = random.uniform(self.spawn_x_min + margin, self.spawn_x_max - margin)
+            spawn_y = self.spawn_y_max + offset * 20  # Stagger vertically below screen
+        elif edge == "left":
+            # Spawn from left edge
+            spawn_x = self.spawn_x_min - offset * 20  # Stagger horizontally left of screen
+            spawn_y = random.uniform(self.spawn_y_min + margin, self.spawn_y_max - margin)
+        else:  # right
+            # Spawn from right edge
+            spawn_x = self.spawn_x_max + offset * 20  # Stagger horizontally right of screen
+            spawn_y = random.uniform(self.spawn_y_min + margin, self.spawn_y_max - margin)
+        
+        return (spawn_x, spawn_y)
+    
     def spawn_enemy(self, enemy_group: pygame.sprite.Group, enemy_class: Optional[Type[Enemy]] = None):
-        """Spawn a single enemy (legacy method)"""
+        """Spawn a single enemy (legacy method) - spawns from random edge"""
         if enemy_class is None:
             # Use first enemy class from factory if available
             if self.enemy_factory:
@@ -134,9 +165,8 @@ class Spawner:
             else:
                 return
         
-        # Random x position at top of screen
-        spawn_x = random.uniform(self.spawn_x_min + 50, self.spawn_x_max - 50)
-        spawn_pos = (spawn_x, self.spawn_y)
+        # Spawn from random edge
+        spawn_pos = self._get_random_edge_spawn_position()
         
         # Create enemy
         enemy = enemy_class(spawn_pos)
@@ -144,7 +174,7 @@ class Spawner:
         self.spawn_count += 1
     
     def spawn_horde(self, enemy_group: pygame.sprite.Group, count: int, spread: float = 100.0, enemy_class: Optional[Type[Enemy]] = None):
-        """Spawn a horde of enemies (legacy method)"""
+        """Spawn a horde of enemies (legacy method) - spawns from random edges"""
         if enemy_class is None:
             # Use first enemy class from factory if available
             if self.enemy_factory:
@@ -153,12 +183,8 @@ class Spawner:
                 return
         
         for i in range(count):
-            # Spread enemies across top of screen
-            spawn_x = random.uniform(
-                self.spawn_x_min + spread,
-                self.spawn_x_max - spread
-            )
-            spawn_pos = (spawn_x, self.spawn_y - i * 20)  # Stagger vertically
+            # Spawn from random edge
+            spawn_pos = self._get_random_edge_spawn_position(i)
             enemy = enemy_class(spawn_pos)
             enemy_group.add(enemy)
             self.spawn_count += 1

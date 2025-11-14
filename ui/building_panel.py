@@ -8,7 +8,7 @@ from world.building import Building, BuildState
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None):
         """
         Initialize building panel.
         Args:
@@ -16,6 +16,7 @@ class BuildingPanel:
             screen_height: Screen height in pixels
             upgrade_panel_frames: List of 3 frames for upgrade progress panel
             upgrade_panel_darken_frames: List of 3 darkened frames for upgrade progress panel
+            panel_background_frames: List of 3 frames (497x742 each) for building detail panel background
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -25,7 +26,15 @@ class BuildingPanel:
         
         self.is_visible = False
         self.selected_building: Optional[Building] = None
-        self.panel_rect = pygame.Rect(0, 0, 300, 400)
+        
+        # Set panel size based on background frames if available
+        self.panel_background_frames = panel_background_frames if panel_background_frames else []
+        if self.panel_background_frames and len(self.panel_background_frames) > 0:
+            bg_width, bg_height = self.panel_background_frames[0].get_size()
+            self.panel_rect = pygame.Rect(0, 0, bg_width, bg_height)
+        else:
+            self.panel_rect = pygame.Rect(0, 0, 300, 400)
+        
         self.panel_rect.bottomright = (screen_width - 10, screen_height - 10)
         self.button_rects = {}  # Store button rects for click detection
         
@@ -80,13 +89,24 @@ class BuildingPanel:
         
         building = self.selected_building
         
-        # Draw panel background
-        panel_bg = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
-        panel_bg.fill((50, 50, 50, 230))
-        surface.blit(panel_bg, self.panel_rect)
+        # Draw panel background using upgrade panel asset - select frame based on upgrade progress
+        # Initialize upgrade_progress if not set (backwards compatibility)
+        if not hasattr(building, 'upgrade_progress'):
+            building.upgrade_progress = 0
         
-        # Draw panel border
-        pygame.draw.rect(surface, (200, 200, 200), self.panel_rect, 3)
+        # Select frame based on upgrade progress (0, 1, 2) or tier if at max progress
+        if self.panel_background_frames and len(self.panel_background_frames) > 0:
+            # Use upgrade_progress to select frame (0, 1, 2)
+            frame_index = min(building.upgrade_progress, len(self.panel_background_frames) - 1)
+            current_background = self.panel_background_frames[frame_index]
+            surface.blit(current_background, self.panel_rect)
+        else:
+            # Fallback: simple background if frames not loaded
+            panel_bg = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
+            panel_bg.fill((50, 50, 50, 230))
+            surface.blit(panel_bg, self.panel_rect)
+            # Draw panel border
+            pygame.draw.rect(surface, (200, 200, 200), self.panel_rect, 3)
         
         # Draw building info
         y_offset = self.panel_rect.y + 20
@@ -116,98 +136,36 @@ class BuildingPanel:
         tier_text = f"Tier: {building.tier} / {building.TIER_MAX}"
         tier_surface = self.font_medium.render(tier_text, True, (255, 255, 255))
         surface.blit(tier_surface, (self.panel_rect.x + 10, y_offset))
-        y_offset += line_height - 25  # Reduced spacing to move upgrade panel up
         
         # Buttons (store rects for click detection)
         self.button_rects = {}
         
-        # Upgrade panel using progress frames
+        # Upgrade clickable area - coordinates (42, 404) to (450, 541) relative to panel background
         # Check if this is a wood wall that can be upgraded to iron
         from world.buildings.wall_wood import WallWood
         can_upgrade_to_iron = isinstance(building, WallWood) and building.state == BuildState.ACTIVE
         can_upgrade_tier = building.tier < building.TIER_MAX and building.state == BuildState.ACTIVE
         
-        # Show upgrade panel if can upgrade and progress < 3 (not yet at tier upgrade)
         # Initialize upgrade_progress if not set (backwards compatibility)
         if not hasattr(building, 'upgrade_progress'):
             building.upgrade_progress = 0
         
-        if (can_upgrade_to_iron or can_upgrade_tier) and self.upgrade_panel_frames and building.upgrade_progress < 3:
-            # Calculate upgrade cost and affordability (per progress step)
-            if can_upgrade_to_iron:
-                upgrade_cost = self._get_wall_upgrade_cost()
-            else:
-                upgrade_cost = self._get_upgrade_cost(building)
+        # Set up upgrade clickable area if building can be upgraded
+        if can_upgrade_to_iron or can_upgrade_tier:
+            # Clickable area coordinates relative to panel background: (42, 404) to (450, 541)
+            clickable_left = 42
+            clickable_top = 404
+            clickable_width = 450 - 42  # 408
+            clickable_height = 541 - 404  # 137
             
-            can_afford = (resources.wood >= upgrade_cost.wood and
-                         resources.iron >= upgrade_cost.iron and
-                         resources.food >= upgrade_cost.food)
+            # Calculate clickable area position on screen (relative to panel position)
+            clickable_x = self.panel_rect.x + clickable_left
+            clickable_y = self.panel_rect.y + clickable_top
             
-            # Select frame based on upgrade progress (0, 1, 2)
-            frame_index = min(building.upgrade_progress, len(self.upgrade_panel_frames) - 1)
+            # Store clickable area rect for click detection
+            self.upgrade_panel_rect = pygame.Rect(clickable_x, clickable_y, clickable_width, clickable_height)
             
-            # Get a frame to calculate dimensions (we'll choose the right one later)
-            temp_frame = self.upgrade_panel_frames[frame_index] if frame_index < len(self.upgrade_panel_frames) else self.upgrade_panel_frames[0]
-            
-            # Scale frame to fit panel if needed (max width is panel width - 20 for padding)
-            max_width = self.panel_rect.width - 20
-            original_width = temp_frame.get_width()
-            original_height = temp_frame.get_height()
-            
-            scale_factor = 1.0
-            if original_width > max_width:
-                scale_factor = max_width / original_width
-                new_width = int(original_width * scale_factor)
-                new_height = int(original_height * scale_factor)
-            else:
-                new_width = original_width
-                new_height = original_height
-            
-            # Position upgrade panel
-            upgrade_panel_x = self.panel_rect.x + (self.panel_rect.width - new_width) // 2
-            upgrade_panel_y = y_offset
-            
-            # Calculate clickable area position on screen
-            # Define clickable area in original image coordinates: (62, 216) to (318, 332)
-            clickable_left_original = 62
-            clickable_top_original = 216
-            clickable_width_original = 318 - 62  # 256
-            clickable_height_original = 332 - 216  # 116
-            
-            # Scale clickable area to match scaled image
-            clickable_left_scaled = int(clickable_left_original * scale_factor)
-            clickable_top_scaled = int(clickable_top_original * scale_factor)
-            clickable_width_scaled = int(clickable_width_original * scale_factor)
-            clickable_height_scaled = int(clickable_height_original * scale_factor)
-            
-            # Calculate clickable area position on screen
-            clickable_x = upgrade_panel_x + clickable_left_scaled
-            clickable_y = upgrade_panel_y + clickable_top_scaled
-            
-            # Store clickable area rect for click detection (not the full panel)
-            self.upgrade_panel_rect = pygame.Rect(clickable_x, clickable_y, clickable_width_scaled, clickable_height_scaled)
-            
-            # Check if mouse is hovering over the upgrade panel
-            is_hovering = False
-            if mouse_pos:
-                is_hovering = self.upgrade_panel_rect.collidepoint(mouse_pos)
-            
-            # Choose which frame set to use (normal or darkened)
-            # Use darkened frames if can't afford or hovering
-            use_darkened = not can_afford or is_hovering
-            if use_darkened and self.upgrade_panel_darken_frames and frame_index < len(self.upgrade_panel_darken_frames):
-                original_frame = self.upgrade_panel_darken_frames[frame_index]
-            else:
-                original_frame = self.upgrade_panel_frames[frame_index] if frame_index < len(self.upgrade_panel_frames) else self.upgrade_panel_frames[0]
-            
-            # Scale the chosen frame
-            if scale_factor != 1.0:
-                current_frame = pygame.transform.smoothscale(original_frame, (new_width, new_height))
-            else:
-                current_frame = original_frame
-            
-            # Draw upgrade panel frame
-            surface.blit(current_frame, (upgrade_panel_x, upgrade_panel_y))
+            # Register upgrade button
             if can_upgrade_to_iron:
                 self.button_rects["upgrade_to_iron"] = self.upgrade_panel_rect
             else:

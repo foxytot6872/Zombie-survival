@@ -145,9 +145,17 @@ class Enemy(pygame.sprite.Sprite):
         # Move toward target (survivor or building) or straight down
         # Prioritize survivors if we have one as target
         if self.target_survivor and self.target_survivor.alive:
-            # Check if we're in attack range (account for zombie radius)
+            # Check if we're in attack range
             distance = (self.pos - self.target_survivor.pos).length()
-            attack_distance = self.attack_range + self.ZOMBIE_RADIUS
+            
+            # Check if enemy is ranged
+            is_ranged = hasattr(self, 'ranged') and self.ranged
+            
+            # For ranged enemies, use full attack_range. For melee, add radius.
+            if is_ranged:
+                attack_distance = self.attack_range
+            else:
+                attack_distance = self.attack_range + self.ZOMBIE_RADIUS
             
             if distance <= attack_distance:
                 # Stop moving and attack
@@ -184,12 +192,17 @@ class Enemy(pygame.sprite.Sprite):
                     self.time_since_progress = 0.0
                     # Will retarget next frame
         elif self.target_building and self.target_building in building_group:
-            # Check if we're in attack range (account for zombie radius)
+            # Check if we're in attack range
             distance = (self.pos - self.target_building.pos).length()
-            attack_distance = self.attack_range + self.ZOMBIE_RADIUS
             
-            # Check if enemy is ranged (like spitter)
+            # Check if enemy is ranged (like spitter or archer skeleton)
             is_ranged = hasattr(self, 'ranged') and self.ranged
+            
+            # For ranged enemies, use full attack_range. For melee, add radius.
+            if is_ranged:
+                attack_distance = self.attack_range
+            else:
+                attack_distance = self.attack_range + self.ZOMBIE_RADIUS
             
             if distance <= attack_distance:
                 # Stop moving and attack
