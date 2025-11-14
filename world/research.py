@@ -18,6 +18,7 @@ class ResearchManager:
         self.unlocked: Set[str] = set()  # Unlocked items (e.g., "sawmill", "railgun_turret")
         self.purchased: Set[str] = set()  # Purchased research keys (e.g., "sawmill_unlock")
         self.research_defs: Dict = {}
+        self.research_modifiers: Dict[str, float] = {}  # Permanent research modifiers
         
         # Load research definitions
         path = "data/config/research.json"
@@ -94,9 +95,72 @@ class ResearchManager:
         for item in unlocks:
             self.unlocked.add(item)
         
+        # Apply modifiers immediately (stack multiplicatively)
+        modifiers = self.research_defs[research_key].get("modifiers", {})
+        for mod_key, mod_value in modifiers.items():
+            if isinstance(mod_value, (int, float)):
+                # Multiplicative stacking: multiply current value by new value
+                # If this is the first research for this modifier, start from 1.0
+                current = self.research_modifiers.get(mod_key, 1.0)
+                self.research_modifiers[mod_key] = current * mod_value
+            else:
+                # For non-numeric modifiers, just set it
+                self.research_modifiers[mod_key] = mod_value
+        
         return True
     
     def get_research_list(self) -> Dict:
         """Get all research definitions."""
         return self.research_defs.copy()
+    
+    def apply_research_modifiers(self) -> Dict[str, float]:
+        """
+        Get effective modifiers combining research and day event modifiers.
+        Research modifiers stack multiplicatively with day event modifiers.
+        Returns:
+            Dict of effective modifier values
+        """
+        if hasattr(self.world, 'modifiers'):
+            effective = self.world.modifiers.copy()
+        else:
+            effective = {
+                "resource_prod_mult": 1.0, "coin_drop_mult": 1.0, "build_cost_mult": 1.0,
+                "turret_fire_rate_mult": 1.0, "building_damage_taken_mult": 1.0,
+                "zombie_spawn_mult": 1.0, "zombie_speed_mult": 1.0, "zombie_hp_mult": 1.0,
+                "turret_range_mult": 1.0, "gather_speed_mult": 1.0, "haul_speed_mult": 1.0,
+                "building_hp_mult": 1.0, "enemy_skeleton_damage_mult": 1.0,
+                # New modifiers
+                "turret_damage_mult": 1.0, "turret_projectile_speed_mult": 1.0,
+                "turret_hp_mult": 1.0, "wall_hp_mult": 1.0, "wall_repair_rate_mult": 1.0,
+                "building_refund_mult": 1.0, "survivor_hp_mult": 1.0, "survivor_speed_mult": 1.0,
+                "survivor_gather_speed_mult": 1.0, "survivor_haul_speed_mult": 1.0,
+                "enemy_armor_pierce_mult": 1.0,
+            }
+        
+        for mod_key, mod_value in self.research_modifiers.items():
+            if isinstance(mod_value, (int, float)):
+                base_value = effective.get(mod_key, 1.0)
+                effective[mod_key] = base_value * mod_value
+            else:
+                effective[mod_key] = mod_value
+        
+        return effective
+    
+    def is_research_unlocked(self, key: str) -> bool:
+        """Alias for is_unlocked for consistency."""
+        return self.is_unlocked(key)
+    
+    def get_research_by_tier(self) -> Dict[int, Dict]:
+        """
+        Get research items grouped by tier.
+        Returns:
+            Dict mapping tier number to dict of research items
+        """
+        tiered = {}
+        for key, data in self.research_defs.items():
+            tier = data.get("tier", 1)
+            if tier not in tiered:
+                tiered[tier] = {}
+            tiered[tier][key] = data
+        return tiered
 

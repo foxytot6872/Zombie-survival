@@ -28,10 +28,14 @@ class GatlingTurret(Building):
         super().__init__(grid_pos, tier=tier, uid=uid)
         
         # Gatling-specific attributes
-        self.cooldown = 300  # milliseconds - very fast firing
-        self.range = 150  # pixels - shorter range
+        self.base_cooldown = 300  # milliseconds - very fast firing
+        self.cooldown = self.base_cooldown  # Will be modified by day events
+        self.base_range = 150  # pixels - shorter range
+        self.range = self.base_range  # Will be modified by day events
         self.damage = 5  # damage per shot - low damage
+        self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 500.0  # pixels per second - fast projectiles
+        self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.angle = 0
         self.target_angle = 0
         self.rotation_speed = 240  # degrees per second - fast rotation
@@ -258,13 +262,20 @@ class GatlingTurret(Building):
             if self.projectile_group is not None:
                 # Use the turret's visual position (with offset) for projectile spawn
                 turret_visual_pos = pygame.Vector2(self.pos.x, self.pos.y + self.turret_offset_y)
+                # Use effective damage and speed (modified by research/day events)
+                effective_damage = getattr(self, 'effective_damage', self.damage)
+                effective_speed = getattr(self, 'effective_projectile_speed', self.projectile_speed)
                 projectile = Projectile(
                     start_pos=(turret_visual_pos.x, turret_visual_pos.y),
                     target_pos=(target_enemy.pos.x, target_enemy.pos.y),
-                    speed=self.projectile_speed,
-                    damage=self.damage,
+                    speed=effective_speed,
+                    damage=effective_damage,
                     target_type="enemy"  # Target enemies
                 )
+                # Set world reference for modifiers (armor pierce, etc.)
+                world_ref = getattr(self, 'world', None)
+                if world_ref:
+                    projectile.world = world_ref
                 self.projectile_group.add(projectile)
     
     def update_animation(self, dt: float, is_firing: bool):
@@ -374,6 +385,35 @@ class GatlingTurret(Building):
     
     def update(self, dt: float, world=None):
         """Update turret"""
+        # Apply turret modifiers from research and day events
+        if world and hasattr(world, 'modifiers'):
+            fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
+            self.cooldown = int(self.base_cooldown * fire_rate_mult)
+            
+            # Apply turret range modifier
+            range_mult = world.modifiers.get("turret_range_mult", 1.0)
+            new_range = int(self.base_range * range_mult)
+            if new_range != self.range:
+                self.range = new_range
+                # Recreate range circle if range changed
+                self.range_image = pygame.Surface((self.range * 2, self.range * 2), pygame.SRCALPHA)
+                pygame.draw.circle(self.range_image, (100, 100, 100, 100), (self.range, self.range), self.range)
+                self.range_rect = self.range_image.get_rect()
+                self.update_range_position()  # Update position to match turret
+            
+            # Apply turret damage modifier (calculate effective damage)
+            damage_mult = world.modifiers.get("turret_damage_mult", 1.0)
+            self.effective_damage = int(5 * damage_mult)  # Base damage is 5
+            
+            # Apply turret projectile speed modifier
+            projectile_speed_mult = world.modifiers.get("turret_projectile_speed_mult", 1.0)
+            self.effective_projectile_speed = self.projectile_speed * projectile_speed_mult
+        else:
+            self.cooldown = self.base_cooldown
+            self.range = self.base_range
+            self.effective_damage = self.damage
+            self.effective_projectile_speed = self.projectile_speed
+        
         super().update(dt, world)
         
         if self.state == BuildState.ACTIVE:

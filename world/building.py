@@ -133,7 +133,9 @@ class Building(pygame.sprite.Sprite):
         self.COST = cost if isinstance(cost, Cost) else self.COST
         self.PASSIVE = production if isinstance(production, Production) else self.PASSIVE
         
-        self.max_hp = int(self.BASE_HP * (1 + 0.15*(tier-1)))
+        # Calculate base max_hp from tier (modifiers applied when building becomes active)
+        base_max_hp = int(self.BASE_HP * (1 + 0.15*(tier-1)))
+        self.max_hp = base_max_hp
         self.hp = 1
         
         # Attacker slot tracking for load balancing
@@ -146,8 +148,11 @@ class Building(pygame.sprite.Sprite):
         self.pos = pygame.Vector2(cx, cy)
         
         # rendering
-        self.image = pygame.Surface((w*TILE, h*TILE), pygame.SRCALPHA)
-        self.rect = self.image.get_rect(center=self.pos)
+        # rect represents the footprint area (top-left aligned)
+        pixel_w = w * TILE
+        pixel_h = h * TILE
+        self.rect = pygame.Rect(self.grid_x * TILE, self.grid_y * TILE, pixel_w, pixel_h)
+        self.image = pygame.Surface((pixel_w, pixel_h), pygame.SRCALPHA)
 
     # ------------------------------------------------------------------
     # Dynamic sprite / level support
@@ -174,8 +179,6 @@ class Building(pygame.sprite.Sprite):
             if sprite_data is None:
                 return
 
-        center = self.rect.center if hasattr(self, "rect") else (self.pos.x, self.pos.y)
-
         if isinstance(sprite_data, list):
             if not sprite_data:
                 return
@@ -186,7 +189,7 @@ class Building(pygame.sprite.Sprite):
             new_image = sprite_data.copy()
 
         self.image = new_image
-        self.rect = self.image.get_rect(center=center)
+        # Keep rect as footprint area - don't change it based on sprite size
 
     # ----- Placement & Economy -----
     @classmethod
@@ -246,10 +249,14 @@ class Building(pygame.sprite.Sprite):
         resources.food -= effective_food
         return True
 
-    def refund_cost(self, resources, ratio: float = 1.0):
+    def refund_cost(self, resources, ratio: float = 1.0, world=None):
         """Refund cost using this building's cost (instance method)."""
         # Use instance COST if available (set in __init__), otherwise use class method
         c = self.COST
+        # Apply building refund modifier
+        if world and hasattr(world, 'modifiers'):
+            refund_mult = world.modifiers.get("building_refund_mult", 1.0)
+            ratio = ratio * refund_mult
         resources.wood += int(c.wood * ratio)
         resources.iron += int(c.iron * ratio)
         resources.food += int(c.food * ratio)
@@ -258,7 +265,30 @@ class Building(pygame.sprite.Sprite):
     def start_construction(self):
         self.state = BuildState.CONSTRUCTING
         self.progress = 0.0
+        # Apply HP modifiers when construction starts (world should be available)
+        self._apply_hp_modifiers()
         self.hp = max(1, int(0.1*self.max_hp))  # vulnerable during build
+    
+    def _apply_hp_modifiers(self):
+        """Apply HP modifiers from research/day events"""
+        # Calculate base max_hp from tier
+        base_max_hp = int(self.BASE_HP * (1 + 0.15*(self.tier-1)))
+        # Apply HP modifiers if world is available
+        world = getattr(self, 'world', None)
+        if world and hasattr(world, 'modifiers'):
+            building_hp_mult = world.modifiers.get("building_hp_mult", 1.0)
+            # Check if this is a turret and apply turret_hp_mult
+            if hasattr(self, 'TYPE_ID') and 'turret' in self.TYPE_ID:
+                turret_hp_mult = world.modifiers.get("turret_hp_mult", 1.0)
+                self.max_hp = int(base_max_hp * building_hp_mult * turret_hp_mult)
+            # Check if this is a wall and apply wall_hp_mult as well
+            elif hasattr(self, 'TYPE_ID') and self.TYPE_ID.startswith('wall'):
+                wall_hp_mult = world.modifiers.get("wall_hp_mult", 1.0)
+                self.max_hp = int(base_max_hp * building_hp_mult * wall_hp_mult)
+            else:
+                self.max_hp = int(base_max_hp * building_hp_mult)
+        else:
+            self.max_hp = base_max_hp
 
     def update(self, dt: float, world=None):
         if self.state == BuildState.CONSTRUCTING:
@@ -295,7 +325,7 @@ class Building(pygame.sprite.Sprite):
     def repair(self, amount: int):
         self.hp = min(self.max_hp, self.hp + amount)
 
-    def upgrade(self) -> bool:
+    def upgrade(self, world=None) -> bool:
         """Upgrade building - increments progress, increases tier when progress reaches 3"""
         if self.tier >= self.TIER_MAX:
             return False
@@ -311,7 +341,21 @@ class Building(pygame.sprite.Sprite):
         if self.upgrade_progress >= 3:
             self.tier += 1
             self.upgrade_progress = 0  # Reset progress for next tier
-            self.max_hp = int(self.BASE_HP * (1 + 0.15*(self.tier-1)))
+            # Recalculate max_hp with modifiers when upgrading
+            base_max_hp = int(self.BASE_HP * (1 + 0.15*(self.tier-1)))
+            if world and hasattr(world, 'modifiers'):
+                building_hp_mult = world.modifiers.get("building_hp_mult", 1.0)
+                # Check if this is a turret and apply turret_hp_mult
+                if hasattr(self, 'TYPE_ID') and 'turret' in self.TYPE_ID:
+                    turret_hp_mult = world.modifiers.get("turret_hp_mult", 1.0)
+                    self.max_hp = int(base_max_hp * building_hp_mult * turret_hp_mult)
+                elif hasattr(self, 'TYPE_ID') and self.TYPE_ID.startswith('wall'):
+                    wall_hp_mult = world.modifiers.get("wall_hp_mult", 1.0)
+                    self.max_hp = int(base_max_hp * building_hp_mult * wall_hp_mult)
+                else:
+                    self.max_hp = int(base_max_hp * building_hp_mult)
+            else:
+                self.max_hp = base_max_hp
             self.on_upgrade()
         
         return True

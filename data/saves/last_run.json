@@ -1,31 +1,22 @@
 {
   "version": "1.0",
   "wave_manager": {
-    "night": 2,
-    "day": 1,
+    "night": 4,
+    "day": 3,
     "state": "SUMMARY",
     "difficulty": "normal",
     "enemies_killed": 0,
-    "enemies_spawned": 12,
+    "enemies_spawned": 37,
     "timer": 0.0
   },
   "resources": {
-<<<<<<< Updated upstream
     "wood": 500.0,
     "iron": 300.0,
-=======
-    "wood": 325.28799999999814,
-    "iron": 364.43799999995736,
->>>>>>> Stashed changes
     "food": 200.0
   },
   "buildings": [
     {
-<<<<<<< Updated upstream
-      "uid": "70ba0768-b728-464c-a7c5-ab0cfc492479",
-=======
-      "uid": "b3f97b0f-56e2-4086-ad31-c9c8f07181c3",
->>>>>>> Stashed changes
+      "uid": "e5816252-6fa0-4a3e-84f4-c8d0e8b5ed81",
       "type": "hq",
       "grid": [
         29,
@@ -37,50 +28,22 @@
       "progress": 0.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "0d20dde6-a574-4fb1-9a25-565ade5d16af",
-=======
-      "uid": "0f6671d2-0c50-4077-bf14-74d6abae4174",
->>>>>>> Stashed changes
+      "uid": "18b8413b-3c7d-4768-9d4b-e4c414e846d9",
       "type": "wall_wood",
       "grid": [
         23,
         12
       ],
       "tier": 1,
-      "hp": 210,
+      "hp": 175,
       "state": "active",
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "81e365fb-d268-4553-91ed-ef0198df5612",
-=======
-      "uid": "7ae9c2d4-3627-45dc-9f73-2715a3fdb8c7",
->>>>>>> Stashed changes
+      "uid": "3f04a683-6e5f-42e9-ac8d-800a6a4b8292",
       "type": "wall_wood",
       "grid": [
         24,
-        12
-      ],
-      "tier": 1,
-<<<<<<< Updated upstream
-      "hp": 230,
-=======
-      "hp": 195,
->>>>>>> Stashed changes
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "142fd083-32b7-4c08-a13d-956584cef140",
-=======
-      "uid": "ebf601cf-0923-43a4-bb54-4e28fe3914f7",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        25,
         12
       ],
       "tier": 1,
@@ -89,11 +52,19 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "cb206dd3-126e-40d6-a081-3638bedc3e11",
-=======
-      "uid": "49eed187-71d9-439f-95c2-3442748a55b8",
->>>>>>> Stashed changes
+      "uid": "73a6487b-a70e-4d22-b2f0-41d18a0d7ae8",
+      "type": "wall_wood",
+      "grid": [
+        25,
+        12
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "18616a40-4fb7-4d6a-8c5b-7d55c5f27b62",
       "type": "wall_wood",
       "grid": [
         26,
@@ -105,11 +76,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "db9c6006-d0e1-46c8-bdf0-a99edd0a8526",
-=======
-      "uid": "27ddc455-c073-4270-9c07-2cbe3481f2e6",
->>>>>>> Stashed changes
+      "uid": "7c1641d6-d6be-428d-9ba6-ec6035132a69",
       "type": "wall_wood",
       "grid": [
         27,
@@ -121,11 +88,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "920fd850-3866-4989-a404-10bbc47ea9c5",
-=======
-      "uid": "60454a70-6ff2-42de-83c2-1e9e889185bf",
->>>>>>> Stashed changes
+      "uid": "bf91a2c3-ce7c-476d-82c5-0c284a65db7d",
       "type": "wall_wood",
       "grid": [
         28,
@@ -137,11 +100,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "c1e3e1f1-2201-42a8-a094-329084402489",
-=======
-      "uid": "ffc8ea5c-4a09-475f-9e99-fc3a18549ce2",
->>>>>>> Stashed changes
+      "uid": "4cf9e51e-dfd9-4c73-b683-e6bf2abde54b",
       "type": "wall_wood",
       "grid": [
         29,
@@ -153,11 +112,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "f7b5003a-3f09-4d3e-ad5a-6d13fc8d1bea",
-=======
-      "uid": "1397fef9-deb5-48aa-8f26-8073816dc1a0",
->>>>>>> Stashed changes
+      "uid": "26d2b8ee-6605-421c-be1b-e3d6e0a5b088",
       "type": "wall_wood",
       "grid": [
         30,
@@ -169,11 +124,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "ac067b28-522d-4292-ac04-197b59aae8fe",
-=======
-      "uid": "d5f317da-df9e-490e-8e0c-bf18917f2b07",
->>>>>>> Stashed changes
+      "uid": "9abd0db0-6485-4338-a986-8b3346ac5b0a",
       "type": "wall_wood",
       "grid": [
         31,
@@ -185,11 +136,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "3e8ea194-13ae-4ff0-8eb8-f8698dddc5ec",
-=======
-      "uid": "287d7138-492b-42e7-b244-e72ce7ee6d9c",
->>>>>>> Stashed changes
+      "uid": "5bb74a0d-9566-4cd2-a173-9cb5d38ddf61",
       "type": "wall_wood",
       "grid": [
         32,
@@ -201,11 +148,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "f7110f62-08b6-4db7-85ea-4c3789501c67",
-=======
-      "uid": "4993afbb-1690-4778-90d4-5aed5db50aff",
->>>>>>> Stashed changes
+      "uid": "37ef112a-27b9-46cd-88aa-6b32b0982d24",
       "type": "wall_wood",
       "grid": [
         33,
@@ -217,25 +160,19 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "0170783f-7dad-4659-9817-7aeef0c364e8",
-=======
-      "uid": "b1e4f9d5-e0db-4e2b-85d3-88d6c03998d7",
->>>>>>> Stashed changes
+      "uid": "e237d1af-13f9-4323-af38-ab86cb04ecdc",
       "type": "wall_wood",
       "grid": [
         34,
         12
       ],
       "tier": 1,
-<<<<<<< Updated upstream
-=======
       "hp": 250,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "1da6cc2c-ebcd-4ea0-b325-d0a1c4cf8ef3",
+      "uid": "9cfc8821-5f07-4992-a28c-69fc297ff5ac",
       "type": "wall_wood",
       "grid": [
         35,
@@ -247,7 +184,7 @@
       "progress": 1.0
     },
     {
-      "uid": "2a19be3c-4f01-4e40-a29a-abc4e501640d",
+      "uid": "fbc5b4fd-4986-45f0-9907-a654a54326db",
       "type": "wall_wood",
       "grid": [
         36,
@@ -259,100 +196,43 @@
       "progress": 1.0
     },
     {
-      "uid": "d801c68c-5f99-4cdd-b9aa-88145398bae8",
+      "uid": "5d719218-efe3-4812-be84-97f44eeb364d",
       "type": "wall_wood",
       "grid": [
         37,
         12
       ],
       "tier": 1,
-      "hp": 235,
+      "hp": 136,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "37fb38a1-eb93-451e-b05d-d401016dabbc",
+      "uid": "e4bb8d7b-39d7-4cc4-bb96-ee355502e868",
       "type": "wall_wood",
       "grid": [
         23,
         19
       ],
       "tier": 1,
->>>>>>> Stashed changes
-      "hp": 250,
+      "hp": 230,
       "state": "active",
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "b2f57849-736d-4deb-8a3d-4ba44b74586a",
-      "type": "wall_wood",
-      "grid": [
-        35,
-        12
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "b281a4e2-226c-47bf-b5ad-d7a1189264f5",
-      "type": "wall_wood",
-      "grid": [
-        36,
-        12
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "5ff77582-ecb8-410f-8e67-0dcd81dd1e34",
-      "type": "wall_wood",
-      "grid": [
-        37,
-        12
-      ],
-      "tier": 1,
-      "hp": 225,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "397a16d9-6bd4-4428-bbc6-3e091fde2d3d",
-      "type": "wall_wood",
-      "grid": [
-        23,
-        19
-      ],
-      "tier": 1,
-      "hp": 23,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "6de6d063-b5f6-4181-86ab-77a0227c0d9d",
-=======
-      "uid": "15c78351-9c6e-4307-9078-a902cb23c002",
->>>>>>> Stashed changes
+      "uid": "22538261-6b2e-44e4-b70c-1ab5194f13df",
       "type": "wall_wood",
       "grid": [
         24,
         19
       ],
       "tier": 1,
-      "hp": 250,
+      "hp": 240,
       "state": "active",
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "d8172bc9-9d0a-4892-b4c3-78e338b7d010",
-=======
-      "uid": "089456d7-9373-4ffb-99c9-e23f8dcaeee4",
->>>>>>> Stashed changes
+      "uid": "d8271efe-6110-47d7-a961-d179a2f83452",
       "type": "wall_wood",
       "grid": [
         25,
@@ -364,11 +244,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "6f411577-a22a-490a-ac34-cbcdbb33fcb1",
-=======
-      "uid": "f57d714c-ee9c-425a-b672-174fc7a56073",
->>>>>>> Stashed changes
+      "uid": "6dcfea79-0ea9-4023-8f47-588b84fb6c52",
       "type": "wall_wood",
       "grid": [
         26,
@@ -380,11 +256,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "36aabfc5-243a-475d-9e3d-5eff98b87d12",
-=======
-      "uid": "a850683c-f707-4e43-a559-00b86abb3696",
->>>>>>> Stashed changes
+      "uid": "9cb8ed4e-6969-46e2-9c16-fcfe90001f94",
       "type": "wall_wood",
       "grid": [
         27,
@@ -396,11 +268,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "7a85868b-a847-4624-9469-ceb537887e61",
-=======
-      "uid": "4352217a-8f3f-4ed0-b054-7d7e7385bd15",
->>>>>>> Stashed changes
+      "uid": "051b9a37-0633-4bf6-a91f-198ec22e1c03",
       "type": "wall_wood",
       "grid": [
         28,
@@ -412,11 +280,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "a4f099ed-7f42-4340-9b95-fcc2a6d4799b",
-=======
-      "uid": "75babaea-9c77-4a79-b4b5-11c3321ae036",
->>>>>>> Stashed changes
+      "uid": "1637cfd6-7563-4efa-8409-eb631d7f43b6",
       "type": "wall_wood",
       "grid": [
         29,
@@ -428,11 +292,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "8acbc280-7fc3-4b1f-b83d-74ad7fefab45",
-=======
-      "uid": "a23375be-3ede-4f10-99fe-cb9e6d796ee7",
->>>>>>> Stashed changes
+      "uid": "007cae09-044f-4c69-8f27-99117cde1144",
       "type": "wall_wood",
       "grid": [
         31,
@@ -444,11 +304,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "29ae5a1c-1b17-46ae-838e-c5fa7028aac0",
-=======
-      "uid": "0cea3f24-3102-49d2-bcfd-3b284c71fa64",
->>>>>>> Stashed changes
+      "uid": "fb42c0ae-de80-454a-9be0-c432bc4238fa",
       "type": "wall_wood",
       "grid": [
         32,
@@ -460,11 +316,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "66f3bbe5-84d6-42af-b423-edc84ebf99a4",
-=======
-      "uid": "d24ac7ba-c4e4-4849-beda-dd9a6cb210b3",
->>>>>>> Stashed changes
+      "uid": "88b1ffad-6a19-4f5a-9f69-37c0c91e45de",
       "type": "wall_wood",
       "grid": [
         33,
@@ -476,11 +328,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "bcee92e8-1bf2-486f-8b87-6fff5ade6682",
-=======
-      "uid": "d6822778-5ba8-4698-951f-296c37fee859",
->>>>>>> Stashed changes
+      "uid": "50bea9ce-e00b-4c6c-aff1-4cbcc7d6738f",
       "type": "wall_wood",
       "grid": [
         34,
@@ -492,11 +340,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "4aea7a5e-2633-4167-ac74-2ceaa55c380f",
-=======
-      "uid": "9b574112-a95d-4627-8c0c-910a17f1ce50",
->>>>>>> Stashed changes
+      "uid": "7ed81841-2a15-49ff-bec2-a1a9b58203b8",
       "type": "wall_wood",
       "grid": [
         35,
@@ -508,11 +352,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "cd040414-80ab-484d-a17b-f0aa88a9cd37",
-=======
-      "uid": "29395447-1a76-413f-8112-bb147594dc78",
->>>>>>> Stashed changes
+      "uid": "076df950-96e7-45b5-beb3-ab6ed7b4b5df",
       "type": "wall_wood",
       "grid": [
         36,
@@ -524,15 +364,155 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "eab2bab7-5544-4804-89d2-88ccd89ee9d6",
-=======
-      "uid": "498c31ac-81ce-4f52-ad01-481d113e4f25",
->>>>>>> Stashed changes
+      "uid": "58c18e8d-a4c0-4f69-8e3c-eec01b7f063d",
       "type": "wall_wood",
       "grid": [
         37,
         19
+      ],
+      "tier": 1,
+      "hp": 223,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "ba4c4b94-c70e-4ce5-8950-f42f930d45c2",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        13
+      ],
+      "tier": 1,
+      "hp": 207,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "b452c4e4-4650-4da6-8527-f6207882b1cc",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        14
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "d9281db1-dea4-4a72-aeb5-c59b5a52374a",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        15
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "f59e8fa7-c5de-45bb-b0bb-28deafe83e9f",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        16
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "cbcfae3a-b5d4-4d9a-9b5a-b60567de1ca9",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        17
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "d6a1c62f-8ffb-4ce7-9df2-604eaabe3c23",
+      "type": "wall_wood",
+      "grid": [
+        23,
+        18
+      ],
+      "tier": 1,
+      "hp": 245,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "5a176a43-3280-424b-b6ae-da23705eb462",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        13
+      ],
+      "tier": 1,
+      "hp": 145,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "49a95243-95fd-4924-9470-936740be287f",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        14
+      ],
+      "tier": 1,
+      "hp": 125,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "8017e529-7459-4336-9d24-c7133f311e68",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        15
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "288fce06-ca52-46c5-a349-dfb25c74ea08",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        16
+      ],
+      "tier": 1,
+      "hp": 250,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "95cd52ed-69b9-4429-aa9d-838f6a435823",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        17
+      ],
+      "tier": 1,
+      "hp": 240,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "798ffb89-cc0a-4b8f-ad54-3d9a32eeadcb",
+      "type": "wall_wood",
+      "grid": [
+        37,
+        18
       ],
       "tier": 1,
       "hp": 235,
@@ -540,214 +520,7 @@
       "progress": 1.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "4c396e64-afde-4708-841e-2f74e44af4a4",
-=======
-      "uid": "353cc2f8-83bf-455a-8fdf-de3b5ed2e77a",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        23,
-        13
-      ],
-      "tier": 1,
-<<<<<<< Updated upstream
-      "hp": 188,
-=======
-      "hp": 250,
->>>>>>> Stashed changes
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "9f81446b-41aa-4af7-bbde-c3df61d806c2",
-=======
-      "uid": "7fce6b0d-3e1e-49a6-bec6-4578ef4e54e7",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        23,
-        14
-      ],
-      "tier": 1,
-<<<<<<< Updated upstream
-      "hp": 240,
-=======
-      "hp": 250,
->>>>>>> Stashed changes
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "91532a71-b85a-46a8-8f73-272dedc4de66",
-=======
-      "uid": "6f1e7048-331c-4370-a7e1-c5ff379fad4a",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        23,
-        15
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "c0ceb1db-d796-4e02-b23c-ce618fa8c3c1",
-=======
-      "uid": "b2fdba82-1e83-4d64-a5ad-b464a2aaae51",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        23,
-        16
-      ],
-      "tier": 1,
-<<<<<<< Updated upstream
-=======
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-      "uid": "6ef973e5-d083-4c75-9c3d-9e73b9692b0d",
-      "type": "wall_wood",
-      "grid": [
-        23,
-        17
-      ],
-      "tier": 1,
->>>>>>> Stashed changes
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "c7daf465-b221-4e8c-8938-83051d933e9b",
-=======
-      "uid": "c6a6a223-29fb-4923-ad53-c631d154a146",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        23,
-        18
-      ],
-      "tier": 1,
-      "hp": 18,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "931fd159-bc83-4f86-9ce8-f2cf8466b082",
-=======
-      "uid": "76bbfd67-f98f-4d12-a042-c7e0a77d8ffd",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        13
-      ],
-      "tier": 1,
-<<<<<<< Updated upstream
-      "hp": 245,
-=======
-      "hp": 250,
->>>>>>> Stashed changes
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "cd250ad4-ed43-45b3-9767-b71c2e2ceb65",
-=======
-      "uid": "4c7db832-070d-4ab8-96d2-0dc6724b655c",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        14
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "95436cd3-2bb0-4eef-8778-38f765775614",
-=======
-      "uid": "16ae5594-46fd-4354-b058-70708f177f58",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        15
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "2c3d0ae8-1557-4833-acd4-31b5c8316b72",
-=======
-      "uid": "e4eba5ef-cba9-43a4-a7a1-97bf4c13bed7",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        16
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "02bdc2a0-3d3e-4592-94e2-3c6061a01c78",
-=======
-      "uid": "d210d018-a7ab-4756-bcc7-74cfc4371821",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        17
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "cdaf9471-676a-4ec7-b6af-456e187a498a",
-=======
-      "uid": "b1c6330c-c585-4b74-bae9-726d895ea287",
->>>>>>> Stashed changes
-      "type": "wall_wood",
-      "grid": [
-        37,
-        18
-      ],
-      "tier": 1,
-      "hp": 250,
-      "state": "active",
-      "progress": 1.0
-    },
-    {
-<<<<<<< Updated upstream
-      "uid": "74a71c31-b869-44a8-bb0b-d2cf24c9ecb2",
-=======
-      "uid": "8dda081f-f6ac-44bf-b8f7-0165d9a232f8",
->>>>>>> Stashed changes
+      "uid": "62ca3828-d2d9-4b30-b6af-8a73ba4fa9d9",
       "type": "gate",
       "grid": [
         30,
@@ -759,26 +532,20 @@
       "progress": 2.0
     },
     {
-<<<<<<< Updated upstream
-      "uid": "82621a70-e65b-494f-8a93-148d3296e224",
-=======
-      "uid": "c41a3c3e-d3fc-48dc-b381-014b91a0b06d",
->>>>>>> Stashed changes
+      "uid": "c08cf532-19d6-4c6e-9615-0b14b0502d58",
       "type": "turret_ballistic",
       "grid": [
         27,
         10
       ],
       "tier": 1,
-<<<<<<< Updated upstream
-=======
       "hp": 220,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "6317e4c0-bf9f-4e7c-ac88-807cb1ae85ed",
+      "uid": "087f9c34-b553-40c6-8536-e882cea7a24b",
       "type": "turret_ballistic",
       "grid": [
         30,
@@ -791,7 +558,7 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "48cf957f-548d-4ec4-8399-c411e4d8dc44",
+      "uid": "c75c8f7b-77a0-4488-967f-cc659059161e",
       "type": "turret_ballistic",
       "grid": [
         33,
@@ -804,64 +571,20 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "da7a3566-8118-420c-b351-4cad350a1b7f",
+      "uid": "866d16d6-3594-4ad5-8c37-cfc56aa8ea2b",
       "type": "turret_ballistic",
       "grid": [
         26,
         21
       ],
       "tier": 1,
->>>>>>> Stashed changes
       "hp": 220,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
     },
     {
-<<<<<<< Updated upstream
-      "uid": "361e4ef5-4561-49e9-b37a-8bc77a77872d",
-      "type": "turret_ballistic",
-      "grid": [
-        30,
-        10
-      ],
-      "tier": 1,
-      "hp": 220,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "268b9691-f3dd-4fcc-bbf6-b8f6adc03ff1",
-      "type": "turret_ballistic",
-      "grid": [
-        33,
-        10
-      ],
-      "tier": 1,
-      "hp": 220,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "80509719-52c8-4300-b4a3-ce41bfd08f24",
-      "type": "turret_ballistic",
-      "grid": [
-        26,
-        21
-      ],
-      "tier": 1,
-      "hp": 200,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "1c21359f-e8ad-4b79-9c6f-71b61829bf4a",
-=======
-      "uid": "defe141e-03ed-4564-805f-2152d46b9d69",
->>>>>>> Stashed changes
+      "uid": "2343202a-222e-4697-a428-e7d9fe2009ab",
       "type": "turret_ballistic",
       "grid": [
         34,
@@ -874,93 +597,30 @@
       "turret_type": "turret_ballistic"
     },
     {
-<<<<<<< Updated upstream
-      "uid": "99b8f341-8c43-454e-8669-5056e29e0dc5",
-=======
-      "uid": "fe2dea90-73da-46fb-8ffa-31ced8ec56c7",
->>>>>>> Stashed changes
+      "uid": "5c8b63ba-6b60-42d9-9a71-639d8b709692",
       "type": "turret_ballistic",
       "grid": [
         21,
         16
       ],
       "tier": 1,
-<<<<<<< Updated upstream
-      "hp": 85,
-=======
-      "hp": 220,
->>>>>>> Stashed changes
+      "hp": 53,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
     },
     {
-<<<<<<< Updated upstream
-      "uid": "2b87edc4-6d10-408d-8145-07e6c2b352d4",
-=======
-      "uid": "b28aa492-f86e-42cd-9d8d-483e8d0fa25f",
->>>>>>> Stashed changes
+      "uid": "d294c980-9c90-4e21-a380-1c9a5406662f",
       "type": "turret_ballistic",
       "grid": [
         39,
         16
       ],
       "tier": 1,
-      "hp": 160,
+      "hp": 29,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
-<<<<<<< Updated upstream
-=======
-    },
-    {
-      "uid": "6d07c801-15c4-400f-949c-2aaf4cbfea55",
-      "type": "smelter",
-      "grid": [
-        25,
-        16
-      ],
-      "tier": 1,
-      "hp": 140,
-      "state": "active",
-      "progress": 4.5
-    },
-    {
-      "uid": "1c9474d1-b154-481f-bb5a-2b747c0718a7",
-      "type": "smelter",
-      "grid": [
-        26,
-        14
-      ],
-      "tier": 1,
-      "hp": 140,
-      "state": "active",
-      "progress": 4.5
-    },
-    {
-      "uid": "4d3a2819-b2e3-4a5e-b3ea-8d77d887ba12",
-      "type": "sawmill",
-      "grid": [
-        33,
-        15
-      ],
-      "tier": 1,
-      "hp": 130,
-      "state": "active",
-      "progress": 3.5
-    },
-    {
-      "uid": "443ed800-3d56-4de8-868b-ff5aba853a14",
-      "type": "sawmill",
-      "grid": [
-        35,
-        16
-      ],
-      "tier": 1,
-      "hp": 13,
-      "state": "constructing",
-      "progress": 1.243
->>>>>>> Stashed changes
     }
   ],
   "game_state": "playing"

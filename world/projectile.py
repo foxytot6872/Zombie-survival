@@ -60,9 +60,14 @@ class Projectile(pygame.sprite.Sprite):
                 for enemy in enemy_group:
                     if enemy.alive and self.rect.colliderect(enemy.rect):
                         # Hit enemy
-                        # Pass world for modifiers if available
+                        # Apply armor pierce modifier if available (for railgun projectiles)
                         world = getattr(self, 'world', None)
-                        enemy.take_damage(self.damage)
+                        effective_damage = self.damage
+                        if world and hasattr(world, 'modifiers'):
+                            armor_pierce_mult = world.modifiers.get("enemy_armor_pierce_mult", 1.0)
+                            # Apply armor pierce (increases damage against armored enemies)
+                            effective_damage = int(self.damage * armor_pierce_mult)
+                        enemy.take_damage(effective_damage)
                         self.hit = True
                         self.active = False
                         return

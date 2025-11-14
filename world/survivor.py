@@ -35,12 +35,19 @@ class Survivor(pygame.sprite.Sprite):
     STUCK_TIME_THRESHOLD: float = 2.0
     STUCK_PROGRESS_THRESHOLD: float = 8.0
     
-    def __init__(self, pos: Tuple[float, float], role: str = "worker", hp: Optional[int] = None):
+    def __init__(self, pos: Tuple[float, float], role: str = "worker", hp: Optional[int] = None, world=None):
         super().__init__()
         self.role = role
-        self.max_hp = hp if hp is not None else self.BASE_HP
+        # Apply survivor HP modifier if available
+        base_hp = hp if hp is not None else self.BASE_HP
+        if world and hasattr(world, 'modifiers'):
+            hp_mult = world.modifiers.get("survivor_hp_mult", 1.0)
+            self.max_hp = int(base_hp * hp_mult)
+        else:
+            self.max_hp = base_hp
         self.hp = self.max_hp
         self.speed = self.SPEED
+        self.base_speed = self.SPEED  # Store base speed for modifier calculations
         
         # Position
         self.pos = pygame.Vector2(pos)
@@ -85,6 +92,13 @@ class Survivor(pygame.sprite.Sprite):
         # Safe distance to enemies
         self.safe_distance_to_enemy_px = 160.0
         self.flee_on_threat = True
+    
+    def _get_effective_speed(self, world=None):
+        """Get effective speed with modifiers applied"""
+        if world and hasattr(world, 'modifiers'):
+            speed_mult = world.modifiers.get("survivor_speed_mult", 1.0)
+            return self.base_speed * speed_mult
+        return self.speed
     
     def load_sprite_sheets(self):
         """Load survivor sprite sheets - survival-Sheet.png with 97 frames (96x64 each)"""
@@ -459,21 +473,27 @@ class Survivor(pygame.sprite.Sprite):
                 
                 if waypoint_dir.length() > 0:
                     direction = waypoint_dir.normalize()
-                    self.velocity = direction * self.speed
+                    # Apply speed modifier
+                    effective_speed = self._get_effective_speed(world)
+                    self.velocity = direction * effective_speed
                 else:
                     self.velocity = pygame.Vector2(0, 0)
             else:
                 # No path - fall back to direct movement
                 if direction.length() > 0:
                     direction = direction.normalize()
-                    self.velocity = direction * self.speed
+                    # Apply speed modifier
+                    effective_speed = self._get_effective_speed(world)
+                    self.velocity = direction * effective_speed
                 else:
                     self.velocity = pygame.Vector2(0, 0)
         else:
             # No pathfinding - use direct movement
             if direction.length() > 0:
                 direction = direction.normalize()
-                self.velocity = direction * self.speed
+                # Apply speed modifier
+                effective_speed = self._get_effective_speed(world)
+                self.velocity = direction * effective_speed
             else:
                 self.velocity = pygame.Vector2(0, 0)
         
@@ -574,14 +594,14 @@ class Worker(Survivor):
     CARRY_CAPACITY = 40
     
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, 
-                 carry_capacity: Optional[int] = None, speed: Optional[float] = None):
+                 carry_capacity: Optional[int] = None, speed: Optional[float] = None, world=None):
         # Load config
         config = self._load_config()
         hp = hp if hp is not None else config.get("hp", self.BASE_HP)
         speed = speed if speed is not None else config.get("speed", self.SPEED)
         carry_capacity = carry_capacity if carry_capacity is not None else config.get("carry_capacity", self.CARRY_CAPACITY)
         
-        super().__init__(pos, role="worker", hp=hp)
+        super().__init__(pos, role="worker", hp=hp, world=world)
         self.speed = speed
         self.carry_capacity = carry_capacity
         self.carried = {"wood": 0, "iron": 0, "food": 0}
@@ -759,8 +779,18 @@ class Worker(Survivor):
                 return
             
             # Gather resources in ticks
+            # Apply gather speed modifier
+            gather_speed_mult = 1.0
+            if world and hasattr(world, 'modifiers'):
+                # Support both gather_speed_mult and survivor_gather_speed_mult (alias)
+                gather_speed_mult = world.modifiers.get("survivor_gather_speed_mult", 
+                                                         world.modifiers.get("gather_speed_mult", 1.0))
+            
+            # Reduce tick time based on gather speed (faster gathering = lower tick time)
+            effective_tick_sec = self.target_node.tick_sec / gather_speed_mult if gather_speed_mult > 0 else self.target_node.tick_sec
+            
             self.current_gather_tick_time += dt
-            if self.current_gather_tick_time >= self.target_node.tick_sec:
+            if self.current_gather_tick_time >= effective_tick_sec:
                 # Tick complete - gather resources
                 if self.can_carry_more():
                     gathered = self.target_node.gather_tick()
@@ -825,9 +855,18 @@ class Worker(Survivor):
                 self.state = SurvivorState.IDLE
                 return
             
-            # Move toward HQ
+            # Move toward HQ (apply haul speed modifier)
             hq_reach_distance = 32.0  # Within 1 tile of HQ center
-            reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=hq_reach_distance)
+            # Temporarily apply haul speed modifier
+            if world and hasattr(world, 'modifiers'):
+                haul_speed_mult = world.modifiers.get("survivor_haul_speed_mult", 
+                                                      world.modifiers.get("haul_speed_mult", 1.0))
+                old_base_speed = self.base_speed
+                self.base_speed = self.SPEED * haul_speed_mult
+                reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=hq_reach_distance)
+                self.base_speed = old_base_speed  # Restore
+            else:
+                reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=hq_reach_distance)
             
             if reached:
                 # Reached HQ - deposit
@@ -914,7 +953,7 @@ class Guard(Survivor):
     
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, 
                  speed: Optional[float] = None, attack_range: Optional[float] = None,
-                 ranged_dmg: Optional[int] = None, cooldown: Optional[float] = None):
+                 ranged_dmg: Optional[int] = None, cooldown: Optional[float] = None, world=None):
         # Load config
         config = self._load_config()
         hp = hp if hp is not None else config.get("hp", self.BASE_HP)
@@ -923,7 +962,7 @@ class Guard(Survivor):
         ranged_dmg = ranged_dmg if ranged_dmg is not None else config.get("ranged_dmg", self.RANGED_DAMAGE)
         cooldown = cooldown if cooldown is not None else config.get("cooldown", self.ATTACK_COOLDOWN)
         
-        super().__init__(pos, role="guard", hp=hp)
+        super().__init__(pos, role="guard", hp=hp, world=world)
         self.speed = speed
         self.attack_range = attack_range
         self.ranged_damage = ranged_dmg

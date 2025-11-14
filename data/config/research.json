@@ -1,23 +1,288 @@
 {
-    "sawmill_unlock": {
-        "name": "Unlock Sawmill",
-        "cost_coins": 25,
-        "unlocks": ["sawmill"]
+    "adv_wood": {
+        "name": "Advanced Woodcutting",
+        "description": "+15% wood income.",
+        "cost_coins": 200,
+        "unlocks": [],
+        "category": "resource",
+        "tier": 2,
+        "prerequisites": ["sawmill_unlock"],
+        "modifiers": {
+            "resource_prod_mult": 1.15
+        }
     },
-    "smelter_unlock": {
-        "name": "Unlock Smelter",
-        "cost_coins": 40,
-        "unlocks": ["smelter"]
+    "lumber_bot": {
+        "name": "Auto Lumber Bot",
+        "description": "Automated wood harvesting.",
+        "cost_coins": 350,
+        "unlocks": [],
+        "category": "resource",
+        "tier": 3,
+        "prerequisites": ["adv_wood"],
+        "modifiers": {
+            "resource_prod_mult": 1.25
+        }
+    },
+    "alloy": {
+        "name": "Alloy Research",
+        "description": "Improved iron yield.",
+        "cost_coins": 220,
+        "unlocks": [],
+        "category": "resource",
+        "tier": 2,
+        "prerequisites": ["smelter_unlock"],
+        "modifiers": {
+            "resource_prod_mult": 1.20
+        }
+    },
+    "forge": {
+        "name": "High-Tech Forge",
+        "description": "Unlock high tier materials.",
+        "cost_coins": 380,
+        "unlocks": [],
+        "category": "resource",
+        "tier": 3,
+        "prerequisites": ["alloy"],
+        "modifiers": {
+            "resource_prod_mult": 1.30
+        }
+    },
+    "turret_t1": {
+        "name": "Tier 1 Turret",
+        "description": "Basic projectile turret.",
+        "cost_coins": 150,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 1,
+        "prerequisites": []
+    },
+    "turret_damage_1": {
+        "name": "High-Caliber Rounds",
+        "description": "Increase turret damage.",
+        "cost_coins": 180,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 2,
+        "prerequisites": ["turret_t1"],
+        "modifiers": {
+            "turret_damage_mult": 1.15
+        }
+    },
+    "turret_firerate_1": {
+        "name": "Advanced Motor Systems",
+        "description": "Increase turret fire rate.",
+        "cost_coins": 180,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 2,
+        "prerequisites": ["turret_t1"],
+        "modifiers": {
+            "turret_fire_rate_mult": 0.85
+        }
+    },
+    "turret_ap": {
+        "name": "Armor-Piercing Rounds",
+        "description": "Pierce through enemy armor.",
+        "cost_coins": 300,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 3,
+        "prerequisites": ["turret_damage_1"],
+        "modifiers": {
+            "enemy_armor_pierce_mult": 1.20
+        }
+    },
+    "turret_overclock": {
+        "name": "Overclock System",
+        "description": "Further increase fire rate.",
+        "cost_coins": 300,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 3,
+        "prerequisites": ["turret_firerate_1"],
+        "modifiers": {
+            "turret_fire_rate_mult": 0.80
+        }
     },
     "turret_t2": {
         "name": "Tier 2 Turret",
-        "cost_coins": 60,
-        "unlocks": ["turret_lv2"]
+        "description": "Enhanced damage.",
+        "cost_coins": 250,
+        "unlocks": ["turret_lv2", "ballistic_tier2"],
+        "category": "turret",
+        "tier": 2,
+        "prerequisites": ["turret_t1"]
     },
-    "railgun_turret": {
+    "railgun": {
         "name": "Railgun Turret",
-        "cost_coins": 100,
-        "unlocks": ["railgun_turret"]
+        "description": "Long-range piercing shot.",
+        "cost_coins": 400,
+        "unlocks": ["railgun"],
+        "category": "turret",
+        "tier": 3,
+        "prerequisites": ["turret_t2"]
+    },
+    "flamethrower": {
+        "name": "Flamethrower Tower",
+        "description": "Area denial flames.",
+        "cost_coins": 500,
+        "unlocks": [],
+        "category": "turret",
+        "tier": 4,
+        "prerequisites": ["railgun"],
+        "modifiers": {
+            "turret_fire_rate_mult": 0.85,
+            "turret_range_mult": 1.15
+        }
+    },
+    "worker_plus": {
+        "name": "Worker NPC +1",
+        "description": "Add another worker slot.",
+        "cost_coins": 120,
+        "unlocks": ["max_survivor_plus_2"],
+        "category": "npc",
+        "tier": 1,
+        "prerequisites": []
+    },
+    "npc_eff": {
+        "name": "NPC Efficiency +10%",
+        "description": "Workers gather faster.",
+        "cost_coins": 220,
+        "unlocks": [],
+        "category": "npc",
+        "tier": 2,
+        "prerequisites": ["worker_plus"],
+        "modifiers": {
+            "gather_speed_mult": 1.10
+        }
+    },
+    "gather_speed": {
+        "name": "Gathering Speed +20%",
+        "description": "Further gather boost.",
+        "cost_coins": 320,
+        "unlocks": [],
+        "category": "npc",
+        "tier": 3,
+        "prerequisites": ["npc_eff"],
+        "modifiers": {
+            "gather_speed_mult": 1.20
+        }
+    },
+    "combat_npc": {
+        "name": "Combat NPC",
+        "description": "Unlock guard NPC patrol.",
+        "cost_coins": 420,
+        "unlocks": [],
+        "category": "npc",
+        "tier": 4,
+        "prerequisites": ["gather_speed"]
+    },
+    "hq_reinforce": {
+        "name": "HQ Reinforcement",
+        "description": "+20% HQ HP.",
+        "cost_coins": 180,
+        "unlocks": [],
+        "category": "hq",
+        "tier": 1,
+        "prerequisites": [],
+        "modifiers": {
+            "building_hp_mult": 1.20
+        }
+    },
+    "perimeter": {
+        "name": "Perimeter Walls",
+        "description": "Unlock perimeter upgrades.",
+        "cost_coins": 260,
+        "unlocks": [],
+        "category": "base",
+        "tier": 2,
+        "prerequisites": ["hq_reinforce"],
+        "modifiers": {
+            "building_damage_taken_mult": 0.90
+        }
+    },
+    "auto_repair": {
+        "name": "Auto-Repair System",
+        "description": "Slow passive repairs.",
+        "cost_coins": 320,
+        "unlocks": [],
+        "category": "base",
+        "tier": 3,
+        "prerequisites": ["perimeter"]
+    },
+    "radar": {
+        "name": "Radar System",
+        "description": "Reveal incoming hordes.",
+        "cost_coins": 320,
+        "unlocks": [],
+        "category": "base",
+        "tier": 3,
+        "prerequisites": ["perimeter"]
+    },
+    "sawmill_unlock": {
+        "name": "Unlock Sawmill",
+        "description": "Unlock sawmill building.",
+        "cost_coins": 25,
+        "unlocks": ["sawmill"],
+        "category": "resource",
+        "tier": 1,
+        "prerequisites": []
+    },
+    "smelter_unlock": {
+        "name": "Unlock Smelter",
+        "description": "Unlock smelter building.",
+        "cost_coins": 40,
+        "unlocks": ["smelter"],
+        "category": "resource",
+        "tier": 1,
+        "prerequisites": []
+    },
+    "wall_reinforce_1": {
+        "name": "Structural Reinforcement",
+        "description": "Increase wall durability.",
+        "cost_coins": 150,
+        "unlocks": [],
+        "category": "base",
+        "tier": 2,
+        "prerequisites": ["perimeter"],
+        "modifiers": {
+            "wall_hp_mult": 1.25
+        }
+    },
+    "refund_1": {
+        "name": "Material Recovery",
+        "description": "Increase building refund rate.",
+        "cost_coins": 200,
+        "unlocks": [],
+        "category": "base",
+        "tier": 2,
+        "prerequisites": ["hq_reinforce"],
+        "modifiers": {
+            "building_refund_mult": 1.20
+        }
+    },
+    "survivor_hp_1": {
+        "name": "Survivor Conditioning",
+        "description": "Increase survivor health.",
+        "cost_coins": 180,
+        "unlocks": [],
+        "category": "npc",
+        "tier": 2,
+        "prerequisites": ["worker_plus"],
+        "modifiers": {
+            "survivor_hp_mult": 1.20
+        }
+    },
+    "survivor_speed_1": {
+        "name": "Lightweight Equipment",
+        "description": "Increase survivor movement speed.",
+        "cost_coins": 220,
+        "unlocks": [],
+        "category": "npc",
+        "tier": 3,
+        "prerequisites": ["npc_eff"],
+        "modifiers": {
+            "survivor_speed_mult": 1.20
+        }
     }
 }
-

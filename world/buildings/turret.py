@@ -27,7 +27,9 @@ class BallisticTurret(Building):
         self.base_range = 200  # pixels - increased for better gameplay
         self.range = self.base_range  # Will be modified by day events
         self.damage = 10  # damage per shot
+        self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 400.0  # pixels per second
+        self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.angle = 0  # Current rotation angle in degrees
         self.target_angle = 0  # Target angle to rotate toward
         self.rotation_speed = 180  # degrees per second - how fast turret rotates
@@ -174,7 +176,7 @@ class BallisticTurret(Building):
             angle_diff = 360 - angle_diff
         return angle_diff <= tolerance
     
-    def shoot(self, target_enemy):
+    def shoot(self, target_enemy, world=None):
         """Shoot at target enemy - spawns projectile"""
         if target_enemy and target_enemy.alive:
             # Start shooting animation
@@ -187,13 +189,21 @@ class BallisticTurret(Building):
             
             # Spawn projectile at target (projectile will deal damage on hit)
             if self.projectile_group is not None:
+                # Use effective damage and speed (modified by research/day events)
+                effective_damage = getattr(self, 'effective_damage', self.damage)
+                effective_speed = getattr(self, 'effective_projectile_speed', self.projectile_speed)
                 projectile = Projectile(
                     start_pos=(self.pos.x, self.pos.y),
                     target_pos=(target_enemy.pos.x, target_enemy.pos.y),
-                    speed=self.projectile_speed,
-                    damage=self.damage,
+                    speed=effective_speed,
+                    damage=effective_damage,
                     target_type="enemy"  # Target enemies
                 )
+                # Set world reference for modifiers (armor pierce, etc.)
+                # Try to get world from parameter, then from self.world, then from getattr
+                world_ref = world or getattr(self, 'world', None)
+                if world_ref:
+                    projectile.world = world_ref
                 self.projectile_group.add(projectile)
     
     def play_shooting_animation(self, dt):
@@ -231,12 +241,12 @@ class BallisticTurret(Building):
     
     def update(self, dt: float, world=None):
         """Update turret - building logic first, then turret-specific logic"""
-        # Apply turret fire rate modifier from day events
+        # Apply turret modifiers from research and day events
         if world and hasattr(world, 'modifiers'):
             fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
             self.cooldown = int(self.base_cooldown * fire_rate_mult)
             
-            # Apply turret range modifier from day events
+            # Apply turret range modifier
             range_mult = world.modifiers.get("turret_range_mult", 1.0)
             new_range = int(self.base_range * range_mult)
             if new_range != self.range:
@@ -246,9 +256,19 @@ class BallisticTurret(Building):
                 pygame.draw.circle(self.range_image, (100, 100, 100, 100), (self.range, self.range), self.range)
                 self.range_rect = self.range_image.get_rect()
                 self.update_range_position()  # Update position to match turret
+            
+            # Apply turret damage modifier (calculate effective damage)
+            damage_mult = world.modifiers.get("turret_damage_mult", 1.0)
+            self.effective_damage = int(10 * damage_mult)  # Base damage is 10
+            
+            # Apply turret projectile speed modifier
+            projectile_speed_mult = world.modifiers.get("turret_projectile_speed_mult", 1.0)
+            self.effective_projectile_speed = self.projectile_speed * projectile_speed_mult
         else:
             self.cooldown = self.base_cooldown
             self.range = self.base_range
+            self.effective_damage = self.damage
+            self.effective_projectile_speed = self.projectile_speed
         
         # Call parent update for construction/production
         super().update(dt, world)
@@ -287,7 +307,7 @@ class BallisticTurret(Building):
                     # 3. Animation plays during shooting, then stops when complete
                     if can_shoot and is_aimed and not self.animation_playing:
                         # Shoot at enemy (starts animation and resets cooldown)
-                        self.shoot(nearest_enemy)
+                        self.shoot(nearest_enemy, world)
                     elif not self.animation_playing and time_since_last_shot >= self.cooldown:
                         # Animation finished and cooldown ready - ready for next shot
                         # Keep is_shooting True if we have a target (allows continuous shooting)

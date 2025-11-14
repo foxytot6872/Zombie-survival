@@ -14,6 +14,7 @@ class DebugSystem:
         self.show_cursor_pos = True
         self.show_fps = True
         self.show_counts = True
+        self.show_footprints = False  # Toggle for showing building footprints
         
         # Debug actions (key -> function)
         self.actions = {}
@@ -142,6 +143,7 @@ class DebugSystem:
             ("1", "+100 Coins"),
             ("2", "Unlock Research"),
             ("3", "Roll Event"),
+            ("F", "Show Footprints"),
             ("F9", "Skip Night"),
             ("F10", "Skip Summary"),
             ("F11", "Cycle Diff"),

@@ -1019,7 +1019,7 @@ def spawn_initial_workers():
     for i in range(3):
         offset_x = (i - 1) * 40  # Spread them out
         worker_pos = (hq_pos.x + offset_x, hq_pos.y + 40)
-        worker = Worker(worker_pos)
+        worker = Worker(worker_pos, world=world)
         survivor_group.add(worker)
     
     print(f"Spawned {3} workers near HQ")
@@ -1412,7 +1412,7 @@ def upgrade_building(building):
             resources.wood -= upgrade_cost.wood
             resources.iron -= upgrade_cost.iron
             resources.food -= upgrade_cost.food
-            building.upgrade()
+            building.upgrade(world)
             # If it's a wall, refresh neighbors after upgrade
             if hasattr(building, 'on_upgrade') and callable(building.on_upgrade):
                 # on_upgrade will call autotile_wall_and_neighbors if world is set
@@ -1442,7 +1442,7 @@ def sell_building(building):
         if isinstance(building, HQ):
             print("Cannot sell HQ - it's the main base!")
             return
-        building.refund_cost(resources, ratio=0.6)
+        building.refund_cost(resources, ratio=0.6, world=world)
         grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
         world.unregister_building(building)
         building_group.remove(building)
@@ -1560,6 +1560,12 @@ def debug_clear_day_event():
         world.day_events.clear_event()
         print("Debug: Cleared day event, modifiers reset")
 
+def debug_toggle_footprints():
+    """Toggle showing building footprints"""
+    debug_system.show_footprints = not debug_system.show_footprints
+    status = "ON" if debug_system.show_footprints else "OFF"
+    print(f"Debug: Show footprints {status}")
+
 # Register debug actions
 debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources)
 debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build)
@@ -1573,6 +1579,7 @@ debug_system.register_action(pygame.K_F8, "Complete All Buildings", debug_comple
 debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins)
 debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research)
 debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event)
+debug_system.register_action(pygame.K_f, "Toggle Footprints", debug_toggle_footprints)
 # F9-F11: Wave skipping (handled in event loop)
 # F12: Toggle debug mode (handled in event loop)
 
@@ -1613,10 +1620,11 @@ building_types = [
 ]
 
 # Mapping of building classes to research unlock keys
+# Note: These are the unlock keys (what gets added to unlocked set when research is purchased)
 building_to_research = {
     Sawmill: "sawmill",
     Smelter: "smelter",
-    PiercerTurret: "railgun_turret",
+    PiercerTurret: "railgun",  # Research "railgun" unlocks "railgun"
 }
 
 # Store all building types for potential unlocking later
@@ -1820,6 +1828,11 @@ current_fps = 60.0
 
 while running:
     dt = clock.tick(FPS) / 1000.0  # Delta time in seconds
+    
+    # Apply research modifiers (combine with day event modifiers)
+    if hasattr(world, 'research') and world.research:
+        effective_modifiers = research_manager.apply_research_modifiers()
+        world.modifiers.update(effective_modifiers)
     
     # Calculate FPS
     fps_timer += dt
@@ -2238,6 +2251,36 @@ while running:
             building.draw(screen)
     
     ###################
+    # Draw building footprints (debug mode)
+    ###################
+    if debug_system.is_active() and debug_system.show_footprints:
+        for building in building_group:
+            # Get footprint dimensions
+            footprint = getattr(building, 'FOOTPRINT', (1, 1))
+            w, h = footprint
+            gx, gy = building.grid_x, building.grid_y
+            
+            # Calculate pixel position for top-left corner
+            px = gx * TILE
+            py = gy * TILE
+            
+            # Draw semi-transparent footprint overlay
+            footprint_surface = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
+            footprint_surface.fill((255, 255, 0, 80))  # Yellow with transparency
+            screen.blit(footprint_surface, (px, py))
+            
+            # Draw footprint outline
+            pygame.draw.rect(screen, (255, 255, 0), (px, py, w * TILE, h * TILE), 2)
+            
+            # Draw grid lines within footprint
+            for dx in range(1, w):
+                line_x = px + dx * TILE
+                pygame.draw.line(screen, (200, 200, 0), (line_x, py), (line_x, py + h * TILE), 1)
+            for dy in range(1, h):
+                line_y = py + dy * TILE
+                pygame.draw.line(screen, (200, 200, 0), (px, line_y), (px + w * TILE, line_y), 1)
+    
+    ###################
     # Draw nodes
     ###################
     for node in node_group:
@@ -2647,6 +2690,19 @@ while running:
                     print("Gather mode disabled")
                 continue
             
+            # Upgrade selected building (U key) - only when not paused/over
+            if event.key == pygame.K_u and not game_over_screen.is_visible and not game_state_manager.is_paused():
+                # Check building panel first (if visible), then global selected_building
+                building_to_upgrade = None
+                if building_panel.is_visible and building_panel.selected_building:
+                    building_to_upgrade = building_panel.selected_building
+                elif selected_building:
+                    building_to_upgrade = selected_building
+                
+                if building_to_upgrade:
+                    upgrade_building(building_to_upgrade)
+                continue
+            
             # ESC key handling (priority order)
             if event.key == pygame.K_ESCAPE:
                 if gather_mode:
@@ -2663,7 +2719,7 @@ while running:
                     continue
                 elif pending_construction and pending_construction.state == BuildState.CONSTRUCTING:
                     # Cancel construction and refund 60%
-                    pending_construction.refund_cost(resources, ratio=0.6)
+                    pending_construction.refund_cost(resources, ratio=0.6, world=world)
                     grid.set_footprint_blocked((pending_construction.grid_x, pending_construction.grid_y), pending_construction.FOOTPRINT, False)
                     building_group.remove(pending_construction)
                     if pending_construction in turret_group:

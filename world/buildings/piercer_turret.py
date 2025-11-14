@@ -25,7 +25,9 @@ class PiercerTurret(Building):
         self.base_range = 250  # pixels - longer range
         self.range = self.base_range  # Will be modified by day events
         self.damage = 25  # damage per shot - high damage
+        self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 600.0  # pixels per second - very fast projectiles
+        self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.pierce = True  # Pierces through enemies
         self.pierce_count = 3  # Number of enemies to pierce
         self.angle = 0
@@ -180,14 +182,21 @@ class PiercerTurret(Building):
                 # We just advanced to the last frame, fire the projectile
                 if hasattr(self, 'pending_target') and self.pending_target and self.pending_target.alive:
                     if self.projectile_group is not None:
+                        # Use effective damage and speed (modified by research/day events)
+                        effective_damage = getattr(self, 'effective_damage', self.damage)
+                        effective_speed = getattr(self, 'effective_projectile_speed', self.projectile_speed)
                         projectile = PiercingProjectile(
                             start_pos=(self.pos.x, self.pos.y),
                             target_pos=(self.pending_target.pos.x, self.pending_target.pos.y),
-                            speed=self.projectile_speed,
-                            damage=self.damage,
+                            speed=effective_speed,
+                            damage=effective_damage,
                             pierce_count=self.pierce_count,
                             enemy_group=self.enemy_group
                         )
+                        # Set world reference for modifiers (armor pierce, etc.)
+                        world_ref = getattr(self, 'world', None)
+                        if world_ref:
+                            projectile.world = world_ref
                         self.projectile_group.add(projectile)
                     self.projectile_fired = True
             
@@ -208,12 +217,12 @@ class PiercerTurret(Building):
     
     def update(self, dt: float, world=None):
         """Update turret"""
-        # Apply turret fire rate modifier from day events
+        # Apply turret modifiers from research and day events
         if world and hasattr(world, 'modifiers'):
             fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
             self.cooldown = int(self.base_cooldown * fire_rate_mult)
             
-            # Apply turret range modifier from day events
+            # Apply turret range modifier
             range_mult = world.modifiers.get("turret_range_mult", 1.0)
             new_range = int(self.base_range * range_mult)
             if new_range != self.range:
@@ -223,9 +232,19 @@ class PiercerTurret(Building):
                 pygame.draw.circle(self.range_image, (150, 100, 100, 100), (self.range, self.range), self.range)
                 self.range_rect = self.range_image.get_rect()
                 self.range_rect.center = self.rect.center  # Update position to match turret
+            
+            # Apply turret damage modifier (calculate effective damage)
+            damage_mult = world.modifiers.get("turret_damage_mult", 1.0)
+            self.effective_damage = int(25 * damage_mult)  # Base damage is 25
+            
+            # Apply turret projectile speed modifier
+            projectile_speed_mult = world.modifiers.get("turret_projectile_speed_mult", 1.0)
+            self.effective_projectile_speed = self.projectile_speed * projectile_speed_mult
         else:
             self.cooldown = self.base_cooldown
             self.range = self.base_range
+            self.effective_damage = self.damage
+            self.effective_projectile_speed = self.projectile_speed
         
         super().update(dt, world)
         
@@ -446,8 +465,14 @@ class PiercingProjectile(Projectile):
                 if enemy.alive and enemy not in self.pierced_enemies:
                     if self.rect.colliderect(enemy.rect):
                         # Hit enemy
-                        # Piercer damage (world not needed for enemy damage)
-                        enemy.take_damage(self.damage)
+                        # Apply armor pierce modifier if available (for railgun projectiles)
+                        world = getattr(self, 'world', None)
+                        effective_damage = self.damage
+                        if world and hasattr(world, 'modifiers'):
+                            armor_pierce_mult = world.modifiers.get("enemy_armor_pierce_mult", 1.0)
+                            # Apply armor pierce (increases damage against armored enemies)
+                            effective_damage = int(self.damage * armor_pierce_mult)
+                        enemy.take_damage(effective_damage)
                         self.pierced_enemies.add(enemy)
                         self.hit = True
                         
