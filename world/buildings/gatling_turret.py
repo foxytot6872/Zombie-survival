@@ -16,7 +16,15 @@ class GatlingTurret(Building):
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
     
-    def __init__(self, grid_pos, turret_image=None, base_image=None, tier=1, uid=None, turret_sheet=None):
+    def __init__(self, grid_pos, sprite_sheets=None, base_images=None, tier=1, uid=None, turret_sheet=None, turret_image=None, base_image=None):
+        """
+        Initialize Gatling turret.
+        
+        Accepts either:
+        - sprite_sheets (list) and base_images (list) for multi-tier support (new way)
+        - turret_sheet and base_image for single tier (old way, for backward compatibility)
+        - turret_image and base_image for old static turret (deprecated)
+        """
         super().__init__(grid_pos, tier=tier, uid=uid)
         
         # Gatling-specific attributes
@@ -27,81 +35,72 @@ class GatlingTurret(Building):
         self.angle = 0
         self.target_angle = 0
         self.rotation_speed = 240  # degrees per second - fast rotation
-        self.base_image = base_image
-        if self.base_image is None:
-            # Create placeholder if base_image not provided
-            self.base_image = pygame.Surface((32, 32))
-            self.base_image.fill((120, 100, 80))
         self.selected = False
         
-        # Animation state
+        # Handle multi-tier support (new way) or single tier (old way)
+        if sprite_sheets is not None and base_images is not None:
+            # New way: lists of sprite sheets and base images for multiple tiers
+            self.sprite_sheets = self._normalize_sprite_sheets(sprite_sheets)
+            self.base_images = self._normalize_base_images(base_images)
+            # Load base animation for tier 3 (if it's a sprite sheet)
+            self._load_base_animation_for_tier(self.tier)
+            self.base_image = self._get_base_image_for_tier(self.tier)
+            # Set current sprite sheet for this tier (like other turrets do)
+            self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+            turret_sheet = self.sprite_sheet
+        elif base_image is not None:
+            # Old way: single base image
+            self.base_images = [base_image]
+            self.base_image = base_image
+        else:
+            # Create placeholder
+            placeholder_base = pygame.Surface((32, 32))
+            placeholder_base.fill((120, 100, 80))
+            self.base_images = [placeholder_base]
+            self.base_image = placeholder_base
+        
+        # Turret animation state
         self.animation_state = "idle"  # "idle", "windup", "firing", "winddown"
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_delay = 0.1  # seconds per frame
+        self.animation_list = []  # All frames from sprite sheet (like other turrets)
         self.windup_frames = []  # frames 1-4 (0-3)
         self.firing_frames = []  # frames 5-9 (4-8)
         self.winddown_frames = []  # frames 4-1 reverse (3-0)
-        self.animation_frames = []
+        self.animation_frames = []  # Alias for animation_list
         self.is_animated = False
         
-        # Check if we have a sprite sheet (tiwtir gun turret)
-        if turret_sheet is not None:
-            self.is_animated = True
-            # Extract frames from sprite sheet (9 frames, 96x96 each)
-            frame_width = 96
-            frame_height = 96
+        # Base animation state (for lv3)
+        self.base_animation_frames = []  # 4 frames for lv3 base
+        self.base_frame_index = 0
+        self.base_animation_timer = 0.0
+        self.base_animation_delay = 0.1  # seconds per frame
+        self.base_is_animated = False
+        
+        # Load animation frames from sprite sheet (same logic as other turrets)
+        if hasattr(self, 'sprite_sheet') and self.sprite_sheet is not None:
+            self.animation_list = self.load_image()
+            # Set up windup/firing/winddown frames from animation_list
+            if len(self.animation_list) >= 9:
+                self.animation_frames = self.animation_list
+                self.windup_frames = self.animation_list[0:4]
+                self.firing_frames = self.animation_list[4:9]
+                self.winddown_frames = self.animation_list[3::-1]
+                self.is_animated = True
+                self.turret_image = self.animation_list[self.frame_index]
+                self.current_frames = [self.animation_list[0]]
+        elif turret_sheet is not None:
+            # Old way: load from turret_sheet parameter
             sheet_width = turret_sheet.get_width()
             sheet_height = turret_sheet.get_height()
-            
-            print(f"Loading Gatling turret sprite sheet: {sheet_width}x{sheet_height}, extracting {frame_width}x{frame_height} frames")
-            
-            # Extract all 9 frames
-            for i in range(9):
-                x_pos = i * frame_width
-                if x_pos + frame_width <= sheet_width:
-                    try:
-                        frame_rect = pygame.Rect(x_pos, 0, frame_width, frame_height)
-                        frame = turret_sheet.subsurface(frame_rect)
-                        self.animation_frames.append(frame)
-                        print(f"  Extracted frame {i+1}: {frame.get_size()}")
-                    except Exception as e:
-                        print(f"  Error extracting frame {i+1}: {e}")
-                else:
-                    print(f"  Frame {i+1} out of bounds: x_pos={x_pos}, width={frame_width}, sheet_width={sheet_width}")
-            
-            print(f"Total frames extracted: {len(self.animation_frames)}")
-            
-            # Set up animation frame groups
-            if len(self.animation_frames) >= 9:
-                # Windup: frames 1-4 (0-3)
-                self.windup_frames = self.animation_frames[0:4]
-                # Firing: frames 5-9 (4-8)
-                self.firing_frames = self.animation_frames[4:9]
-                # Winddown: frames 4-1 reverse (3-0)
-                self.winddown_frames = self.animation_frames[3::-1]  # Reverse slice from index 3 to 0
-                print(f"Animation groups: windup={len(self.windup_frames)}, firing={len(self.firing_frames)}, winddown={len(self.winddown_frames)}")
-            else:
-                print(f"Warning: Expected 9 frames but got {len(self.animation_frames)}")
-            
-            # Start with idle (first frame) - use windup frames for idle state
-            if self.animation_frames and len(self.animation_frames) > 0:
-                # Use first frame as idle
-                first_frame = self.animation_frames[0]
-                self.current_frames = [first_frame]
-                self.frame_index = 0
-                # Make sure we have a valid image - convert to ensure it's a proper surface
-                self.turret_image = first_frame.copy().convert_alpha() if first_frame else None
-                self.animation_state = "idle"
+            print(f"Loading Gatling turret sprite sheet (tier {tier}): {sheet_width}x{sheet_height}")
+            if self._reload_animation_from_sheet(turret_sheet):
+                print(f"  Loaded {len(self.animation_frames)} frames: windup={len(self.windup_frames)}, firing={len(self.firing_frames)}, winddown={len(self.winddown_frames)}")
                 if self.turret_image:
-                    print(f"Initial turret image size: {self.turret_image.get_size()}, is_animated={self.is_animated}")
-                else:
-                    print(f"Warning: Failed to create turret_image from first frame")
+                    print(f"  Initial turret image size: {self.turret_image.get_size()}")
             else:
-                self.current_frames = []
-                self.frame_index = 0
-                self.turret_image = None
-                print(f"Warning: No frames extracted, turret_image is None. Frames: {len(self.animation_frames)}")
+                print(f"  Warning: Failed to load animation from sprite sheet")
         else:
             # Static image (old Gatling turret) - scale it up
             if turret_image:
@@ -380,8 +379,11 @@ class GatlingTurret(Building):
                 else:
                     self.target_enemy = None
             
-            # Update animation
+            # Update turret animation
             self.update_animation(dt, is_firing)
+            
+            # Update base animation (lv3 only, plays while shooting)
+            self.update_base_animation(dt, is_firing)
     
     def draw(self, surface: pygame.Surface):
         """Draw turret"""
@@ -390,8 +392,14 @@ class GatlingTurret(Building):
             self.update_range_position()
             surface.blit(self.range_image, self.range_rect)
         
-        # Draw base
-        if self.base_image:
+        # Draw base (animated if lv3)
+        if self.base_is_animated and self.base_animation_frames and len(self.base_animation_frames) > 0:
+            # Draw animated base (lv3)
+            base_frame = self.base_animation_frames[self.base_frame_index]
+            base_rect = base_frame.get_rect(center=self.pos)
+            surface.blit(base_frame, base_rect)
+        elif self.base_image:
+            # Draw static base (lv1, lv2)
             base_rect = self.base_image.get_rect(center=self.pos)
             surface.blit(self.base_image, base_rect)
         else:
@@ -477,4 +485,226 @@ class GatlingTurret(Building):
     def update_range_position(self):
         """Update range circle position"""
         self.range_rect.center = self.rect.center
+    
+    def _normalize_base_images(self, base_images):
+        """Normalize base images to a list of at least TIER_MAX items."""
+        if not base_images:
+            placeholder = pygame.Surface((32, 32))
+            placeholder.fill((120, 100, 80))
+            base_images = [placeholder]
+        
+        if isinstance(base_images, pygame.Surface):
+            base_images = [base_images]
+        elif not isinstance(base_images, (list, tuple)):
+            base_images = []
+        
+        if not base_images:
+            placeholder = pygame.Surface((32, 32))
+            placeholder.fill((120, 100, 80))
+            base_images = [placeholder]
+        
+        # Extend to TIER_MAX if needed
+        while len(base_images) < self.TIER_MAX:
+            base_images.append(base_images[-1])
+        
+        return list(base_images)
+    
+    def _normalize_sprite_sheets(self, sprite_sheets):
+        """Normalize sprite sheets to a list of at least TIER_MAX items."""
+        placeholder = self._placeholder_sprite_sheet()
+        
+        if not sprite_sheets:
+            sprite_sheets = [placeholder]
+        
+        if isinstance(sprite_sheets, pygame.Surface):
+            sprite_sheets = [sprite_sheets]
+        elif not isinstance(sprite_sheets, (list, tuple)):
+            sprite_sheets = []
+        
+        if not sprite_sheets:
+            sprite_sheets = [placeholder]
+        
+        # Extend to TIER_MAX if needed
+        while len(sprite_sheets) < self.TIER_MAX:
+            sprite_sheets.append(sprite_sheets[-1])
+        
+        return list(sprite_sheets)
+    
+    @staticmethod
+    def _placeholder_sprite_sheet():
+        """Create a placeholder animation sheet with 9 frames (96x96 each)."""
+        frame_width = 96
+        frame_height = 96
+        width = frame_width * 9  # 9 frames
+        surface = pygame.Surface((width, frame_height), pygame.SRCALPHA)
+        for i in range(9):
+            frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            color = (140, 140, 140, 255) if i % 2 == 0 else (90, 90, 90, 255)
+            surface.fill(color, frame_rect)
+        return surface
+    
+    def _get_base_image_for_tier(self, tier: int):
+        """Get base image for the given tier."""
+        index = max(0, min(tier - 1, len(self.base_images) - 1))
+        return self.base_images[index]
+    
+    def _get_sprite_sheet_for_tier(self, tier: int):
+        """Get sprite sheet for the given tier."""
+        if not hasattr(self, 'sprite_sheets') or not self.sprite_sheets:
+            return None
+        index = max(0, min(tier - 1, len(self.sprite_sheets) - 1))
+        return self.sprite_sheets[index]
+    
+    def load_image(self):
+        """Load animation frames from sprite sheet (same pattern as other turrets, 96x96 per frame, 9 frames total)"""
+        if not hasattr(self, 'sprite_sheet') or self.sprite_sheet is None:
+            return []
+        
+        size = 96  # Gatling turret frame size is 96x96
+        animation_list = []
+        # Extract 9 frames (96x96 each)
+        for x in range(9):
+            x_pos = x * size
+            if x_pos + size <= self.sprite_sheet.get_width():
+                try:
+                    temp_img = self.sprite_sheet.subsurface(x_pos, 0, size, size)
+                    animation_list.append(temp_img)
+                except Exception as e:
+                    print(f"Error extracting frame {x+1}: {e}")
+        return animation_list
+    
+    def _reload_animation_from_sheet(self, turret_sheet):
+        """Reload animation frames from a sprite sheet (96x96 per frame, 9 frames total)."""
+        if turret_sheet is None:
+            return False
+        
+        self.is_animated = True
+        self.animation_frames = []
+        frame_width = 96
+        frame_height = 96
+        sheet_width = turret_sheet.get_width()
+        sheet_height = turret_sheet.get_height()
+        
+        # Extract all 9 frames (96x96 each)
+        for i in range(9):
+            x_pos = i * frame_width
+            if x_pos + frame_width <= sheet_width:
+                try:
+                    frame_rect = pygame.Rect(x_pos, 0, frame_width, frame_height)
+                    frame = turret_sheet.subsurface(frame_rect).copy()
+                    self.animation_frames.append(frame)
+                except Exception as e:
+                    print(f"  Error extracting frame {i+1}: {e}")
+        
+        # Set up animation frame groups (windup: 1-4, firing: 5-9, winddown: 4-1 reverse)
+        if len(self.animation_frames) >= 9:
+            # Clear old frame groups
+            self.windup_frames = []
+            self.firing_frames = []
+            self.winddown_frames = []
+            # Set up new frame groups from reloaded frames
+            self.windup_frames = self.animation_frames[0:4]
+            self.firing_frames = self.animation_frames[4:9]
+            self.winddown_frames = self.animation_frames[3::-1]
+            print(f"  Set up animation groups: windup={len(self.windup_frames)}, firing={len(self.firing_frames)}, winddown={len(self.winddown_frames)}")
+        else:
+            print(f"  Warning: Expected 9 frames but got {len(self.animation_frames)}")
+        
+        # Initialize turret_image from first frame
+        if self.animation_frames:
+            self.turret_image = self.animation_frames[0].copy().convert_alpha()
+            self.current_frames = [self.animation_frames[0]]
+            self.frame_index = 0
+            self.animation_state = "idle"
+            return True
+        return False
+    
+    def _load_base_animation_for_tier(self, tier):
+        """Load base animation frames if tier 3 (sprite sheet with 4 frames)."""
+        if tier == 3 and hasattr(self, 'base_images') and len(self.base_images) >= 3:
+            base_sheet = self.base_images[2]  # Index 2 = tier 3
+            if base_sheet:
+                sheet_width = base_sheet.get_width()
+                sheet_height = base_sheet.get_height()
+                
+                # Check if it's a sprite sheet (should be 256x64 for 4 frames of 64x64)
+                if sheet_width >= 256 and sheet_height == 64:
+                    # Extract 4 frames (64x64 each)
+                    frame_width = 64
+                    frame_height = 64
+                    self.base_animation_frames = []
+                    
+                    for i in range(4):
+                        x_pos = i * frame_width
+                        if x_pos + frame_width <= sheet_width:
+                            try:
+                                frame_rect = pygame.Rect(x_pos, 0, frame_width, frame_height)
+                                frame = base_sheet.subsurface(frame_rect).copy()
+                                self.base_animation_frames.append(frame)
+                            except Exception as e:
+                                print(f"Error extracting base frame {i+1}: {e}")
+                    
+                    if len(self.base_animation_frames) == 4:
+                        self.base_is_animated = True
+                        self.base_frame_index = 0
+                        self.base_animation_timer = 0.0
+                        # Use first frame as base_image
+                        self.base_image = self.base_animation_frames[0]
+                        print(f"Loaded base animation for tier 3: {len(self.base_animation_frames)} frames")
+                    else:
+                        print(f"Warning: Expected 4 base frames but got {len(self.base_animation_frames)}")
+                        self.base_is_animated = False
+                        self.base_image = base_sheet
+                else:
+                    # Not a sprite sheet, use as static image
+                    self.base_is_animated = False
+                    self.base_image = base_sheet
+    
+    def update_base_animation(self, dt: float, is_firing: bool):
+        """Update base animation (lv3 only) - plays while shooting."""
+        if not self.base_is_animated or not self.base_animation_frames:
+            return
+        
+        # Only animate while shooting
+        if is_firing:
+            self.base_animation_timer += dt
+            
+            if self.base_animation_timer >= self.base_animation_delay:
+                self.base_animation_timer = 0.0
+                # Loop through frames 0-3
+                self.base_frame_index = (self.base_frame_index + 1) % len(self.base_animation_frames)
+        else:
+            # Reset to first frame when not shooting
+            if self.base_frame_index != 0:
+                self.base_frame_index = 0
+                self.base_animation_timer = 0.0
+    
+    def on_upgrade(self):
+        """Handle tier upgrades - swap base texture and sprite sheet when available (same logic as other turrets)."""
+        super().on_upgrade()
+        
+        # Update base image for new tier (reload animation if tier 3)
+        if hasattr(self, 'base_images'):
+            self._load_base_animation_for_tier(self.tier)
+            self.base_image = self._get_base_image_for_tier(self.tier)
+        
+        # Update sprite sheet and reload animation for new tier (same logic as other turrets)
+        if hasattr(self, 'sprite_sheets') and self.sprite_sheets:
+            self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+            # Reload animation frames from new sprite sheet (same as other turrets)
+            self.animation_list = self.load_image()
+            # Set up windup/firing/winddown frames from animation_list
+            if len(self.animation_list) >= 9:
+                self.animation_frames = self.animation_list
+                self.windup_frames = self.animation_list[0:4]
+                self.firing_frames = self.animation_list[4:9]
+                self.winddown_frames = self.animation_list[3::-1]
+                self.is_animated = True
+            # Reset animation state
+            self.frame_index = 0
+            self.animation_timer = 0.0
+            self.animation_state = "idle"
+            if self.animation_list and len(self.animation_list) > 0:
+                self.turret_image = self.animation_list[self.frame_index]
+                self.current_frames = [self.animation_list[0]]
 

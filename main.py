@@ -146,29 +146,55 @@ railgun_sheet_lv3 = load_image_or_placeholder(
 railgun_sprite_sheets = [railgun_sheet_lv1, railgun_sheet_lv2, railgun_sheet_lv3]
 
 # Gatling turret images - try new tiwtir textures first, fallback to old
-gatling_image = None
-gatling_turret_sheet = None
+# Load all three tiers for Gatling turret
+gatling_base_lv1 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv1.png',
+    (64, 64),
+    (120, 100, 80, 255),
+    "Gatling turret base Lv1"
+)
+gatling_base_lv2 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv2.png',
+    (64, 64),
+    (120, 100, 80, 255),
+    "Gatling turret base Lv2"
+)
+# Lv3 base is a sprite sheet with 4 frames (64x64 each) - 256x64 total
+gatling_base_lv3 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv3.png',
+    (256, 64),  # 4 frames * 64 = 256 pixels wide, 64 pixels tall
+    (120, 100, 80, 255),
+    "Gatling turret base Lv3 (sprite sheet)"
+)
+gatling_base_images = [gatling_base_lv1, gatling_base_lv2, gatling_base_lv3]
 
-try:
-    # Try new tiwtir gun textures first
-    gatling_base = pygame.image.load('asset/Tiwtir_gun_base_lv1.png').convert_alpha()
-    gatling_turret_sheet = pygame.image.load('asset/Tiwtir_gun_turret_lv1.png').convert_alpha()
-    print("Loaded Tiwtir Gatling gun textures")
-except:
-    try:
-        # Fallback to old Gatling textures
-        gatling_base = pygame.image.load('asset/Gatling_Base_lv1.png').convert_alpha()
-        gatling_image = pygame.image.load('asset/Gatling_lv1.png').convert_alpha()
-        gatling_turret_sheet = None  # Mark as not using sprite sheet
-        print("Loaded old Gatling turret assets")
-    except:
-        # Create placeholder images if files don't exist
-        gatling_base = pygame.Surface((32, 32))
-        gatling_base.fill((120, 100, 80))
-        gatling_image = pygame.Surface((32, 32), pygame.SRCALPHA)
-        gatling_image.fill((180, 160, 140))
-        gatling_turret_sheet = None
-        print("Warning: Gatling turret assets not found, using placeholder")
+# Gatling turret sprite sheets (9 frames, 96x96 each)
+gatling_frame_size = 96
+gatling_sheet_width = gatling_frame_size * 9  # 9 frames * 96 = 864
+gatling_sheet_lv1 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv1.png',
+    (gatling_sheet_width, gatling_frame_size),
+    (180, 160, 140, 255),
+    "Gatling turret sprite sheet Lv1"
+)
+gatling_sheet_lv2 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv2.png',
+    (gatling_sheet_width, gatling_frame_size),
+    (180, 160, 140, 255),
+    "Gatling turret sprite sheet Lv2"
+)
+gatling_sheet_lv3 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv3.png',
+    (gatling_sheet_width, gatling_frame_size),
+    (180, 160, 140, 255),
+    "Gatling turret sprite sheet Lv3"
+)
+gatling_sprite_sheets = [gatling_sheet_lv1, gatling_sheet_lv2, gatling_sheet_lv3]
+
+# Backward compatibility - use lv1 for old code paths
+gatling_image = None
+gatling_turret_sheet = gatling_sheet_lv1  # Default to lv1
+gatling_base = gatling_base_lv1  # Default to lv1
 
 # Zombie sprite sheets (32 frames, 48x48 each)
 zombie_sprite_sheet = load_image_or_placeholder(
@@ -1465,7 +1491,7 @@ buttons = {}
 # Note: HQ is not buildable - it spawns automatically at game start
 building_types = [
     (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
-    (GatlingTurret, "Gatling", (200, 150, 100), gatling_image if 'gatling_image' in globals() and gatling_image is not None else None, gatling_base if 'gatling_base' in globals() else None),
+    (GatlingTurret, "Gatling", (200, 150, 100), gatling_sprite_sheets, gatling_base_images),
     (PiercerTurret, "Piercer", (150, 100, 150), railgun_sprite_sheets, railgun_base_images),
     (Wall, "Wall", (120, 120, 120)),
     (Gate, "Gate", (100, 100, 100)),
@@ -1637,19 +1663,8 @@ def create_building(building_class, grid_pos, *args):
             return building
     elif building_class is GatlingTurret:
         if len(args) >= 2:
-            turret_image, base_image = args[0], args[1]
-            # Pass turret_sheet if available (for tiwtir gun), otherwise pass None
-            # Access the global gatling_turret_sheet variable
-            turret_sheet_param = globals().get('gatling_turret_sheet', None)
-            if turret_sheet_param is None:
-                try:
-                    # Try to access from the module's global namespace
-                    import main as main_module
-                    turret_sheet_param = getattr(main_module, 'gatling_turret_sheet', None)
-                except:
-                    pass
-            print(f"Creating GatlingTurret: turret_image={turret_image is not None}, base_image={base_image is not None}, turret_sheet={turret_sheet_param is not None}")
-            building = building_class(grid_pos, turret_image, base_image, tier=1, turret_sheet=turret_sheet_param)
+            sprite_sheets, base_images = args[0], args[1]
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
             turret_group.add(building)
             return building
     else:
