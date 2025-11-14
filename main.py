@@ -1,5 +1,6 @@
 ﻿import pygame
 import json
+from typing import Dict
 import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
@@ -22,8 +23,8 @@ from ui.pause_menu import PauseMenu
 from ui.building_panel import BuildingPanel
 from ui.hud import HUD
 from ui.research_button import ResearchButton
-from ui.research_panel import ResearchPanel
 from ui.start_screen import StartScreen
+from research_tree import open_research_tree
 from world.research import ResearchManager
 # Nodes and survivors
 from world.nodes import TreePatch, ScrapPile, spawn_daily_nodes
@@ -531,6 +532,7 @@ class World:
         self.hud = None
         self.nodes = node_group if node_group else pygame.sprite.Group()
         self.survivor_group = survivor_group if survivor_group else pygame.sprite.Group()
+        self.buildings_by_type: Dict[str, list] = {}
     
     def enemy_count(self):
         """Get current enemy count"""
@@ -578,6 +580,27 @@ class World:
         """Alias for refresh_wall_and_neighbors (backwards compatibility)."""
         self.refresh_wall_and_neighbors(gx, gy)
 
+    # ----- Building registry helpers -----
+    def register_building(self, building):
+        type_id = getattr(building, "TYPE_ID", building.__class__.__name__.lower())
+        type_id = type_id.lower()
+        self.buildings_by_type.setdefault(type_id, []).append(building)
+
+    def unregister_building(self, building):
+        type_id = getattr(building, "TYPE_ID", building.__class__.__name__.lower()).lower()
+        if type_id in self.buildings_by_type:
+            try:
+                self.buildings_by_type[type_id].remove(building)
+                if not self.buildings_by_type[type_id]:
+                    del self.buildings_by_type[type_id]
+            except ValueError:
+                pass
+
+    def upgrade_buildings(self, type_id: str, new_level: int):
+        type_id = type_id.lower()
+        for building in self.buildings_by_type.get(type_id, []):
+            building.upgrade_level(new_level)
+
 # Initialize core systems first
 game_state_manager = GameStateManager()
 # Start in menu state
@@ -618,9 +641,6 @@ pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, building_panel_frames)
 
-# Initialize research UI
-research_panel = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-research_button = ResearchButton(10, 10, 120, 40, research_panel.toggle)
 
 # Set UI callbacks
 def load_startup_cfg():
@@ -809,6 +829,7 @@ def spawn_starting_layout():
     
     hq = HQ((hq_gx, hq_gy), tier=1)
     building_group.add(hq)
+    world.register_building(hq)
     grid.set_footprint_blocked((hq_gx, hq_gy), HQ.FOOTPRINT, True)
     
     # Store HQ reference in world
@@ -830,6 +851,7 @@ def spawn_starting_layout():
             w.progress = w.BUILD_TIME
             w.world = world
             building_group.add(w)
+            world.register_building(w)
             grid.set_footprint_blocked((gx, compound_top), WallWood.FOOTPRINT, True)
             walls_placed.append((gx, compound_top))
     
@@ -842,6 +864,7 @@ def spawn_starting_layout():
             w.progress = w.BUILD_TIME
             w.world = world
             building_group.add(w)
+            world.register_building(w)
             grid.set_footprint_blocked((gx, compound_bottom), WallWood.FOOTPRINT, True)
             walls_placed.append((gx, compound_bottom))
     
@@ -854,6 +877,7 @@ def spawn_starting_layout():
             w.progress = w.BUILD_TIME
             w.world = world
             building_group.add(w)
+            world.register_building(w)
             grid.set_footprint_blocked((compound_left, gy), WallWood.FOOTPRINT, True)
             walls_placed.append((compound_left, gy))
     
@@ -866,6 +890,7 @@ def spawn_starting_layout():
             w.progress = w.BUILD_TIME
             w.world = world
             building_group.add(w)
+            world.register_building(w)
             grid.set_footprint_blocked((compound_right, gy), WallWood.FOOTPRINT, True)
             walls_placed.append((compound_right, gy))
     
@@ -887,6 +912,7 @@ def spawn_starting_layout():
                     if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
                         building.grid_x == gate_gx and building.grid_y == gate_gy and
                         isinstance(building, WallWood)):
+                        world.unregister_building(building)
                         building_group.remove(building)
                         grid.set_footprint_blocked((gate_gx, gate_gy), WallWood.FOOTPRINT, False)
                         walls_placed.remove((gate_gx, gate_gy))
@@ -897,6 +923,7 @@ def spawn_starting_layout():
         g.hp = g.max_hp
         g.progress = g.BUILD_TIME
         building_group.add(g)
+        world.register_building(g)
         grid.set_footprint_blocked((gate_gx, gate_gy), Gate.FOOTPRINT, True)
         print(f"Gate placed at ({gate_gx}, {gate_gy})")
     
@@ -916,6 +943,7 @@ def spawn_starting_layout():
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
             building_group.add(t)
+            world.register_building(t)
             turret_group.add(t)
             grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
             print(f"Turret placed at ({turret_gx}, {turret_gy}) - top")
@@ -930,6 +958,7 @@ def spawn_starting_layout():
             t.hp = t.max_hp
             t.progress = t.BUILD_TIME
             building_group.add(t)
+            world.register_building(t)
             turret_group.add(t)
             grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
             print(f"Turret placed at ({turret_gx}, {turret_gy}) - bottom")
@@ -943,6 +972,7 @@ def spawn_starting_layout():
         t.hp = t.max_hp
         t.progress = t.BUILD_TIME
         building_group.add(t)
+        world.register_building(t)
         turret_group.add(t)
         grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
         print(f"Turret placed at ({turret_gx}, {turret_gy}) - left")
@@ -955,6 +985,7 @@ def spawn_starting_layout():
         t.hp = t.max_hp
         t.progress = t.BUILD_TIME
         building_group.add(t)
+        world.register_building(t)
         turret_group.add(t)
         grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
         print(f"Turret placed at ({turret_gx}, {turret_gy}) - right")
@@ -1413,6 +1444,7 @@ def sell_building(building):
             return
         building.refund_cost(resources, ratio=0.6)
         grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
+        world.unregister_building(building)
         building_group.remove(building)
         if building in turret_group:
             turret_group.remove(building)
@@ -1618,6 +1650,13 @@ def rebuild_building_buttons():
 # Initial button creation
 rebuild_building_buttons()
 
+def launch_research_tree():
+    """Open the research tree UI and rebuild buttons afterwards."""
+    open_research_tree(screen, world, research_manager, game_state_manager)
+    rebuild_building_buttons()
+
+research_button = ResearchButton(10, 10, 120, 40, launch_research_tree)
+
 ###################
 # Helper functions
 ###################
@@ -1733,23 +1772,31 @@ def create_building(building_class, grid_pos, *args):
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
             building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
+            building.world = world
+            world.register_building(building)
             turret_group.add(building)
             return building
     elif building_class is PiercerTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
             building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
+            building.world = world
+            world.register_building(building)
             turret_group.add(building)
             return building
     elif building_class is GatlingTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
             building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
+            building.world = world
+            world.register_building(building)
             turret_group.add(building)
             return building
     else:
         # Other buildings just need grid position
         building = building_class(grid_pos, tier=1)
+        building.world = world
+        world.register_building(building)
         return building
     
     return None
@@ -1924,6 +1971,7 @@ while running:
         # Check if it's a wall (for autotiling neighbors)
         is_wall = hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith('wall')
         
+        world.unregister_building(building)
         # Unblock grid tiles
         grid.set_footprint_blocked((gx, gy), building.FOOTPRINT, False)
         # Remove from groups
@@ -2256,10 +2304,9 @@ while running:
         building_panel.draw(screen, resources, mouse_pos)
     
     ###################
-    # Draw research UI
+    # Draw research button
     ###################
     research_button.draw(screen)
-    research_panel.draw(screen)
     
     ###################
     # Draw pause menu
@@ -2407,12 +2454,6 @@ while running:
                 if keys[pygame.K_F3]:
                     debug_spawn_zombie_at_mouse(mouse_pos)
                     continue
-            
-            # Handle research panel clicks (must be before other UI to close panel)
-            if research_panel.handle_click(mouse_pos):
-                # Rebuild buttons in case a research was unlocked
-                rebuild_building_buttons()
-                continue
             
             # Handle research button click
             if research_button.handle_click(mouse_pos):
@@ -2570,8 +2611,8 @@ while running:
                 if start_screen.handle_event(event):
                     continue
             
-            # Handle research panel ESC key
-            if research_panel.handle_key(event.key):
+            if event.key == pygame.K_r:
+                launch_research_tree()
                 continue
             # F12: Toggle debug mode (works even when paused/over - always accessible)
             if event.key == pygame.K_F12:
