@@ -19,6 +19,8 @@ class ResearchManager:
         self.purchased: Set[str] = set()  # Purchased research keys (e.g., "sawmill_unlock")
         self.research_defs: Dict = {}
         self.research_modifiers: Dict[str, float] = {}  # Permanent research modifiers
+        self._cached_effective_modifiers: Dict[str, float] = {}  # Cached effective modifiers
+        self._modifiers_dirty: bool = True  # Flag to indicate if modifiers need recalculation
         
         # Load research definitions
         path = "data/config/research.json"
@@ -107,6 +109,9 @@ class ResearchManager:
                 # For non-numeric modifiers, just set it
                 self.research_modifiers[mod_key] = mod_value
         
+        # Mark modifiers as dirty so they get recalculated
+        self._modifiers_dirty = True
+        
         return True
     
     def get_research_list(self) -> Dict:
@@ -117,26 +122,31 @@ class ResearchManager:
         """
         Get effective modifiers combining research and day event modifiers.
         Research modifiers stack multiplicatively with day event modifiers.
+        Uses caching to avoid recalculating every frame.
         Returns:
             Dict of effective modifier values
         """
-        if hasattr(self.world, 'modifiers'):
-            effective = self.world.modifiers.copy()
-        else:
-            effective = {
-                "resource_prod_mult": 1.0, "coin_drop_mult": 1.0, "build_cost_mult": 1.0,
-                "turret_fire_rate_mult": 1.0, "building_damage_taken_mult": 1.0,
-                "zombie_spawn_mult": 1.0, "zombie_speed_mult": 1.0, "zombie_hp_mult": 1.0,
-                "turret_range_mult": 1.0, "gather_speed_mult": 1.0, "haul_speed_mult": 1.0,
-                "building_hp_mult": 1.0, "enemy_skeleton_damage_mult": 1.0,
-                # New modifiers
-                "turret_damage_mult": 1.0, "turret_projectile_speed_mult": 1.0,
-                "turret_hp_mult": 1.0, "wall_hp_mult": 1.0, "wall_repair_rate_mult": 1.0,
-                "building_refund_mult": 1.0, "survivor_hp_mult": 1.0, "survivor_speed_mult": 1.0,
-                "survivor_gather_speed_mult": 1.0, "survivor_haul_speed_mult": 1.0,
-                "enemy_armor_pierce_mult": 1.0,
-            }
+        # Only recalculate if modifiers are dirty
+        if not self._modifiers_dirty:
+            return self._cached_effective_modifiers
         
+        # Get base modifiers from day events
+        # IMPORTANT: We need to get day event modifiers directly, not from world.modifiers
+        # because world.modifiers might already contain research modifiers from previous frame
+        if hasattr(self.world, 'day_events') and self.world.day_events:
+            # Get day event modifiers directly from day event manager
+            # Day events store modifiers in world.modifiers, but we need to ensure
+            # we're not reading research modifiers that were added in previous frames
+            # For now, we'll assume world.modifiers is reset by day events when they change
+            # and we mark it dirty, so we can safely read from it
+            if hasattr(self.world, 'modifiers'):
+                effective = self.world.modifiers.copy()
+            else:
+                effective = self._get_default_modifiers()
+        else:
+            effective = self._get_default_modifiers()
+        
+        # Apply research modifiers multiplicatively on top of day event modifiers
         for mod_key, mod_value in self.research_modifiers.items():
             if isinstance(mod_value, (int, float)):
                 base_value = effective.get(mod_key, 1.0)
@@ -144,7 +154,27 @@ class ResearchManager:
             else:
                 effective[mod_key] = mod_value
         
-        return effective
+        # Cache the result
+        self._cached_effective_modifiers = effective
+        self._modifiers_dirty = False
+        
+        return self._cached_effective_modifiers
+    
+    def _get_default_modifiers(self) -> Dict[str, float]:
+        """Get default modifier values (all 1.0)."""
+        return {
+            "resource_prod_mult": 1.0, "coin_drop_mult": 1.0, "build_cost_mult": 1.0,
+            "turret_fire_rate_mult": 1.0, "building_damage_taken_mult": 1.0,
+            "zombie_spawn_mult": 1.0, "zombie_speed_mult": 1.0, "zombie_hp_mult": 1.0,
+            "turret_range_mult": 1.0, "gather_speed_mult": 1.0, "haul_speed_mult": 1.0,
+            "building_hp_mult": 1.0, "enemy_skeleton_damage_mult": 1.0,
+            # New modifiers
+            "turret_damage_mult": 1.0, "turret_projectile_speed_mult": 1.0,
+            "turret_hp_mult": 1.0, "wall_hp_mult": 1.0, "wall_repair_rate_mult": 1.0,
+            "building_refund_mult": 1.0, "survivor_hp_mult": 1.0, "survivor_speed_mult": 1.0,
+            "survivor_gather_speed_mult": 1.0, "survivor_haul_speed_mult": 1.0,
+            "enemy_armor_pierce_mult": 1.0,
+        }
     
     def is_research_unlocked(self, key: str) -> bool:
         """Alias for is_unlocked for consistency."""

@@ -108,7 +108,13 @@ class Building(pygame.sprite.Sprite):
         return default
 
     def __init__(self, grid_pos: Tuple[int,int], tier: int = 1, uid: str | None = None):
-        super().__init__()
+        # Production batch system
+        self.production_timer: float = 0.0  # Timer for batch production
+        self.production_interval: float = 5.0  # Seconds between batches
+        self.base_batch_amount: int = 50  # Base amount per batch (scales with tier)
+        
+        # Initialize pygame sprite
+        pygame.sprite.Sprite.__init__(self)
         self.uid = uid or str(uuid.uuid4())
         self.grid_x, self.grid_y = grid_pos
         self.level = 1
@@ -300,14 +306,38 @@ class Building(pygame.sprite.Sprite):
                 self.on_complete(world)
 
         elif self.state == BuildState.ACTIVE:
-            # passive production tick (resources teleport to stockpile)
+            # Batch-based production system
             if world and hasattr(world, "resources"):
-                p = self._current_production()
-                # Apply resource production modifier from day events
+                # Update production timer
+                self.production_timer += dt
+                
+                # Calculate tier multiplier for batch amount
+                tier_mult = 1.0 + 0.2 * (self.tier - 1)  # Tier 1: 1.0x, Tier 2: 1.2x, Tier 3: 1.4x
+                
+                # Apply resource production modifier from day events/research
                 prod_mult = world.modifiers.get("resource_prod_mult", 1.0) if hasattr(world, 'modifiers') else 1.0
-                world.resources.wood += p.wood_per_min * dt/60.0 * prod_mult
-                world.resources.iron += p.iron_per_min * dt/60.0 * prod_mult
-                world.resources.food += p.food_per_min * dt/60.0 * prod_mult
+                
+                # Check if it's time to produce a batch
+                if self.production_timer >= self.production_interval:
+                    # Calculate batch amount (scaled by tier and modifiers)
+                    batch_amount = int(self.base_batch_amount * tier_mult * prod_mult)
+                    
+                    # Get what this building produces
+                    p = self._current_production()
+                    
+                    # Prevent NaN values
+                    import math
+                    if not math.isnan(batch_amount) and not math.isinf(batch_amount) and batch_amount > 0:
+                        # Give resources based on what this building produces
+                        if p.wood_per_min > 0:
+                            world.resources.wood += batch_amount
+                        if p.iron_per_min > 0:
+                            world.resources.iron += batch_amount
+                        if p.food_per_min > 0:
+                            world.resources.food += batch_amount
+                    
+                    # Reset timer (keep remainder for smooth timing)
+                    self.production_timer -= self.production_interval
 
     def take_damage(self, amount: int, world=None):
         if self.state not in (BuildState.CONSTRUCTING, BuildState.ACTIVE):

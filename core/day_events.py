@@ -145,7 +145,7 @@ class DayEventManager:
     def clear_event(self):
         """Clear current event and reset modifiers to neutral."""
         self.current_event = None
-        # Reset modifiers to neutral
+        # Reset modifiers to neutral (day event modifiers only, no research modifiers)
         if hasattr(self.world, 'modifiers'):
             self.world.modifiers = {
                 "resource_prod_mult": 1.0,
@@ -160,6 +160,9 @@ class DayEventManager:
                 "node_spawn_bonus": False,
                 "lightning_storm": False
             }
+        # Mark research modifiers as dirty so they get recalculated
+        if hasattr(self.world, 'research') and hasattr(self.world.research, '_modifiers_dirty'):
+            self.world.research._modifiers_dirty = True
     
     def roll_new_day_event(self, day_number: int) -> Optional[Dict]:
         """

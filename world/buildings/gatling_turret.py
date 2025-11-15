@@ -5,7 +5,7 @@ import pygame
 import math
 import constants as c
 from world.building import Building, Cost, BuildState
-from world.projectile import Projectile
+from world.projectile import GatlingBullet
 
 class GatlingTurret(Building):
     """Gatling turret - high ROF, low damage, short range"""
@@ -265,7 +265,7 @@ class GatlingTurret(Building):
                 # Use effective damage and speed (modified by research/day events)
                 effective_damage = getattr(self, 'effective_damage', self.damage)
                 effective_speed = getattr(self, 'effective_projectile_speed', self.projectile_speed)
-                projectile = Projectile(
+                projectile = GatlingBullet(
                     start_pos=(turret_visual_pos.x, turret_visual_pos.y),
                     target_pos=(target_enemy.pos.x, target_enemy.pos.y),
                     speed=effective_speed,

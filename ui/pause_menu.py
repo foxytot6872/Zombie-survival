@@ -83,6 +83,24 @@ class PauseMenu:
         overlay.fill((0, 0, 0, 180))
         surface.blit(overlay, (0, 0))
         
+        # DEBUG: Draw overlay rectangle for pause menu panel (~600x400, center)
+        panel_width = 600
+        panel_height = 400
+        panel_x = (self.screen_width - panel_width) // 2
+        panel_y = (self.screen_height - panel_height) // 2
+        panel_overlay = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        panel_overlay.fill((128, 128, 255, 100))  # Light blue overlay
+        surface.blit(panel_overlay, (panel_x, panel_y))
+        
+        # DEBUG: Draw overlay rectangles for menu buttons (300x60 each)
+        y_offset = self.screen_height // 2 - 50
+        option_height = 60
+        for i, option in enumerate(self.options):
+            button_overlay = pygame.Surface((300, option_height), pygame.SRCALPHA)
+            button_overlay.fill((255, 200, 0, 100))  # Orange overlay
+            surface.blit(button_overlay, (self.screen_width // 2 - 150, y_offset - 5))
+            y_offset += option_height
+        
         # Draw title
         title_surface = self.font_large.render("PAUSED", True, (255, 255, 255))
         title_rect = title_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 - 200))

@@ -7,18 +7,28 @@ from typing import Optional, Dict
 class HUD:
     """HUD for displaying game information"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None):
         """
         Initialize HUD.
         Args:
             screen_width: Screen width in pixels
             screen_height: Screen height in pixels
+            daycounter_frames: List of pygame.Surface frames for animated day counter (5 frames, 200x85 each)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.font_large = pygame.font.Font(None, 48)
         self.font_medium = pygame.font.Font(None, 32)
         self.font_small = pygame.font.Font(None, 24)
+        
+        # Day counter animation
+        self.daycounter_frames = daycounter_frames if daycounter_frames else []
+        self.daycounter_animation_timer = 0.0
+        self.daycounter_animation_duration = 0.5  # Blinking animation duration (0.5 seconds)
+        self.daycounter_current_frame = 0
+        self.previous_state = None  # Track previous game state to detect transitions
+        self.is_transitioning = False  # Whether we're currently in a transition animation
+        self.transition_animation_timer = 0.0
         
         # HUD elements
         self.day = 1
@@ -43,6 +53,56 @@ class HUD:
         self.hq_hp = hq_hp
         self.hq_max_hp = hq_max_hp
         
+        # Update day counter animation
+        if self.daycounter_frames:
+            # Detect state transitions
+            if self.previous_state is not None and self.previous_state != self.state:
+                # State changed - start transition animation
+                self.is_transitioning = True
+                self.transition_animation_timer = 0.0
+                # Start from appropriate frame range
+                if self.state == "DAY":
+                    self.daycounter_current_frame = 0  # Start day animation (frames 0-2)
+                elif self.state == "NIGHT":
+                    self.daycounter_current_frame = 3  # Start night animation (frames 3-5)
+            
+            # Update transition animation if transitioning
+            if self.is_transitioning:
+                self.transition_animation_timer += dt
+                
+                if self.state == "DAY":
+                    # Day animation: frames 0-2 (1-3 in 1-indexed)
+                    frame_time = self.daycounter_animation_duration / 3  # 3 frames for day
+                    frame_index = int(self.transition_animation_timer / frame_time)
+                    if frame_index >= 3:
+                        frame_index = 2  # Stay on last frame of animation
+                        self.is_transitioning = False  # Animation complete
+                    self.daycounter_current_frame = frame_index
+                elif self.state == "NIGHT":
+                    # Night animation: frames 3-5 (4-6 in 1-indexed)
+                    frame_time = self.daycounter_animation_duration / 3  # 3 frames for night
+                    frame_index = int(self.transition_animation_timer / frame_time)
+                    if frame_index >= 3:
+                        frame_index = 2  # Stay on last frame of animation
+                        self.is_transitioning = False  # Animation complete
+                    self.daycounter_current_frame = 3 + frame_index  # Offset by 3 for night frames
+            else:
+                # Not transitioning - show static frame based on state
+                if self.state == "DAY":
+                    self.daycounter_current_frame = 0  # Frame 1 (day static)
+                elif self.state == "NIGHT":
+                    self.daycounter_current_frame = 3  # Frame 4 (night static)
+                else:
+                    # Default to day frame
+                    self.daycounter_current_frame = 0
+            
+            # Update previous state
+            self.previous_state = self.state
+            
+            # Clamp to valid frame index
+            if self.daycounter_current_frame >= len(self.daycounter_frames):
+                self.daycounter_current_frame = len(self.daycounter_frames) - 1
+        
         # Update event banner
         if self.event_visible:
             self.event_timer -= dt
@@ -62,21 +122,37 @@ class HUD:
     
     def draw(self, surface: pygame.Surface):
         """Draw HUD"""
-        # Draw day/night indicator (top-right)
-        state_text = f"Day {self.day} - Night {self.night}"
-        if self.state == "DAY":
-            state_text += " (Day)"
-            state_color = (100, 200, 255)
-        elif self.state == "NIGHT":
-            state_text += " (Night)"
-            state_color = (200, 100, 100)
+        # Day/Night indicator area (top-right) - use animated sprite if available
+        if self.daycounter_frames and len(self.daycounter_frames) > 0:
+            # Draw animated day counter sprite
+            current_frame = self.daycounter_frames[self.daycounter_current_frame]
+            # Position at top-right (256x128 sprite)
+            daycounter_rect = current_frame.get_rect(topright=(self.screen_width - 10, 10))
+            # DEBUG: Draw overlay rectangle for day counter (256x128)
+            overlay = pygame.Surface((256, 128), pygame.SRCALPHA)
+            overlay.fill((255, 0, 0, 80))  # Red overlay
+            surface.blit(overlay, (self.screen_width - 266, 10))
+            surface.blit(current_frame, daycounter_rect)
         else:
-            state_text += f" ({self.state})"
-            state_color = (200, 200, 200)
-        
-        state_surface = self.font_large.render(state_text, True, state_color)
-        state_rect = state_surface.get_rect(topright=(self.screen_width - 10, 10))
-        surface.blit(state_surface, state_rect)
+            # Fallback to text if sprite not available
+            state_text = f"Day {self.day} - Night {self.night}"
+            if self.state == "DAY":
+                state_text += " (Day)"
+                state_color = (100, 200, 255)
+            elif self.state == "NIGHT":
+                state_text += " (Night)"
+                state_color = (200, 100, 100)
+            else:
+                state_text += f" ({self.state})"
+                state_color = (200, 200, 200)
+            
+            state_surface = self.font_large.render(state_text, True, state_color)
+            state_rect = state_surface.get_rect(topright=(self.screen_width - 10, 10))
+            # Overlay rectangle for day/night indicator (estimated ~300x50)
+            overlay = pygame.Surface((300, 50), pygame.SRCALPHA)
+            overlay.fill((255, 0, 0, 80))  # Red overlay
+            surface.blit(overlay, (self.screen_width - 310, 10))
+            surface.blit(state_surface, state_rect)
         
         # Draw HQ HP (top-center, important!)
         hq_hp_pct = self.hq_hp / self.hq_max_hp if self.hq_max_hp > 0 else 0.0
@@ -91,6 +167,10 @@ class HUD:
         hq_text = f"HQ HP: {int(self.hq_hp)} / {int(self.hq_max_hp)}"
         hq_surface = self.font_large.render(hq_text, True, hq_color)
         hq_rect = hq_surface.get_rect(center=(self.screen_width // 2, 25))
+        # Overlay rectangle for HQ HP text area (estimated ~400x50)
+        overlay = pygame.Surface((400, 50), pygame.SRCALPHA)
+        overlay.fill((0, 255, 0, 80))  # Green overlay
+        surface.blit(overlay, (self.screen_width // 2 - 200, 0))
         surface.blit(hq_surface, hq_rect)
         
         # Draw HP bar below text
@@ -98,6 +178,10 @@ class HUD:
         bar_height = 20
         bar_x = self.screen_width // 2 - bar_width // 2
         bar_y = 45
+        # Overlay rectangle for HP bar (300x20)
+        overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 255, 80))  # Blue overlay
+        surface.blit(overlay, (bar_x, bar_y))
         # Background bar
         pygame.draw.rect(surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
         # HP bar
@@ -106,11 +190,17 @@ class HUD:
         # Border
         pygame.draw.rect(surface, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
         
-        # Draw wave info (top-right, below day/night)
+        # Draw wave info (top-right, below day counter)
         if self.wave_info:
             wave_text = f"Zombies: {self.wave_info.get('enemies_spawned', 0)} / {self.wave_info.get('total_to_spawn', 0)}"
             wave_surface = self.font_medium.render(wave_text, True, (255, 255, 255))
-            wave_rect = wave_surface.get_rect(topright=(self.screen_width - 10, state_rect.bottom + 5))
+            # Position below day counter (128 pixels tall + 5 pixel spacing)
+            wave_y = 10 + 128 + 5 if (self.daycounter_frames and len(self.daycounter_frames) > 0) else 60
+            wave_rect = wave_surface.get_rect(topright=(self.screen_width - 10, wave_y))
+            # Overlay rectangle for wave info (estimated ~250x30)
+            overlay = pygame.Surface((250, 30), pygame.SRCALPHA)
+            overlay.fill((255, 255, 0, 80))  # Yellow overlay
+            surface.blit(overlay, (self.screen_width - 260, wave_y))
             surface.blit(wave_surface, wave_rect)
         
         # Draw event banner (top-center, fades in/out)
@@ -129,5 +219,9 @@ class HUD:
             event_surface = self.font_large.render(self.event_text, True, (255, 255, 255))
             event_surface.set_alpha(alpha)
             event_rect = event_surface.get_rect(center=(self.screen_width // 2, 50))
+            # Overlay rectangle for event banner (estimated ~600x60)
+            overlay = pygame.Surface((600, 60), pygame.SRCALPHA)
+            overlay.fill((255, 0, 255, 80))  # Magenta overlay
+            surface.blit(overlay, (self.screen_width // 2 - 300, 20))
             surface.blit(event_surface, event_rect)
 

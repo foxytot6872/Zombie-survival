@@ -70,6 +70,15 @@ class GameOverScreen:
         overlay.fill((0, 0, 0, 200))
         surface.blit(overlay, (0, 0))
         
+        # DEBUG: Draw overlay rectangle for game over panel (~800x600, center)
+        panel_width = 800
+        panel_height = 600
+        panel_x = (self.screen_width - panel_width) // 2
+        panel_y = (self.screen_height - panel_height) // 2
+        panel_overlay = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        panel_overlay.fill((255, 128, 128, 100))  # Light red overlay
+        surface.blit(panel_overlay, (panel_x, panel_y))
+        
         # Determine title and color
         if self.game_state == GameState.WIN:
             title = "VICTORY!"

@@ -55,6 +55,11 @@ class ResearchPanel:
         overlay.fill((0, 0, 0, 180))
         screen.blit(overlay, (0, 0))
         
+        # DEBUG: Draw overlay rectangle for research panel (~600x800, center)
+        panel_overlay = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+        panel_overlay.fill((128, 255, 128, 100))  # Light green overlay
+        screen.blit(panel_overlay, self.rect)
+        
         # Draw panel background
         panel_bg = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
         panel_bg.fill((40, 40, 40, 240))

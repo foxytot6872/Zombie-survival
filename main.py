@@ -5,7 +5,8 @@ import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
 from world.spawner import Spawner
-from world.projectile import Projectile, ArrowProjectile
+from world.projectile import Projectile, ArrowProjectile, GatlingBullet, ZombieBullet
+from world.buildings.piercer_turret import PiercingProjectile
 from world.debug import DebugSystem
 from button import Button
 from world.map import Grid
@@ -219,10 +220,29 @@ brute_sprite_sheet = load_image_or_placeholder(
     "Zombie Brute sprite sheet"
 )
 
+# Swarmling zombie sprite sheet (32 frames, 48x48 each)
+# Note: Individual frames will be scaled to 0.8 in the SwarmlingZombie class
+swarmling_sprite_sheet = load_image_or_placeholder(
+    'asset/Zombie_Swarmling-Sheet.png',
+    (48 * 32, 48),  # 32 frames * 48 pixels = 1536 pixels wide, 48 pixels tall
+    (120, 100, 80, 255),
+    "Zombie Swarmling sprite sheet"
+)
+
+# Spitter zombie sprite sheet (31 frames, 64x64 each)
+spitter_sprite_sheet = load_image_or_placeholder(
+    'asset/Pumpkinhead/Pumpkinhead-Sheet.png',
+    (64 * 31, 64),  # 31 frames * 64 pixels = 1984 pixels wide, 64 pixels tall
+    (100, 50, 150, 255),
+    "Spitter zombie sprite sheet"
+)
+
 # Set sprite sheets for zombie classes
 BasicZombie.sprite_sheet = zombie_sprite_sheet
 RunnerZombie.sprite_sheet = runner_sprite_sheet
 BruteZombie.sprite_sheet = brute_sprite_sheet
+SwarmlingZombie.sprite_sheet = swarmling_sprite_sheet
+SpitterZombie.sprite_sheet = spitter_sprite_sheet
 
 # Skeleton sprite sheet (40 frames, 48x48 each)
 skeleton_sprite_sheet = load_image_or_placeholder(
@@ -257,6 +277,46 @@ arrow_projectile_sheet = load_image_or_placeholder(
 # Set sprite sheet for ArrowProjectile class
 ArrowProjectile.sprite_sheet = arrow_projectile_sheet
 
+# Ballistic Bullet sprite sheet (4 frames, 16x16 each)
+ballistic_bullet_sheet = load_image_or_placeholder(
+    'asset\Balisticbullet-Sheet.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (255, 200, 0, 255),
+    "Ballistic Bullet sprite sheet"
+)
+
+# Set sprite sheet for Projectile class (base projectile used by ballistic turrets)
+Projectile.sprite_sheet = ballistic_bullet_sheet
+
+# Gatling (Tiwtir) Bullet sprite sheet (4 frames, 16x16 each)
+gatling_bullet_sheet = load_image_or_placeholder(
+    'asset\Tiwtirbullet-Sheet.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (255, 150, 0, 255),
+    "Gatling Bullet sprite sheet"
+)
+
+# Railgun Bullet sprite sheet (4 frames, 16x16 each)
+railgun_bullet_sheet = load_image_or_placeholder(
+    'asset\Railgunbullet-Sheet.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (200, 100, 255, 255),
+    "Railgun Bullet sprite sheet"
+)
+
+# Zombie Bullet sprite sheet (4 frames, 16x16 each)
+zombie_bullet_sheet = load_image_or_placeholder(
+    'asset\Zombiebullet-Sheet.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (150, 50, 50, 255),
+    "Zombie Bullet sprite sheet"
+)
+
+# Set sprite sheets for projectile classes
+GatlingBullet.sprite_sheet = gatling_bullet_sheet
+PiercingProjectile.sprite_sheet = railgun_bullet_sheet
+ZombieBullet.sprite_sheet = zombie_bullet_sheet
+
 # Warrior Skeleton sprite sheet (46 frames, 48x48 each)
 warrior_skeleton_sprite_sheet = load_image_or_placeholder(
     'asset/WarriorSkeleton_Sheet.png',
@@ -268,6 +328,38 @@ warrior_skeleton_sprite_sheet = load_image_or_placeholder(
 # Set sprite sheet for WarriorSkeleton class
 WarriorSkeleton.sprite_sheet = warrior_skeleton_sprite_sheet
 
+# Day counter sprite sheet (6 frames, 256x128 each)
+daycounter_sheet = load_image_or_placeholder(
+    'asset/hud/Daycounter-Sheet.png',
+    (256 * 6, 128),  # 6 frames * 256 pixels = 1536 pixels wide, 128 pixels tall
+    (100, 100, 100, 255),
+    "Day counter sprite sheet"
+)
+# Extract 6 frames from the sheet
+daycounter_frames = []
+if daycounter_sheet:
+    frame_width = 256
+    frame_height = 128
+    for i in range(6):
+        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+        if frame_rect.right <= daycounter_sheet.get_width():
+            frame = daycounter_sheet.subsurface(frame_rect)
+            daycounter_frames.append(frame)
+        else:
+            # If frame doesn't exist, use first frame as fallback
+            if daycounter_frames:
+                daycounter_frames.append(daycounter_frames[0])
+            else:
+                # Create placeholder if no frames available
+                placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                placeholder.fill((100, 100, 100, 255))
+                daycounter_frames.append(placeholder)
+else:
+    # Create placeholder frames if sheet not loaded
+    for i in range(6):
+        placeholder = pygame.Surface((256, 128), pygame.SRCALPHA)
+        placeholder.fill((100, 100, 100, 255))
+        daycounter_frames.append(placeholder)
 
 # HQ building image
 hq_image = load_image_or_placeholder(
@@ -315,35 +407,43 @@ if upgrade_panel_darken_sheet:
         upgrade_panel_darken_frames.append(frame)
 
 # New upgrade panel sheet for building detail panel background - extract 3 frames (497x742 each)
+# Scale factor for making panel bigger (1.2x - slightly bigger than original)
+PANEL_SCALE = 1.2
 building_panel_sheet = load_image_or_placeholder(
     'asset/upgrade_panel_Sheet.png',
     (497 * 3, 742),  # 3 frames * 497 pixels = 1491 pixels wide, 742 pixels tall
     (50, 50, 50, 255),
     "Building detail panel background sheet"
 )
-# Extract 3 frames from the sheet
+# Extract 3 frames from the sheet and scale them up
 building_panel_frames = []
 if building_panel_sheet:
     frame_width = 497
     frame_height = 742
+    scaled_width = int(frame_width * PANEL_SCALE)
+    scaled_height = int(frame_height * PANEL_SCALE)
     for i in range(3):
         frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
         if frame_rect.right <= building_panel_sheet.get_width():
             frame = building_panel_sheet.subsurface(frame_rect)
-            building_panel_frames.append(frame)
+            # Scale the frame up
+            scaled_frame = pygame.transform.scale(frame, (scaled_width, scaled_height))
+            building_panel_frames.append(scaled_frame)
         else:
             # If frame doesn't exist, use first frame as fallback
             if building_panel_frames:
                 building_panel_frames.append(building_panel_frames[0])
             else:
                 # Create placeholder if no frames available
-                placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                placeholder = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
                 placeholder.fill((50, 50, 50, 255))
                 building_panel_frames.append(placeholder)
 else:
     # Create placeholder frames if sheet not loaded
+    scaled_width = int(497 * PANEL_SCALE)
+    scaled_height = int(742 * PANEL_SCALE)
     for i in range(3):
-        placeholder = pygame.Surface((497, 742), pygame.SRCALPHA)
+        placeholder = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
         placeholder.fill((50, 50, 50, 255))
         building_panel_frames.append(placeholder)
 
@@ -629,7 +729,7 @@ wave_manager = WaveManager(world, waves_config, difficulty="normal")
 world.wave_manager = wave_manager
 
 # Initialize UI components
-hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames)
 # Set HUD reference in world for day events
 world.hud = hud
 
@@ -1590,7 +1690,8 @@ def create_button_image(text, color=(100, 150, 100), width=100, height=40):
     """Create a button image with text"""
     button_img = pygame.Surface((width, height))
     button_img.fill(color)
-    font = pygame.font.Font(None, 20)
+    # Use larger font for bigger buttons
+    font = pygame.font.Font(None, int(20 * 1.5))  # Scale font with button size
     text_surface = font.render(text, True, (255, 255, 255))
     text_rect = text_surface.get_rect(center=(width//2, height//2))
     button_img.blit(text_surface, text_rect)
@@ -1601,9 +1702,9 @@ def create_button_image(text, color=(100, 150, 100), width=100, height=40):
 ###################
 # Building buttons will be horizontal at bottom left
 button_x_start = 10
-button_spacing = 105  # Width (100) + spacing (5)
-button_width = 100
-button_height = 40
+button_width = 150  # Increased from 100
+button_height = 60  # Increased from 40
+button_spacing = 160  # Width (150) + spacing (10)
 buttons = {}
 
 # Building types with their button labels and colors
@@ -1747,31 +1848,69 @@ def select_building(mouse_pos, building_group):
     return False
 
 def draw_resources(screen, resources, font):
-    """Draw resource display (including coins) at bottom-right."""
-    line_height = 25
+    """Draw resource display (including coins) at bottom, spanning horizontally."""
     padding = 10
+    item_spacing = 30  # Space between items horizontally (increased from 20)
+    # Use larger font for resources
+    resource_font = pygame.font.Font(None, 36)  # Increased from 24
+    
+    # Handle NaN values by converting to 0
+    import math
+    wood_val = resources.wood if not math.isnan(resources.wood) else 0
+    iron_val = resources.iron if not math.isnan(resources.iron) else 0
+    food_val = resources.food if not math.isnan(resources.food) else 0
+    coins_val = resources.coins if not math.isnan(resources.coins) else 0
+    
+    # Also fix the resources if they're NaN
+    if math.isnan(resources.wood):
+        resources.wood = 0
+    if math.isnan(resources.iron):
+        resources.iron = 0
+    if math.isnan(resources.food):
+        resources.food = 0
+    if math.isnan(resources.coins):
+        resources.coins = 0
     
     texts = [
-        f"Wood: {int(resources.wood)}",
-        f"Iron: {int(resources.iron)}",
-        f"Food: {int(resources.food)}",
-        f"Coins: {int(resources.coins)}"
+        f"Wood: {int(wood_val)}",
+        f"Iron: {int(iron_val)}",
+        f"Food: {int(food_val)}",
+        f"Coins: {int(coins_val)}",
+        f"Zombies: {len(enemy_group)}"
     ]
     
-    # Calculate position from bottom-right
-    total_height = len(texts) * line_height + line_height  # +1 for enemy count
-    start_y = c.SCREEN_HEIGHT - total_height - padding
-    x_offset = c.SCREEN_WIDTH - 200  # 200px from right edge
+    # Calculate total width needed
+    text_surfaces = []
+    total_width = 0
+    for text in texts:
+        # Use gold color for coins, red for zombies, white for others
+        if "Coins" in text:
+            color = (255, 215, 0)
+        elif "Zombies" in text:
+            color = (255, 0, 0)
+        else:
+            color = (255, 255, 255)
+        text_surface = resource_font.render(text, True, color)
+        text_surfaces.append((text_surface, color))
+        total_width += text_surface.get_width() + item_spacing
     
-    for i, text in enumerate(texts):
-        # Use gold color for coins
-        color = (255, 215, 0) if "Coins" in text else (255, 255, 255)
-        text_surface = font.render(text, True, color)
-        screen.blit(text_surface, (x_offset, start_y + i * line_height))
+    # Remove last spacing
+    total_width -= item_spacing
     
-    # Draw enemy count
-    enemy_text = font.render(f"Zombies: {len(enemy_group)}", True, (255, 0, 0))
-    screen.blit(enemy_text, (x_offset, start_y + len(texts) * line_height))
+    # Position at bottom-right, spanning horizontally
+    start_x = c.SCREEN_WIDTH - total_width - padding  # Right-aligned with padding
+    start_y = c.SCREEN_HEIGHT - 45  # 45px from bottom (increased from 30)
+    
+    # DEBUG: Draw overlay rectangle for resource display area (horizontal span)
+    resource_overlay = pygame.Surface((total_width + 20, 45), pygame.SRCALPHA)
+    resource_overlay.fill((0, 255, 255, 80))  # Cyan overlay
+    screen.blit(resource_overlay, (start_x - 10, start_y - 5))
+    
+    # Draw all resources horizontally
+    current_x = start_x
+    for text_surface, color in text_surfaces:
+        screen.blit(text_surface, (current_x, start_y))
+        current_x += text_surface.get_width() + item_spacing
 
 def create_building(building_class, grid_pos, *args):
     """Create a building instance based on the building class."""
@@ -1830,8 +1969,16 @@ while running:
     dt = clock.tick(FPS) / 1000.0  # Delta time in seconds
     
     # Apply research modifiers (combine with day event modifiers)
+    # Use caching to avoid recalculating every frame - only recalculates when research changes
+    # IMPORTANT: world.modifiers should only contain day event modifiers.
+    # We apply research modifiers on top and store the result in world.modifiers
+    # for components to read. Day events will reset world.modifiers when they change.
     if hasattr(world, 'research') and world.research:
+        # Get effective modifiers (cached, only recalculates when research changes or day events change)
         effective_modifiers = research_manager.apply_research_modifiers()
+        # Update world.modifiers with effective modifiers
+        # Day events will reset world.modifiers to only day event modifiers when they change,
+        # and mark research modifiers as dirty, so this is safe
         world.modifiers.update(effective_modifiers)
     
     # Calculate FPS
@@ -1925,6 +2072,16 @@ while running:
                 build_mode = True
                 # Deselect any selected building when entering build mode
                 deselect_building()
+    
+    # DEBUG: Draw overlay rectangles for build menu buttons (bottom-left)
+    if buttons:
+        # Calculate total width of button row
+        num_buttons = len(buttons)
+        total_button_width = num_buttons * button_spacing
+        button_row_y = c.SCREEN_HEIGHT - button_height - 10
+        button_overlay = pygame.Surface((total_button_width, button_height), pygame.SRCALPHA)
+        button_overlay.fill((255, 128, 0, 80))  # Orange overlay
+        screen.blit(button_overlay, (button_x_start, button_row_y))
     
     # Highlight selected button
     if selected_building_type:
@@ -2349,6 +2506,11 @@ while running:
     ###################
     # Draw research button
     ###################
+    # DEBUG: Draw overlay rectangle for research button (top-left, 10px padding)
+    if hasattr(research_button, 'rect'):
+        research_overlay = pygame.Surface((research_button.rect.width, research_button.rect.height), pygame.SRCALPHA)
+        research_overlay.fill((128, 0, 255, 80))  # Purple overlay
+        screen.blit(research_overlay, research_button.rect)
     research_button.draw(screen)
     
     ###################

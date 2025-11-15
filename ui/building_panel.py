@@ -20,9 +20,10 @@ class BuildingPanel:
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.font_large = pygame.font.Font(None, 48)
-        self.font_medium = pygame.font.Font(None, 32)
-        self.font_small = pygame.font.Font(None, 24)
+        # Scale fonts up (1.2x - slightly bigger than original)
+        self.font_large = pygame.font.Font(None, int(48 * 1.2))  # ~58
+        self.font_medium = pygame.font.Font(None, int(32 * 1.2))  # ~38
+        self.font_small = pygame.font.Font(None, int(24 * 1.2))  # ~29
         
         self.is_visible = False
         self.selected_building: Optional[Building] = None
@@ -33,9 +34,13 @@ class BuildingPanel:
             bg_width, bg_height = self.panel_background_frames[0].get_size()
             self.panel_rect = pygame.Rect(0, 0, bg_width, bg_height)
         else:
-            self.panel_rect = pygame.Rect(0, 0, 300, 400)
+            # Fallback size (scaled up)
+            self.panel_rect = pygame.Rect(0, 0, int(300 * 1.2), int(400 * 1.2))
         
         self.panel_rect.bottomright = (screen_width - 10, screen_height - 10)
+        
+        # Scale factor for internal elements (1.2x - slightly bigger than original)
+        self.scale = 1.2
         self.button_rects = {}  # Store button rects for click detection
         
         self.upgrade_panel_frames = upgrade_panel_frames if upgrade_panel_frames else []
@@ -89,6 +94,11 @@ class BuildingPanel:
         
         building = self.selected_building
         
+        # DEBUG: Draw overlay rectangle for building panel (497x742, bottom-right)
+        panel_overlay = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
+        panel_overlay.fill((255, 0, 128, 80))  # Pink overlay
+        surface.blit(panel_overlay, self.panel_rect)
+        
         # Draw panel background using upgrade panel asset - select frame based on upgrade progress
         # Initialize upgrade_progress if not set (backwards compatibility)
         if not hasattr(building, 'upgrade_progress'):
@@ -108,34 +118,35 @@ class BuildingPanel:
             # Draw panel border
             pygame.draw.rect(surface, (200, 200, 200), self.panel_rect, 3)
         
-        # Draw building info
-        y_offset = self.panel_rect.y + 20
-        line_height = 30
+        # Draw building info (scaled up)
+        y_offset = self.panel_rect.y + int(20 * self.scale)
+        line_height = int(30 * self.scale)
         
-        # Building name
+        # Building name (use larger font)
         building_name = building.TYPE_ID.replace('_', ' ').title()
         name_surface = self.font_large.render(building_name, True, (255, 255, 255))
-        surface.blit(name_surface, (self.panel_rect.x + 10, y_offset))
-        y_offset += line_height + 10
+        surface.blit(name_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
+        y_offset += line_height + int(10 * self.scale)
         
         # HP bar
         hp_text = f"HP: {building.hp} / {building.max_hp}"
         hp_surface = self.font_medium.render(hp_text, True, (255, 255, 255))
-        surface.blit(hp_surface, (self.panel_rect.x + 10, y_offset))
+        surface.blit(hp_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         y_offset += line_height
         
-        # Draw HP bar
-        hp_bar_rect = pygame.Rect(self.panel_rect.x + 10, y_offset, self.panel_rect.width - 20, 20)
+        # Draw HP bar (scaled)
+        hp_bar_rect = pygame.Rect(self.panel_rect.x + int(10 * self.scale), y_offset, 
+                                  self.panel_rect.width - int(20 * self.scale), int(20 * self.scale))
         hp_percent = building.hp / building.max_hp if building.max_hp > 0 else 0
         hp_color = (0, 255, 0) if hp_percent > 0.5 else (255, 255, 0) if hp_percent > 0.25 else (255, 0, 0)
         pygame.draw.rect(surface, (0, 0, 0), hp_bar_rect)
         pygame.draw.rect(surface, hp_color, (hp_bar_rect.x, hp_bar_rect.y, int(hp_bar_rect.width * hp_percent), hp_bar_rect.height))
-        y_offset += line_height + 10
+        y_offset += line_height + int(10 * self.scale)
         
         # Tier
         tier_text = f"Tier: {building.tier} / {building.TIER_MAX}"
         tier_surface = self.font_medium.render(tier_text, True, (255, 255, 255))
-        surface.blit(tier_surface, (self.panel_rect.x + 10, y_offset))
+        surface.blit(tier_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         
         # Buttons (store rects for click detection)
         self.button_rects = {}
@@ -153,10 +164,11 @@ class BuildingPanel:
         # Set up upgrade clickable area if building can be upgraded
         if can_upgrade_to_iron or can_upgrade_tier:
             # Clickable area coordinates relative to panel background: (42, 404) to (450, 541)
-            clickable_left = 42
-            clickable_top = 404
-            clickable_width = 450 - 42  # 408
-            clickable_height = 541 - 404  # 137
+            # Scale these coordinates by the panel scale factor
+            clickable_left = int(42 * self.scale)
+            clickable_top = int(404 * self.scale)
+            clickable_width = int((450 - 42) * self.scale)  # 408 * scale
+            clickable_height = int((541 - 404) * self.scale)  # 137 * scale
             
             # Calculate clickable area position on screen (relative to panel position)
             clickable_x = self.panel_rect.x + clickable_left
@@ -164,6 +176,11 @@ class BuildingPanel:
             
             # Store clickable area rect for click detection
             self.upgrade_panel_rect = pygame.Rect(clickable_x, clickable_y, clickable_width, clickable_height)
+            
+            # DEBUG: Draw overlay rectangle for upgrade clickable area (408x137)
+            upgrade_overlay = pygame.Surface((clickable_width, clickable_height), pygame.SRCALPHA)
+            upgrade_overlay.fill((0, 255, 128, 100))  # Light green overlay for upgrade area
+            surface.blit(upgrade_overlay, self.upgrade_panel_rect)
             
             # Register upgrade button
             if can_upgrade_to_iron:
