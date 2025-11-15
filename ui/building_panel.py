@@ -87,7 +87,7 @@ class BuildingPanel:
         
         return None
     
-    def draw(self, surface: pygame.Surface, resources, mouse_pos=None):
+    def draw(self, surface: pygame.Surface, resources, mouse_pos=None, show_ui_rectangles: bool = False):
         """Draw building panel"""
         if not self.is_visible or not self.selected_building:
             return
@@ -95,9 +95,10 @@ class BuildingPanel:
         building = self.selected_building
         
         # DEBUG: Draw overlay rectangle for building panel (497x742, bottom-right)
-        panel_overlay = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
-        panel_overlay.fill((255, 0, 128, 80))  # Pink overlay
-        surface.blit(panel_overlay, self.panel_rect)
+        if show_ui_rectangles:
+            panel_overlay = pygame.Surface((self.panel_rect.width, self.panel_rect.height), pygame.SRCALPHA)
+            panel_overlay.fill((255, 0, 128, 80))  # Pink overlay
+            surface.blit(panel_overlay, self.panel_rect)
         
         # Draw panel background using upgrade panel asset - select frame based on upgrade progress
         # Initialize upgrade_progress if not set (backwards compatibility)
@@ -178,9 +179,10 @@ class BuildingPanel:
             self.upgrade_panel_rect = pygame.Rect(clickable_x, clickable_y, clickable_width, clickable_height)
             
             # DEBUG: Draw overlay rectangle for upgrade clickable area (408x137)
-            upgrade_overlay = pygame.Surface((clickable_width, clickable_height), pygame.SRCALPHA)
-            upgrade_overlay.fill((0, 255, 128, 100))  # Light green overlay for upgrade area
-            surface.blit(upgrade_overlay, self.upgrade_panel_rect)
+            if show_ui_rectangles:
+                upgrade_overlay = pygame.Surface((clickable_width, clickable_height), pygame.SRCALPHA)
+                upgrade_overlay.fill((0, 255, 128, 100))  # Light green overlay for upgrade area
+                surface.blit(upgrade_overlay, self.upgrade_panel_rect)
             
             # Register upgrade button
             if can_upgrade_to_iron:
