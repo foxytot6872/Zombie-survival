@@ -447,6 +447,25 @@ zombie_bullet_sheet = load_image_or_placeholder(
     "Zombie Bullet sprite sheet"
 )
 
+# Coin sprite sheet (frames, 16x16 each)
+coin_sheet = load_image_or_placeholder(
+    'asset/Coin-Sheet.png',
+    (16 * 8, 16),  # Assuming 8 frames * 16 pixels = 128 pixels wide, 16 pixels tall
+    (255, 215, 0, 255),  # Gold color placeholder
+    "Coin sprite sheet"
+)
+# Extract coin frames
+coin_frame_size = 16
+coin_frames = []
+if coin_sheet:
+    coin_frames_count = coin_sheet.get_width() // coin_frame_size
+    for i in range(coin_frames_count):
+        frame_rect = pygame.Rect(i * coin_frame_size, 0, coin_frame_size, coin_frame_size)
+        if frame_rect.right <= coin_sheet.get_width():
+            frame = coin_sheet.subsurface(frame_rect)
+            coin_frames.append(frame)
+    print(f"Loaded {len(coin_frames)} coin frames from sprite sheet")
+
 # Set sprite sheets for projectile classes
 GatlingBullet.sprite_sheet = gatling_bullet_sheet
 PiercingProjectile.sprite_sheet = railgun_bullet_sheet
@@ -1104,6 +1123,9 @@ enemy_group = pygame.sprite.Group()
 # Projectile groups
 projectile_group = pygame.sprite.Group()
 
+# Coin drops list for visual coin effects
+coin_drops = []
+
 build_mode = False  # True when player wants to build
 selected_building_type = None  # Building class to build
 selected_building = None  # Currently selected building
@@ -1122,6 +1144,77 @@ selection_highlight_timer = None  # AnimationTimer for selection highlight
 
 # Button animations - store animation timers per button
 button_animations = {}  # {(building_class, 'hover'|'click'): AnimationTimer}
+
+# Coin Drop System
+class CoinDrop:
+    """Visual coin drop effect when enemies are killed"""
+    def __init__(self, pos: pygame.Vector2, coin_value: int, frames: list):
+        self.pos = pygame.Vector2(pos)
+        self.start_y = pos.y
+        self.coin_value = coin_value
+        self.frames = frames
+        self.frame_index = 0
+        self.animation_timer = 0.0
+        self.animation_delay = 0.1  # 100ms per frame
+        
+        # Physics
+        self.velocity_y = -150.0  # Initial upward velocity (bounce up)
+        self.gravity = 400.0  # Gravity acceleration
+        self.collected = False
+        self.collect_timer = 0.0
+        self.collect_delay = 1.5  # Auto-collect after 1.5 seconds
+        
+        # Image and rect
+        if self.frames:
+            self.image = self.frames[0]
+            self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.image = None
+            self.rect = pygame.Rect(self.pos.x, self.pos.y, 16, 16)
+    
+    def update(self, dt: float, resources):
+        """Update coin drop physics and animation"""
+        if self.collected:
+            return
+        
+        # Update position with physics
+        self.velocity_y += self.gravity * dt
+        self.pos.y += self.velocity_y * dt
+        
+        # Bounce effect - if coin falls below start position, stop it
+        if self.pos.y >= self.start_y:
+            self.pos.y = self.start_y
+            self.velocity_y = 0.0  # Stop falling
+        
+        # Update animation
+        self.animation_timer += dt
+        if self.animation_timer >= self.animation_delay and self.frames:
+            self.animation_timer = 0.0
+            self.frame_index = (self.frame_index + 1) % len(self.frames)
+            self.image = self.frames[self.frame_index]
+        
+        # Auto-collect timer
+        self.collect_timer += dt
+        if self.collect_timer >= self.collect_delay:
+            self.collect(resources)
+        
+        # Update rect
+        if self.image:
+            self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.rect.center = self.pos
+    
+    def collect(self, resources):
+        """Collect the coin and award coins to player"""
+        if not self.collected:
+            self.collected = True
+            resources.add_coins(self.coin_value)
+    
+    def draw(self, surface: pygame.Surface):
+        """Draw the coin drop"""
+        if self.collected or not self.image:
+            return
+        surface.blit(self.image, self.rect)
 
 # Enemy factory for spawner
 enemy_factory = {
@@ -2086,7 +2179,7 @@ def apply_difficulty_settings(difficulty: Difficulty, *, reset_resources: bool =
 
 def restart_game():
     """Restart game"""
-    global building_group, turret_group, enemy_group, projectile_group, resources, wave_manager, game_state_manager, node_group, survivor_group
+    global building_group, turret_group, enemy_group, projectile_group, resources, wave_manager, game_state_manager, node_group, survivor_group, coin_drops
     # Reset game state
     building_group.empty()
     turret_group.empty()
@@ -2094,6 +2187,7 @@ def restart_game():
     projectile_group.empty()
     node_group.empty()
     survivor_group.empty()
+    coin_drops.clear()  # Clear coin drops on restart
     grid.clear()
     wave_manager.reset()
     game_state_manager.reset()
@@ -3296,7 +3390,15 @@ while running:
             # Apply coin drop modifier from day events
             coin_mult = world.modifiers.get("coin_drop_mult", 1.0) if hasattr(world, 'modifiers') else 1.0
             coin_reward = int(coin_reward * coin_mult)
-            resources.add_coins(coin_reward)
+            
+            # Spawn visual coin drop instead of directly adding coins
+            if coin_frames:
+                coin_drop = CoinDrop(enemy.pos.copy(), coin_reward, coin_frames)
+                coin_drops.append(coin_drop)
+            else:
+                # Fallback: directly add coins if no sprite frames available
+                resources.add_coins(coin_reward)
+            
             enemy.coins_dropped = True
     
     # Build spatial grid for separation AFTER enemies have moved
@@ -3421,6 +3523,19 @@ while running:
     for projectile in projectiles_to_remove:
         projectile_group.remove(projectile)
     
+    ###################
+    # Update coin drops
+    ###################
+    coin_drops_to_remove = []
+    for coin_drop in coin_drops:
+        coin_drop.update(dt, resources)
+        if coin_drop.collected:
+            coin_drops_to_remove.append(coin_drop)
+    
+    # Remove collected coin drops
+    for coin_drop in coin_drops_to_remove:
+        coin_drops.remove(coin_drop)
+    
     # Draw turrets separately (they have custom rendering)
     for turret in turret_group:
         turret.draw(screen)
@@ -3480,6 +3595,12 @@ while running:
         projectile.draw(screen)
     
     ###################
+    # Draw coin drops
+    ###################
+    for coin_drop in coin_drops:
+        coin_drop.draw(screen)
+    
+    ###################
     # Draw enemies
     ###################
     # Debug: Print enemy count periodically
@@ -3491,8 +3612,21 @@ while running:
     
     for enemy in enemy_group:
         # Debug: Check if enemy is valid before drawing
-        if not hasattr(enemy, 'alive') or not enemy.alive:
-            continue  # Skip dead enemies (they'll be removed)
+        if not hasattr(enemy, 'alive'):
+            continue
+        
+        # Allow drawing dead enemies if they have a death animation that's still playing
+        if not enemy.alive:
+            # Check if enemy has death animation support
+            if isinstance(enemy, (BasicZombie, RunnerZombie, BruteZombie, Skeleton, ArcherSkeleton, WarriorSkeleton)):
+                # Only skip if death animation is complete
+                if hasattr(enemy, 'death_animation_complete') and enemy.death_animation_complete:
+                    continue  # Skip enemies with completed death animation
+                # Otherwise, draw them (death animation still playing)
+            else:
+                # For enemies without death animations, skip immediately
+                continue
+        
         if not hasattr(enemy, 'pos'):
             print(f"WARNING: Enemy missing pos attribute: {type(enemy).__name__}")
             continue
