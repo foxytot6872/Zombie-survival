@@ -58,6 +58,10 @@ class BallisticTurret(Building):
         # Current target enemy
         self.target_enemy = None
         
+        # Target check cooldown - only retarget every 0.25 seconds
+        self.last_target_check = 0.0
+        self.target_check_interval = 0.25  # seconds
+        
         # Projectile group (will be set by world)
         self.projectile_group = None
         
@@ -84,15 +88,27 @@ class BallisticTurret(Building):
             animation_list.append(temp_img)
         return animation_list
     
-    def find_nearest_enemy(self, enemy_group):
-        """Find the nearest enemy within range"""
+    def find_nearest_enemy(self, enemy_group, spatial_grid=None):
+        """
+        Find the nearest enemy within range.
+        Uses spatial grid for efficient querying if provided.
+        """
         if not enemy_group:
             return None
         
         nearest_enemy = None
         nearest_distance = float('inf')
         
-        for enemy in enemy_group:
+        # Use spatial grid if available (much faster than scanning all enemies)
+        candidates = []
+        if spatial_grid:
+            # Get enemies from nearby cells (radius_cells=2 covers ~256 pixels)
+            candidates = spatial_grid.get_nearby(self.pos, radius_cells=2)
+        else:
+            # Fallback: scan all enemies
+            candidates = list(enemy_group)
+        
+        for enemy in candidates:
             if not enemy.alive:
                 continue
             
@@ -285,8 +301,37 @@ class BallisticTurret(Building):
                 self.projectile_group = world.projectile_group
             
             if enemy_group:
-                # Find nearest enemy
-                nearest_enemy = self.find_nearest_enemy(enemy_group)
+                # Only retarget if cooldown has passed
+                import time
+                current_time = time.time()
+                should_retarget = (current_time - self.last_target_check) >= self.target_check_interval
+                
+                # Get spatial grid from world if available
+                spatial_grid = None
+                if world and hasattr(world, 'spatial_grid'):
+                    spatial_grid = world.spatial_grid
+                
+                if should_retarget:
+                    # Find nearest enemy (using spatial grid if available)
+                    nearest_enemy = self.find_nearest_enemy(enemy_group, spatial_grid)
+                    self.last_target_check = current_time
+                    
+                    # Update target if found
+                    if nearest_enemy and nearest_enemy.alive:
+                        self.target_enemy = nearest_enemy
+                else:
+                    # Use existing target if still alive and in range
+                    nearest_enemy = self.target_enemy
+                    if nearest_enemy and nearest_enemy.alive:
+                        # Check if target is still in range
+                        distance = math.sqrt(
+                            (nearest_enemy.pos.x - self.pos.x) ** 2 + 
+                            (nearest_enemy.pos.y - self.pos.y) ** 2
+                        )
+                        if distance > self.range:
+                            # Target out of range - clear it
+                            nearest_enemy = None
+                            self.target_enemy = None
                 
                 if nearest_enemy and nearest_enemy.alive:
                     # Calculate angle to target

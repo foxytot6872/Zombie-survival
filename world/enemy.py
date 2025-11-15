@@ -64,6 +64,10 @@ class Enemy(pygame.sprite.Sprite):
         self.time_since_progress = 0.0
         self.pathfinding_cache = {}  # Cache pathfinding results (cleared when > 100 entries)
         
+        # Pathfinding cooldown - only recalculate path every 0.5 seconds
+        self.last_path_update = 0.0
+        self.path_update_interval = 0.5  # seconds
+        
         # Projectile group for ranged enemies (set by world)
         self.projectile_group = None
     
@@ -104,6 +108,9 @@ class Enemy(pygame.sprite.Sprite):
         
         # Update attack timer
         self.attack_timer += dt
+        
+        # Force path recalculation if we reached end of waypoint or target changed
+        # This is handled in choose_target by checking target_building != building
         
         # Set projectile group for ranged enemies
         if world and hasattr(world, 'projectile_group'):
@@ -358,16 +365,30 @@ class Enemy(pygame.sprite.Sprite):
                 if cache_key in self.pathfinding_cache:
                     has_path = self.pathfinding_cache[cache_key]
                 else:
-                    # Check if path exists
-                    # SwarmlingZombie ignores walls in pathfinding
-                    from world.enemies.swarmling import SwarmlingZombie
-                    ignore_walls = isinstance(self, SwarmlingZombie)
+                    # Only recalculate path if cooldown has passed OR target changed OR no cached path
+                    # Get current time from world or use a frame-based timer
+                    import time
+                    current_time = time.time()
+                    should_recalc = (
+                        (current_time - self.last_path_update) >= self.path_update_interval or
+                        self.target_building != building  # Target changed - recalc immediately
+                    )
                     
-                    start_grid = (int(self.pos.x // 32), int(self.pos.y // 32))
-                    goal_grid = (building.grid_x, building.grid_y)
-                    path = pathfinding.find_path(start_grid, goal_grid, ignore_walls=ignore_walls)
-                    has_path = path is not None
-                    self.pathfinding_cache[cache_key] = has_path
+                    if should_recalc:
+                        # Check if path exists
+                        # SwarmlingZombie ignores walls in pathfinding
+                        from world.enemies.swarmling import SwarmlingZombie
+                        ignore_walls = isinstance(self, SwarmlingZombie)
+                        
+                        start_grid = (int(self.pos.x // 32), int(self.pos.y // 32))
+                        goal_grid = (building.grid_x, building.grid_y)
+                        path = pathfinding.find_path(start_grid, goal_grid, ignore_walls=ignore_walls)
+                        has_path = path is not None
+                        self.pathfinding_cache[cache_key] = has_path
+                        self.last_path_update = current_time
+                    else:
+                        # Use cached result if available, otherwise assume path exists (optimistic)
+                        has_path = True  # Optimistic - will recalc on next interval
                 
                 if not has_path:
                     pathfinding_penalty = self.PATHFINDING_PENALTY

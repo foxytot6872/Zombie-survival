@@ -19,6 +19,7 @@ from core.game_state import GameState, GameStateManager
 from core.save_system import SaveSystem
 from core.sound import SoundSystem
 from core.day_events import DayEventManager
+from core.spatial_grid import SpatialGrid
 # UI components
 from ui.game_over import GameOverScreen
 from ui.pause_menu import PauseMenu
@@ -3077,6 +3078,13 @@ while running:
     # Update world's enemy group and projectile group references (for turrets and enemies)
     world.enemy_group = enemy_group
     world.projectile_group = projectile_group
+    
+    # Build spatial grid for turret targeting (before turrets update)
+    spatial_grid = SpatialGrid(cell_size=128)
+    for enemy in enemy_group:
+        if enemy.alive:
+            spatial_grid.insert(enemy)
+    world.spatial_grid = spatial_grid  # Make spatial grid available to turrets
     
     # Update enemies first (movement and targeting)
     enemies_to_remove = []
