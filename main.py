@@ -758,7 +758,53 @@ if demolish_button_sheet:
             placeholder.fill((100, 100, 100, 255))
             demolish_button_frames.append(placeholder)
 
-# Health bar image - extract 11 frames (280x27 each) - for health display (0% to 100% in 10% increments)
+# HQ Health bar image - extract 21 frames (550x28 each) - for HQ health display at top of screen
+# Frame 1 = 100% health, Frame 21 = 0% health (death)
+try:
+    hq_health_bar_sheet = pygame.image.load('asset/hud/BaseHealthBar-Sheet.png').convert_alpha()
+    hq_health_sheet_width, hq_health_sheet_height = hq_health_bar_sheet.get_size()
+    print(f"Loaded HQ health bar sheet: {hq_health_sheet_width}x{hq_health_sheet_height}")
+    
+    # Verify dimensions match expected size (21 frames * 550 = 11550 wide, 28 tall)
+    hq_health_frame_width = 550
+    hq_health_frame_height = 28
+    if hq_health_sheet_width < 550 * 21 or hq_health_sheet_height < 28:
+        print(f"Warning: HQ health bar sheet size {hq_health_sheet_width}x{hq_health_sheet_height} doesn't match expected (11550x28)")
+        print(f"  Using actual dimensions: hq_health_frame_width={hq_health_sheet_width // 21}, hq_health_frame_height={hq_health_sheet_height}")
+        hq_health_frame_width = hq_health_sheet_width // 21
+        hq_health_frame_height = hq_health_sheet_height
+except Exception as e:
+    print(f"Error loading HQ health bar sheet: {e}")
+    hq_health_bar_sheet = load_image_or_placeholder(
+        'asset/hud/BaseHealthBar-Sheet.png',
+        (550 * 21, 28),
+        (100, 100, 100, 255),
+        "HQ health bar sprite sheet"
+    )
+    hq_health_frame_width = 550
+    hq_health_frame_height = 28
+
+# Extract 21 frames from the HQ health bar sheet (Frame 1 = 100%, Frame 21 = 0%)
+hq_health_bar_frames = []
+if hq_health_bar_sheet:
+    for i in range(21):
+        try:
+            frame_rect = pygame.Rect(i * hq_health_frame_width, 0, hq_health_frame_width, hq_health_frame_height)
+            frame = hq_health_bar_sheet.subsurface(frame_rect)
+            hq_health_bar_frames.append(frame)
+            hp_percentage = 100.0 - (i * (100.0 / 20.0))  # Frame 0 = 100%, Frame 20 = 0%
+            print(f"Extracted HQ health bar frame {i+1} ({hp_percentage:.1f}%): {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting HQ health bar frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((hq_health_frame_width, hq_health_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            hq_health_bar_frames.append(placeholder)
+    print(f"HQ health bar: Extracted {len(hq_health_bar_frames)} frames total")
+else:
+    print(f"Warning: HQ health bar sheet not loaded, frames list will be empty")
+
+# Health bar image - extract 11 frames (280x27 each) - for building health display in upgrade panel
 try:
     health_bar_sheet = pygame.image.load('asset/hud/HealthBar-Sheet.png').convert_alpha()
     health_sheet_width, health_sheet_height = health_bar_sheet.get_size()
@@ -784,7 +830,7 @@ except Exception as e:
     health_frame_width = 280
     health_frame_height = 27
 
-# Extract 11 frames from the health bar sheet (0% to 100% in 10% increments)
+# Extract 11 frames from the health bar sheet (0% to 100% in 10% increments) - for building panel
 health_bar_frames = []
 if health_bar_sheet:
     for i in range(11):
@@ -1271,7 +1317,7 @@ wave_manager = WaveManager(world, waves_config, difficulty="normal")
 world.wave_manager = wave_manager
 
 # Initialize UI components with pixel fonts
-hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, font_large, font_medium, font_small)
+hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, font_large, font_medium, font_small, hq_health_bar_frames)
 # Set HUD reference in world for day events
 world.hud = hud
 

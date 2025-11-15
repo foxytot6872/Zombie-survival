@@ -7,7 +7,7 @@ from typing import Optional, Dict
 class HUD:
     """HUD for displaying game information"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None, font_large=None, font_medium=None, font_small=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None, font_large=None, font_medium=None, font_small=None, hq_health_bar_frames=None):
         """
         Initialize HUD.
         Args:
@@ -19,6 +19,8 @@ class HUD:
             font_large: Optional pygame.font.Font for large text (defaults to system font)
             font_medium: Optional pygame.font.Font for medium text (defaults to system font)
             font_small: Optional pygame.font.Font for small text (defaults to system font)
+            hq_health_bar_frames: List of pygame.Surface frames for HQ health bar (21 frames, 550x28 each)
+                Frame 0 = 100% health, Frame 20 = 0% health (death)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -38,6 +40,9 @@ class HUD:
         # Number sprite frames (0-9)
         self.red_number_frames = red_number_frames if red_number_frames else []
         self.blue_number_frames = blue_number_frames if blue_number_frames else []
+        
+        # HQ health bar sprite frames (21 frames: Frame 0 = 100%, Frame 20 = 0%)
+        self.hq_health_bar_frames = hq_health_bar_frames if hq_health_bar_frames else []
         
         # HUD elements
         self.day = 1
@@ -206,9 +211,12 @@ class HUD:
                 surface.blit(overlay, (self.screen_width - 310, 10))
             surface.blit(state_surface, state_rect)
         
-        # Draw HQ HP (top-center, important!)
+        # Draw HQ HP (top-center, important!) - Visual health bar only, no text (show don't tell)
         hq_hp_pct = self.hq_hp / self.hq_max_hp if self.hq_max_hp > 0 else 0.0
-        # Color based on HP percentage
+        # Clamp HP percentage to [0.0, 1.0]
+        hq_hp_pct = max(0.0, min(1.0, hq_hp_pct))
+        
+        # Color based on HP percentage (for fallback rectangle only)
         if hq_hp_pct > 0.6:
             hq_color = (0, 255, 0)  # Green
         elif hq_hp_pct > 0.3:
@@ -216,33 +224,54 @@ class HUD:
         else:
             hq_color = (255, 0, 0)  # Red
         
-        hq_text = f"HQ HP: {int(self.hq_hp)} / {int(self.hq_max_hp)}"
-        hq_surface = self.font_large.render(hq_text, True, hq_color)
-        hq_rect = hq_surface.get_rect(center=(self.screen_width // 2, 25))
-        # Overlay rectangle for HQ HP text area (estimated ~400x50)
-        if show_ui_rectangles:
-            overlay = pygame.Surface((400, 50), pygame.SRCALPHA)
-            overlay.fill((0, 255, 0, 80))  # Green overlay
-            surface.blit(overlay, (self.screen_width // 2 - 200, 0))
-        surface.blit(hq_surface, hq_rect)
-        
-        # Draw HP bar below text
-        bar_width = 300
-        bar_height = 20
-        bar_x = self.screen_width // 2 - bar_width // 2
-        bar_y = 45
-        # Overlay rectangle for HP bar (300x20)
-        if show_ui_rectangles:
-            overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
-            overlay.fill((0, 0, 255, 80))  # Blue overlay
-            surface.blit(overlay, (bar_x, bar_y))
-        # Background bar
-        pygame.draw.rect(surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
-        # HP bar
-        hp_bar_width = int(bar_width * hq_hp_pct)
-        pygame.draw.rect(surface, hq_color, (bar_x, bar_y, hp_bar_width, bar_height))
-        # Border
-        pygame.draw.rect(surface, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
+        # Draw HQ health bar sprite (no text - visual representation only)
+        if self.hq_health_bar_frames and len(self.hq_health_bar_frames) >= 21:
+            # Calculate frame index: Frame 0 = 100%, Frame 20 = 0%
+            # Formula: frame_index = int((1.0 - hq_hp_pct) * 20)
+            frame_index = int((1.0 - hq_hp_pct) * 20)
+            # Clamp to valid range [0, 20]
+            frame_index = max(0, min(20, frame_index))
+            
+            # Get the health bar frame
+            health_bar_frame = self.hq_health_bar_frames[frame_index]
+            original_width, original_height = health_bar_frame.get_size()
+            
+            # Scale health bar to 1.5x size
+            scale_factor = 1.5
+            bar_width = int(original_width * scale_factor)
+            bar_height = int(original_height * scale_factor)
+            scaled_health_bar = pygame.transform.scale(health_bar_frame, (bar_width, bar_height))
+            
+            # Position health bar at top-center (visual representation only, no text)
+            bar_x = self.screen_width // 2 - bar_width // 2
+            bar_y = 20  # Top of screen, centered
+            
+            # Overlay rectangle for HP bar (for debug)
+            if show_ui_rectangles:
+                overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
+                overlay.fill((0, 0, 255, 80))  # Blue overlay
+                surface.blit(overlay, (bar_x, bar_y))
+            
+            # Draw the scaled health bar sprite
+            surface.blit(scaled_health_bar, (bar_x, bar_y))
+        else:
+            # Fallback: Draw simple rectangle bar if sprite frames not available
+            bar_width = 300
+            bar_height = 20
+            bar_x = self.screen_width // 2 - bar_width // 2
+            bar_y = 20  # Top of screen, centered
+            # Overlay rectangle for HP bar (300x20)
+            if show_ui_rectangles:
+                overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
+                overlay.fill((0, 0, 255, 80))  # Blue overlay
+                surface.blit(overlay, (bar_x, bar_y))
+            # Background bar
+            pygame.draw.rect(surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
+            # HP bar
+            hp_bar_width = int(bar_width * hq_hp_pct)
+            pygame.draw.rect(surface, hq_color, (bar_x, bar_y, hp_bar_width, bar_height))
+            # Border
+            pygame.draw.rect(surface, (255, 255, 255), (bar_x, bar_y, bar_width, bar_height), 2)
         
         # Draw wave info (top-right, below day counter)
         if self.wave_info:
