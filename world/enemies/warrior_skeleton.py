@@ -3,7 +3,7 @@ Warrior Skeleton enemy - melee fighter with blocking ability.
 """
 import pygame
 import random
-from world.enemy import Enemy
+from world.enemy import Enemy, EnemyAssets
 from typing import Tuple, Optional
 
 class WarriorSkeleton(Enemy):
@@ -17,10 +17,7 @@ class WarriorSkeleton(Enemy):
     BLOCK_CHANCE = 0.3  # 30% chance to block incoming damage
     BLOCK_DAMAGE_REDUCTION = 0.5  # Block reduces damage by 50%
     
-    # Class-level sprite sheet (set from main.py after loading)
-    sprite_sheet = None
-    
-    # Animation frame ranges (0-indexed, so subtract 1 from user's frame numbers)
+    # Animation frame ranges (0-indexed)
     IDLE_FRAMES = (0, 7)      # Frames 1-8 (0-7)
     WALK_FRAMES = (8, 15)      # Frames 9-16 (8-15)
     ATTACK_FRAMES = (16, 27)   # Frames 17-28 (16-27)
@@ -28,56 +25,60 @@ class WarriorSkeleton(Enemy):
     HURT_FRAMES = (34, 37)     # Frames 35-38 (34-37)
     DEATH_FRAMES = (38, 45)    # Frames 39-46 (38-45)
     
+    # Frame size and scale
+    FRAME_SIZE = 48
+    SPRITE_SCALE = 1.2  # Warrior skeleton is bigger
+    
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, sprite_sheet=None):
         super().__init__(pos, hp)
         
-        # Use provided sprite_sheet or class-level sprite_sheet
-        self.sprite_sheet = sprite_sheet if sprite_sheet is not None else WarriorSkeleton.sprite_sheet
-        self.animation_frames = []
-        self.current_state = "idle"
-        self.frame_index = self.IDLE_FRAMES[0]  # Start at first idle frame
-        self.animation_timer = 0.0
-        self.animation_delay = 0.15  # seconds per frame
-        self.facing_right = True  # Default facing right
-        self.is_hurt = False
-        self.hurt_timer = 0.0
-        self.hurt_duration = 0.3  # seconds to show hurt animation
-        self.is_blocking = False
-        self.block_timer = 0.0
-        self.block_duration = 0.5  # seconds to show block animation
-        self.death_animation_complete = False
-        self.sprite_scale = 1.2  # Scale warrior skeleton sprite to be bigger
+        # Use cached sprite sheet from EnemyAssets
+        self.sprite_sheet = EnemyAssets.warrior_skeleton_sprite_sheet
+        if sprite_sheet is not None:
+            self.sprite_sheet = sprite_sheet
         
-        # Load animation frames if sprite sheet provided
+        # Load animation frames from cache
         if self.sprite_sheet:
-            self.load_animation_frames()
-            # Update image size to 48x48 (will be scaled when drawing)
+            self.animation_frames = EnemyAssets.load_frames(self.sprite_sheet, self.FRAME_SIZE)
             self.image = pygame.Surface((48, 48), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.animation_frames = []
+        
+        # Animation state
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.animation_delay = 0.15
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.3
+        self.is_blocking = False
+        self.block_timer = 0.0
+        self.block_duration = 0.5
+        self.death_animation_complete = False
+        self.sprite_scale = self.SPRITE_SCALE
         
         # Default to moving down if no buildings found
-        self.set_direction((0, 1))  # Down direction (fallback)
+        self.set_direction((0, 1))
+    
+    def on_reset(self):
+        """Reset animation state for reuse"""
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.is_blocking = False
+        self.block_timer = 0.0
+        self.death_animation_complete = False
+        self.set_direction((0, 1))
     
     def load_animation_frames(self):
-        """Load all animation frames from sprite sheet"""
-        if not self.sprite_sheet:
-            return
-        
-        frame_size = 48  # Each frame is 48x48 pixels
-        sheet_width = self.sprite_sheet.get_width()
-        num_frames = sheet_width // frame_size  # Should be 46 frames
-        
-        self.animation_frames = []
-        for i in range(num_frames):
-            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
-            if frame_rect.right <= sheet_width:
-                frame = self.sprite_sheet.subsurface(frame_rect)
-                self.animation_frames.append(frame)
-            else:
-                # Create placeholder if frame doesn't exist
-                placeholder = pygame.Surface((frame_size, frame_size), pygame.SRCALPHA)
-                placeholder.fill((255, 0, 255, 128))  # Magenta placeholder
-                self.animation_frames.append(placeholder)
+        """Legacy method - now uses cached frames from EnemyAssets"""
+        pass
     
     def get_current_frame_range(self):
         """Get the frame range for current animation state"""

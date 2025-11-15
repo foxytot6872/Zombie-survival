@@ -2,7 +2,7 @@
 Skeleton enemy - basic skeleton type.
 """
 import pygame
-from world.enemy import Enemy
+from world.enemy import Enemy, EnemyAssets
 from typing import Tuple, Optional
 
 class Skeleton(Enemy):
@@ -14,62 +14,60 @@ class Skeleton(Enemy):
     ATTACK_RANGE = 32.0  # pixels - range for attacking buildings
     ATTACK_COOLDOWN = 1.2  # seconds - time between attacks
     
-    # Class-level sprite sheet (set from main.py after loading)
-    sprite_sheet = None
-    
-    # Animation frame ranges (0-indexed, so subtract 1 from user's frame numbers)
+    # Animation frame ranges (0-indexed)
     IDLE_FRAMES = (0, 7)      # Frames 1-8 (0-7)
     WALK_FRAMES = (8, 15)      # Frames 9-16 (8-15)
     ATTACK_FRAMES = (16, 27)   # Frames 17-28 (16-27)
     HURT_FRAMES = (28, 31)     # Frames 29-32 (28-31)
     DEATH_FRAMES = (32, 39)    # Frames 33-40 (32-39)
     
+    # Frame size for this enemy type
+    FRAME_SIZE = 48
+    
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, sprite_sheet=None):
         super().__init__(pos, hp)
         
-        # Use provided sprite_sheet or class-level sprite_sheet
-        self.sprite_sheet = sprite_sheet if sprite_sheet is not None else Skeleton.sprite_sheet
-        self.animation_frames = []
-        self.current_state = "idle"
-        self.frame_index = self.IDLE_FRAMES[0]  # Start at first idle frame
-        self.animation_timer = 0.0
-        self.animation_delay = 0.15  # seconds per frame
-        self.facing_right = True  # Default facing right
-        self.is_hurt = False
-        self.hurt_timer = 0.0
-        self.hurt_duration = 0.3  # seconds to show hurt animation
-        self.death_animation_complete = False
+        # Use cached sprite sheet from EnemyAssets
+        self.sprite_sheet = EnemyAssets.skeleton_sprite_sheet
+        if sprite_sheet is not None:
+            self.sprite_sheet = sprite_sheet
         
-        # Load animation frames if sprite sheet provided
+        # Load animation frames from cache
         if self.sprite_sheet:
-            self.load_animation_frames()
-            # Update image size to 48x48
+            self.animation_frames = EnemyAssets.load_frames(self.sprite_sheet, self.FRAME_SIZE)
             self.image = pygame.Surface((48, 48), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.animation_frames = []
+        
+        # Animation state
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.animation_delay = 0.15
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.3
+        self.death_animation_complete = False
         
         # Default to moving down if no buildings found
-        self.set_direction((0, 1))  # Down direction (fallback)
+        self.set_direction((0, 1))
+    
+    def on_reset(self):
+        """Reset animation state for reuse"""
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.death_animation_complete = False
+        self.set_direction((0, 1))
     
     def load_animation_frames(self):
-        """Load all animation frames from sprite sheet"""
-        if not self.sprite_sheet:
-            return
-        
-        frame_size = 48  # Each frame is 48x48 pixels
-        sheet_width = self.sprite_sheet.get_width()
-        num_frames = sheet_width // frame_size  # Should be 40 frames
-        
-        self.animation_frames = []
-        for i in range(num_frames):
-            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
-            if frame_rect.right <= sheet_width:
-                frame = self.sprite_sheet.subsurface(frame_rect)
-                self.animation_frames.append(frame)
-            else:
-                # Create placeholder if frame doesn't exist
-                placeholder = pygame.Surface((frame_size, frame_size), pygame.SRCALPHA)
-                placeholder.fill((255, 0, 255, 128))  # Magenta placeholder
-                self.animation_frames.append(placeholder)
+        """Legacy method - now uses cached frames from EnemyAssets"""
+        pass
     
     def get_current_frame_range(self):
         """Get the frame range for current animation state"""

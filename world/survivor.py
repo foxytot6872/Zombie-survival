@@ -92,7 +92,6 @@ class Survivor(pygame.sprite.Sprite):
         # Safe distance to enemies
         self.safe_distance_to_enemy_px = 160.0
         self.flee_on_threat = True
-    
     def _get_effective_speed(self, world=None):
         """Get effective speed with modifiers applied"""
         if world and hasattr(world, 'modifiers'):
@@ -344,7 +343,7 @@ class Survivor(pygame.sprite.Sprite):
                     pass  # Stay on last frame
                 else:
                     self.frame_index = (self.frame_index + 1) % len(self.current_frames)
-    
+        
     def apply_separation(self, dt: float, neighbors):
         """Apply separation force to avoid overlapping with other survivors"""
         if not neighbors:
@@ -532,7 +531,7 @@ class Survivor(pygame.sprite.Sprite):
             self.carried = {"wood": 0, "iron": 0, "food": 0}
     
     def draw(self, surface: pygame.Surface):
-        """Draw survivor"""
+        """Draw survivor with idle behavior offsets"""
         self.image.fill((0, 0, 0, 0))
         
         if not self.alive:
@@ -573,7 +572,7 @@ class Survivor(pygame.sprite.Sprite):
                 end_pos = pygame.Vector2(12, 12) + dir_normalized * 8
                 pygame.draw.line(self.image, (255, 255, 255), (12, 12), end_pos, 2)
         
-        surface.blit(self.image, self.rect)
+        surface.blit(self.image, self.rect.topleft)
         
         # Draw carried resources indicator (if worker)
         if self.role == "worker" and hasattr(self, 'carried'):

@@ -418,6 +418,7 @@ class Building(pygame.sprite.Sprite):
             damage_mult = world.modifiers.get("building_damage_taken_mult", 1.0)
             amount = int(amount * damage_mult)
         self.hp -= amount
+        
         if self.hp <= 0:
             self.hp = 0
             self.state = BuildState.DESTROYED

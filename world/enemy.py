@@ -3,7 +3,63 @@ Base Enemy class with common attributes and behaviors.
 """
 from __future__ import annotations
 import pygame
-from typing import Tuple, Optional
+import time
+from typing import Tuple, Optional, Dict
+
+
+class EnemyAssets:
+    """
+    Global enemy sprite assets cache.
+    Loads and caches all enemy sprites once at game start.
+    """
+    # Cached sprite sheets (set from main.py after loading)
+    zombie_sprite_sheet = None
+    runner_sprite_sheet = None
+    brute_sprite_sheet = None
+    swarmling_sprite_sheet = None
+    spitter_sprite_sheet = None
+    skeleton_sprite_sheet = None
+    archer_skeleton_sprite_sheet = None
+    warrior_skeleton_sprite_sheet = None
+    
+    # Cached animation frames (loaded once, reused by all instances)
+    # Format: {sprite_sheet: [frame1, frame2, ...]}
+    _frame_cache: Dict[pygame.Surface, list] = {}
+    
+    @classmethod
+    def load_frames(cls, sprite_sheet, frame_size: int) -> list:
+        """
+        Load animation frames from a sprite sheet.
+        Caches frames to avoid reloading.
+        
+        Args:
+            sprite_sheet: The sprite sheet surface
+            frame_size: Size of each frame (width = height)
+            
+        Returns:
+            List of frame surfaces
+        """
+        if not sprite_sheet:
+            return []
+        
+        # Check cache first
+        if sprite_sheet in cls._frame_cache:
+            return cls._frame_cache[sprite_sheet]
+        
+        # Load frames
+        frames = []
+        sheet_width = sprite_sheet.get_width()
+        num_frames = sheet_width // frame_size
+        
+        for i in range(num_frames):
+            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
+            frame = sprite_sheet.subsurface(frame_rect)
+            frames.append(frame)
+        
+        # Cache frames
+        cls._frame_cache[sprite_sheet] = frames
+        return frames
+
 
 class Enemy(pygame.sprite.Sprite):
     """
@@ -68,8 +124,100 @@ class Enemy(pygame.sprite.Sprite):
         self.last_path_update = 0.0
         self.path_update_interval = 0.5  # seconds
         
+        # Delay target selection on spawn to avoid expensive pathfinding during spawning
+        self.spawn_time = time.time()  # Time when enemy was spawned
+        self.target_selection_delay = 0.1  # Wait 100ms before selecting target (defers expensive pathfinding)
+        
         # Projectile group for ranged enemies (set by world)
         self.projectile_group = None
+    
+    def reset(self, spawn_pos: Tuple[float, float], modifiers: Optional[Dict] = None):
+        """
+        Reset enemy for reuse in pooling system.
+        Does NOT create new surfaces or animations (reuses existing).
+        
+        Args:
+            spawn_pos: Spawn position (x, y)
+            modifiers: Optional modifiers dictionary (speed_mult, hp_mult, etc.)
+        """
+        # Reset position
+        self.pos = pygame.Vector2(spawn_pos)
+        self.velocity = pygame.Vector2(0, 0)
+        self.rect.center = self.pos
+        
+        # Reset HP
+        self.max_hp = self.BASE_HP
+        self.hp = self.max_hp
+        self.speed = self.SPEED
+        self.damage = self.DAMAGE
+        self.attack_range = self.ATTACK_RANGE
+        self.attack_cooldown = self.ATTACK_COOLDOWN
+        
+        # Reset state
+        self.alive = True
+        self.reached_bottom = False
+        self.coins_dropped = False
+        
+        # Reset targeting
+        # Release building slot if we have one
+        if self.target_building and hasattr(self.target_building, 'release_attack_slot'):
+            try:
+                self.target_building.release_attack_slot()
+            except:
+                pass  # Building might be destroyed, ignore
+        self.target_building = None
+        self.target_survivor = None
+        
+        # Reset combat
+        self.attack_timer = 0.0
+        self.is_attacking = False
+        
+        # Reset stuck detection
+        self.last_progress_check_pos = pygame.Vector2(self.pos)
+        self.time_since_progress = 0.0
+        self.pathfinding_cache.clear()
+        
+        # Reset pathfinding cooldown
+        self.last_path_update = 0.0
+        
+        # Reset spawn time for delayed target selection
+        self.spawn_time = time.time()
+        
+        # Apply modifiers if provided
+        if modifiers:
+            # Speed modifier
+            speed_mult = modifiers.get("zombie_speed_mult", 1.0)
+            self.speed *= speed_mult
+            
+            # HP modifier
+            hp_mult = modifiers.get("zombie_hp_mult", 1.0)
+            self.max_hp = int(self.max_hp * hp_mult)
+            self.hp = self.max_hp
+        
+        # Start moving immediately (direction depends on spawn position)
+        # This ensures enemies are visible and moving right away
+        if self.velocity.length() == 0:
+            # If spawning below screen (from bottom), move UP. Otherwise move down.
+            screen_height = 1080  # Default fallback
+            try:
+                import constants as c
+                screen_height = c.SCREEN_HEIGHT
+            except:
+                pass
+            if self.pos.y > screen_height + 50:  # Spawned below screen
+                self.set_direction((0, -1))  # Move UP toward screen
+            else:
+                self.set_direction((0, 1))  # Move straight down initially
+        
+        # Call subclass-specific reset (for animation states, etc.)
+        self.on_reset()
+    
+    def on_reset(self):
+        """
+        Subclass-specific reset logic.
+        Override in subclasses to reset animation states, etc.
+        """
+        pass
     
     def apply_separation(self, dt: float, neighbors):
         """Apply separation force to avoid overlapping with other zombies"""
@@ -146,8 +294,14 @@ class Enemy(pygame.sprite.Sprite):
                     self.target_building = None
             
             # Choose target if no target or need to retarget
+            # Defer target selection slightly after spawn to avoid expensive pathfinding during spawning
             if self.target_building is None and self.target_survivor is None:
-                self.choose_target(world)
+                current_time = time.time()
+                time_since_spawn = current_time - self.spawn_time
+                
+                # Only choose target after delay period (avoids freeze during spawning)
+                if time_since_spawn >= self.target_selection_delay:
+                    self.choose_target(world)
         
         # Move toward target (survivor or building) or straight down
         # Prioritize survivors if we have one as target
@@ -331,6 +485,15 @@ class Enemy(pygame.sprite.Sprite):
             self.target_survivor = None
             return
         
+        # OPTIMIZATION: Pre-filter candidates by distance to reduce expensive pathfinding calls
+        # Only check pathfinding for top 5 closest buildings (much faster)
+        if len(candidates) > 5:
+            # Sort by distance first (cheap operation)
+            candidates_with_distance = [(b, (self.pos - b.pos).length()) for b in candidates]
+            candidates_with_distance.sort(key=lambda x: x[1])  # Sort by distance
+            # Take only top 5 closest for pathfinding evaluation
+            candidates = [b for b, _ in candidates_with_distance[:5]]
+        
         # Score each candidate building
         best_building = None
         best_score = float('inf')
@@ -367,7 +530,6 @@ class Enemy(pygame.sprite.Sprite):
                 else:
                     # Only recalculate path if cooldown has passed OR target changed OR no cached path
                     # Get current time from world or use a frame-based timer
-                    import time
                     current_time = time.time()
                     should_recalc = (
                         (current_time - self.last_path_update) >= self.path_update_interval or
@@ -525,8 +687,18 @@ class Enemy(pygame.sprite.Sprite):
         if not self.alive:
             return
         
+        # Ensure rect exists
+        if not hasattr(self, 'rect') or self.rect is None:
+            # Create rect if missing
+            if not hasattr(self, 'image') or self.image is None:
+                self.image = pygame.Surface((32, 32), pygame.SRCALPHA)
+            self.rect = self.image.get_rect(center=self.pos if hasattr(self, 'pos') else (0, 0))
+        
         # Update rect position
-        self.rect.center = self.pos
+        if hasattr(self, 'pos'):
+            self.rect.center = self.pos
+        else:
+            return  # Can't draw without position
         
         # Draw enemy body (subclasses can override)
         self.draw_body(surface)

@@ -3,7 +3,7 @@ Enemy spawner system for managing hordes and waves.
 """
 import pygame
 import random
-from typing import List, Type, Dict, Optional
+from typing import List, Type, Dict, Optional, Tuple
 from world.enemy import Enemy
 import constants as c
 
@@ -29,21 +29,28 @@ class Spawner:
         self.wave_recipe: Dict[str, int] = {}  # {enemy_type: count}
         self.spawned_counts: Dict[str, int] = {}  # Track how many of each type spawned
         self.total_to_spawn = 0
-        self.batch_size = 2  # Enemies per spawn batch
         
-        # Spawn area (all edges of screen)
+        # Staggered spawning: spawn 1 enemy per frame instead of batches
+        self.to_spawn_queue: List[str] = []  # Flat list of enemy types to spawn (shuffled)
+        
+        # Spawn area (all edges of screen) - must be initialized BEFORE cache generation
         self.spawn_y = 0
         self.spawn_x_min = 0
         self.spawn_x_max = c.SCREEN_WIDTH
         self.spawn_y_min = 0
         self.spawn_y_max = c.SCREEN_HEIGHT
+        
+        # Precomputed spawn positions cache (200 positions)
+        self.spawn_cache: List[Tuple[float, float]] = []
+        self.spawn_cache_size = 200
+        self._generate_spawn_cache()
     
     def begin(self, recipe: Dict[str, int], spawn_config: Dict):
         """
         Begin a wave with a recipe.
         Args:
             recipe: Dictionary mapping enemy type IDs to counts
-            spawn_config: Spawn configuration (interval_sec, batch_size)
+            spawn_config: Spawn configuration (interval_sec)
         """
         self.wave_recipe = recipe.copy()
         self.spawned_counts = {k: 0 for k in recipe.keys()}
@@ -53,19 +60,31 @@ class Spawner:
         self.active = True
         self.spawn_timer = 0.0
         
+        # Expand recipe into flat list for staggered spawning (1 enemy per frame)
+        self.to_spawn_queue = []
+        for enemy_type, count in recipe.items():
+            for _ in range(count):
+                self.to_spawn_queue.append(enemy_type)
+        # Shuffle queue for variety
+        random.shuffle(self.to_spawn_queue)
+        
+        # Debug output
+        print(f"Spawner.begin(): Recipe = {recipe}, Total to spawn = {self.total_to_spawn}, Queue size = {len(self.to_spawn_queue)}")
+        
         # Update spawn config
         if "interval_sec" in spawn_config:
             self.spawn_interval = spawn_config["interval_sec"]
-        if "batch_size" in spawn_config:
-            self.batch_size = spawn_config["batch_size"]
     
     def update(self, dt: float, enemy_group: pygame.sprite.Group, world=None):
-        """Update spawner and spawn enemies if needed"""
+        """
+        Update spawner and spawn enemies if needed.
+        Spawns exactly ONE enemy per frame when interval elapsed (staggered spawning).
+        """
         if not self.active or self.done:
             return
         
-        # Check if wave is complete
-        if self.total_to_spawn > 0 and self.spawn_count >= self.total_to_spawn:
+        # Check if queue is empty (wave complete)
+        if not self.to_spawn_queue:
             self.done = True
             self.active = False
             return
@@ -79,52 +98,98 @@ class Spawner:
         # Update spawn timer
         self.spawn_timer += dt
         
-        # Spawn batch if interval elapsed
-        if self.spawn_timer >= effective_interval:
-            self._spawn_batch(enemy_group, world)
-            self.spawn_timer = 0.0
+        # Spawn exactly ONE enemy if interval elapsed and queue not empty
+        if self.spawn_timer >= effective_interval and self.to_spawn_queue:
+            enemy_type = self.to_spawn_queue.pop()
+            enemy = self._spawn_single_enemy(enemy_type, enemy_group, world)
+            if enemy:
+                self.spawn_timer = 0.0
+            else:
+                # Failed to spawn - put enemy type back in queue and try again next frame
+                self.to_spawn_queue.append(enemy_type)
+                print(f"Warning: Failed to spawn {enemy_type}, will retry")
     
-    def _spawn_batch(self, enemy_group: pygame.sprite.Group, world=None):
-        """Spawn a batch of enemies from random edges"""
-        batch_count = 0
+    def _spawn_single_enemy(self, enemy_type: str, enemy_group: pygame.sprite.Group, world=None):
+        """
+        Spawn a single enemy - simple approach like F3 debug mode.
+        Args:
+            enemy_type: Type ID of enemy to spawn
+            enemy_group: Group to add enemy to
+            world: World object for modifiers
+        Returns:
+            Enemy instance if spawned successfully, None otherwise
+        """
+        # Get enemy class from factory
+        if enemy_type not in self.enemy_factory:
+            return None
         
-        # Spawn enemies from recipe (iterate through all types to ensure balanced spawning)
-        enemy_types = list(self.wave_recipe.keys())
-        random.shuffle(enemy_types)  # Randomize order for variety
+        enemy_class = self.enemy_factory[enemy_type]
         
-        for enemy_type in enemy_types:
-            if batch_count >= self.batch_size:
-                break
-            
-            total_count = self.wave_recipe[enemy_type]
-            
-            # Check if we need more of this type
-            if self.spawned_counts[enemy_type] < total_count:
-                # Get enemy class from factory
-                if enemy_type in self.enemy_factory:
-                    enemy_class = self.enemy_factory[enemy_type]
-                    
-                    # Spawn enemy from weighted random edge (based on night bias + turret noise)
-                    spawn_pos = self._get_random_edge_spawn_position(batch_count, world)
-                    
-                    enemy = enemy_class(spawn_pos)
-                    
-                    # Apply day event modifiers to enemy
-                    if world and hasattr(world, 'modifiers'):
-                        # Apply speed modifier
-                        speed_mult = world.modifiers.get("zombie_speed_mult", 1.0)
-                        enemy.speed *= speed_mult
-                        
-                        # Apply HP modifier
-                        hp_mult = world.modifiers.get("zombie_hp_mult", 1.0)
-                        enemy.max_hp = int(enemy.max_hp * hp_mult)
-                        enemy.hp = enemy.max_hp  # Set current HP to max
-                    
-                    enemy_group.add(enemy)
-                    
-                    self.spawned_counts[enemy_type] += 1
-                    self.spawn_count += 1
-                    batch_count += 1
+        # Get spawn position at edge of screen (simple - just pick random edge)
+        import constants as c
+        margin = 50
+        edge = random.choice(["top", "bottom", "left", "right"])
+        
+        if edge == "top":
+            spawn_x = random.uniform(margin, c.SCREEN_WIDTH - margin)
+            spawn_y = random.uniform(-50, 0)  # Just above screen
+        elif edge == "bottom":
+            spawn_x = random.uniform(margin, c.SCREEN_WIDTH - margin)
+            spawn_y = random.uniform(c.SCREEN_HEIGHT, c.SCREEN_HEIGHT + 50)  # Just below screen
+        elif edge == "left":
+            spawn_x = random.uniform(-50, 0)  # Just left of screen
+            spawn_y = random.uniform(margin, c.SCREEN_HEIGHT - margin)
+        else:  # right
+            spawn_x = random.uniform(c.SCREEN_WIDTH, c.SCREEN_WIDTH + 50)  # Just right of screen
+            spawn_y = random.uniform(margin, c.SCREEN_HEIGHT - margin)
+        
+        spawn_pos = pygame.Vector2(spawn_x, spawn_y)
+        
+        # Create enemy directly (same as F3 debug mode)
+        enemy = enemy_class(spawn_pos)
+        
+        # Apply modifiers if available
+        if world and hasattr(world, 'modifiers'):
+            modifiers = world.modifiers
+            if modifiers.get("zombie_speed_mult", 1.0) != 1.0:
+                enemy.speed *= modifiers.get("zombie_speed_mult", 1.0)
+            if modifiers.get("zombie_hp_mult", 1.0) != 1.0:
+                hp_mult = modifiers.get("zombie_hp_mult", 1.0)
+                enemy.max_hp = int(enemy.max_hp * hp_mult)
+                enemy.hp = enemy.max_hp
+        
+        # Add to group (same as F3 debug mode)
+        enemy_group.add(enemy)
+        self.spawned_counts[enemy_type] = self.spawned_counts.get(enemy_type, 0) + 1
+        self.spawn_count += 1
+        
+        return enemy
+    
+    def _generate_spawn_cache(self):
+        """Pre-generate 200 spawn positions to avoid recalculating during gameplay"""
+        self.spawn_cache = []
+        for _ in range(self.spawn_cache_size):
+            # Use existing spawn position logic to generate positions
+            pos = self._get_random_edge_spawn_position(0, world=None)
+            self.spawn_cache.append(pos)
+    
+    def _get_cached_spawn_position(self, world=None) -> Tuple[float, float]:
+        """
+        Get a cached spawn position (fast, no recalculation).
+        Occasionally refreshes cache with new positions.
+        Args:
+            world: World object for noise calculation (only used for cache refresh)
+        Returns:
+            Tuple (x, y) spawn position
+        """
+        # Occasionally refresh cache (every 50 spawns, regenerate 10% of positions)
+        if random.random() < 0.02:  # 2% chance per spawn
+            for _ in range(10):  # Refresh 10 positions
+                idx = random.randint(0, len(self.spawn_cache) - 1)
+                self.spawn_cache[idx] = self._get_random_edge_spawn_position(0, world)
+        
+        # Return random cached position
+        return random.choice(self.spawn_cache)
     
     def _get_random_edge_spawn_position(self, offset: int = 0, world=None):
         """
@@ -164,9 +229,10 @@ class Spawner:
             spawn_x = random.uniform(self.spawn_x_min + margin, self.spawn_x_max - margin)
             spawn_y = self.spawn_y_min - offset * 20  # Stagger vertically above screen
         elif edge == "bottom":
-            # Spawn from bottom edge
+            # Spawn from bottom edge - must spawn BELOW screen so enemies move UP onto screen
             spawn_x = random.uniform(self.spawn_x_min + margin, self.spawn_x_max - margin)
-            spawn_y = self.spawn_y_max + offset * 20  # Stagger vertically below screen
+            # Spawn 100+ pixels below screen to give enemies room to move onto screen
+            spawn_y = self.spawn_y_max + 100 + offset * 20
         elif edge == "left":
             # Spawn from left edge
             spawn_x = self.spawn_x_min - offset * 20  # Stagger horizontally left of screen
@@ -268,4 +334,5 @@ class Spawner:
         self.wave_recipe = {}
         self.spawned_counts = {}
         self.total_to_spawn = 0
+        self.to_spawn_queue = []
 

@@ -20,6 +20,8 @@ from core.save_system import SaveSystem
 from core.sound import SoundSystem
 from core.day_events import DayEventManager
 from core.spatial_grid import SpatialGrid
+from core.input_buffer import InputBuffer
+from core.animation_timer import AnimationTimer, PulseAnimation
 # UI components
 from ui.game_over import GameOverScreen
 from ui.pause_menu import PauseMenu
@@ -356,12 +358,20 @@ spitter_sprite_sheet = load_image_or_placeholder(
     "Spitter zombie sprite sheet"
 )
 
-# Set sprite sheets for zombie classes
+# Set sprite sheets for zombie classes (legacy - kept for compatibility)
 BasicZombie.sprite_sheet = zombie_sprite_sheet
 RunnerZombie.sprite_sheet = runner_sprite_sheet
 BruteZombie.sprite_sheet = brute_sprite_sheet
 SwarmlingZombie.sprite_sheet = swarmling_sprite_sheet
 SpitterZombie.sprite_sheet = spitter_sprite_sheet
+
+# Set sprite sheets in EnemyAssets cache (for pooling system)
+from world.enemy import EnemyAssets
+EnemyAssets.zombie_sprite_sheet = zombie_sprite_sheet
+EnemyAssets.runner_sprite_sheet = runner_sprite_sheet
+EnemyAssets.brute_sprite_sheet = brute_sprite_sheet
+EnemyAssets.swarmling_sprite_sheet = swarmling_sprite_sheet
+EnemyAssets.spitter_sprite_sheet = spitter_sprite_sheet
 
 # Skeleton sprite sheet (40 frames, 48x48 each)
 skeleton_sprite_sheet = load_image_or_placeholder(
@@ -371,8 +381,11 @@ skeleton_sprite_sheet = load_image_or_placeholder(
     "Skeleton sprite sheet"
 )
 
-# Set sprite sheet for Skeleton class
+# Set sprite sheet for Skeleton class (legacy - kept for compatibility)
 Skeleton.sprite_sheet = skeleton_sprite_sheet
+
+# Set sprite sheet in EnemyAssets cache
+EnemyAssets.skeleton_sprite_sheet = skeleton_sprite_sheet
 
 # Archer Skeleton sprite sheet (34 frames, 48x48 each)
 archer_skeleton_sprite_sheet = load_image_or_placeholder(
@@ -382,8 +395,11 @@ archer_skeleton_sprite_sheet = load_image_or_placeholder(
     "Archer Skeleton sprite sheet"
 )
 
-# Set sprite sheet for ArcherSkeleton class
+# Set sprite sheet for ArcherSkeleton class (legacy - kept for compatibility)
 ArcherSkeleton.sprite_sheet = archer_skeleton_sprite_sheet
+
+# Set sprite sheet in EnemyAssets cache
+EnemyAssets.archer_skeleton_sprite_sheet = archer_skeleton_sprite_sheet
 
 # Arrow Projectile sprite sheet (4 frames, 16x16 each)
 arrow_projectile_sheet = load_image_or_placeholder(
@@ -444,8 +460,11 @@ warrior_skeleton_sprite_sheet = load_image_or_placeholder(
     "Warrior Skeleton sprite sheet"
 )
 
-# Set sprite sheet for WarriorSkeleton class
+# Set sprite sheet for WarriorSkeleton class (legacy - kept for compatibility)
 WarriorSkeleton.sprite_sheet = warrior_skeleton_sprite_sheet
+
+# Set sprite sheet in EnemyAssets cache
+EnemyAssets.warrior_skeleton_sprite_sheet = warrior_skeleton_sprite_sheet
 
 # Day counter sprite sheet (6 frames, 256x128 each)
 daycounter_sheet = load_image_or_placeholder(
@@ -1092,6 +1111,18 @@ pending_construction = None  # Building being constructed (can cancel)
 
 gather_mode = False  # True when player wants to assign workers to nodes
 
+# Build ghost responsiveness - track mouse position separately for instant updates
+build_ghost_grid_pos = None  # Grid position for build ghost (updated on MOUSEMOTION)
+build_ghost_can_place = False  # Whether current position is valid
+
+# Building placement feedback
+placement_glow_tiles = []  # List of (grid_pos, time) for placement glow effects
+selection_highlight_building = None  # Building currently showing selection highlight
+selection_highlight_timer = None  # AnimationTimer for selection highlight
+
+# Button animations - store animation timers per button
+button_animations = {}  # {(building_class, 'hover'|'click'): AnimationTimer}
+
 # Enemy factory for spawner
 enemy_factory = {
     "walker": BasicZombie,
@@ -1103,6 +1134,11 @@ enemy_factory = {
     "archer_skeleton": ArcherSkeleton,
     "warrior_skeleton": WarriorSkeleton
 }
+
+# Initialize enemy pooling system (pre-allocates enemies at game start)
+from core.enemy_pool import EnemyPool
+EnemyPool.initialize(enemy_factory)
+print("Enemy pooling system initialized")
 
 # Enemy spawner (updated to support wave-based spawning)
 zombie_spawner = Spawner(enemy_factory, spawn_interval=1.0)
@@ -1316,6 +1352,9 @@ world.research = research_manager
 wave_manager = WaveManager(world, waves_config, difficulty="normal")
 # Update world with wave_manager reference
 world.wave_manager = wave_manager
+
+# Initialize responsiveness systems
+input_buffer = InputBuffer(buffer_duration=0.125)  # 125ms buffer
 
 # Initialize UI components with pixel fonts
 hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, font_large, font_medium, font_small, hq_health_bar_frames)
@@ -2298,9 +2337,11 @@ def debug_spawn_zombie_at_mouse(mouse_pos):
     print(f"Debug: Spawned all enemy types (8 total) near {mouse_pos}")
 
 def debug_clear_enemies():
-    """Clear all enemies"""
+    """Clear all enemies (release to pool)"""
     count = len(enemy_group)
-    enemy_group.empty()
+    for enemy in list(enemy_group):
+        enemy_group.remove(enemy)
+        EnemyPool.release(enemy)
     print(f"Debug: Cleared {count} enemies")
 
 def debug_clear_buildings():
@@ -2320,7 +2361,7 @@ def debug_toggle_spawner():
     print(f"Debug: Spawner {status}")
 
 def debug_kill_all_enemies():
-    """Kill all enemies"""
+    """Kill all enemies (they will be released to pool on death)"""
     count = 0
     for enemy in enemy_group:
         enemy.take_damage(enemy.hp)
@@ -2390,9 +2431,10 @@ def debug_skip_state():
         hud.show_event(f"Debug: Skipped to Night {wave_manager.night}", 3.0)
         print(f"Debug: Skipped to night {wave_manager.night}")
     elif current_state == WaveManager.STATE_NIGHT:
-        # Skip to summary (clear all enemies first)
+        # Skip to summary (clear all enemies first - release to pool)
         for enemy in list(enemy_group):
             enemy_group.remove(enemy)
+            EnemyPool.release(enemy)
         zombie_spawner.done = True
         zombie_spawner.active = False
         wave_manager.start_summary()
@@ -2533,13 +2575,27 @@ def can_place_building(building_class, grid_pos, grid, building_group=None):
     return building_class.can_place(grid, grid_pos, building_group)
 
 def draw_preview(screen, grid_pos, can_place, footprint=(1, 1)):
-    """Draw building preview at grid position."""
+    """Draw building preview at grid position with responsive feedback."""
     w, h = footprint
     gx, gy = grid_pos
     
     # Calculate pixel position for top-left corner
     px = gx * TILE
     py = gy * TILE
+    
+    # Draw tile highlights BEFORE preview (cheap alpha overlay)
+    # Highlight each tile in the footprint
+    for dx in range(w):
+        for dy in range(h):
+            tile_px = (gx + dx) * TILE
+            tile_py = (gy + dy) * TILE
+            # Light tint overlay (very cheap)
+            highlight = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
+            if can_place:
+                highlight.fill((100, 200, 255, 40))  # Soft light-blue tint for valid
+            else:
+                highlight.fill((255, 100, 100, 40))  # Soft red tint for invalid
+            screen.blit(highlight, (tile_px, tile_py))
     
     # Choose color based on whether placement is valid
     if can_place:
@@ -2573,8 +2629,8 @@ def deselect_building():
     selected_building = None
 
 def select_building(mouse_pos, building_group):
-    """Select a building at mouse position."""
-    global selected_building
+    """Select a building at mouse position with visual feedback."""
+    global selected_building, selection_highlight_building, selection_highlight_timer
     
     # Deselect all buildings first
     for building in building_group:
@@ -2588,6 +2644,10 @@ def select_building(mouse_pos, building_group):
             if hasattr(building, 'selected'):
                 building.selected = True
             selected_building = building
+            # Start selection highlight animation (150ms)
+            selection_highlight_building = building
+            selection_highlight_timer = AnimationTimer(duration=0.15)
+            selection_highlight_timer.start()
             return True
     
     return False
@@ -2771,6 +2831,10 @@ while running:
     
     # Fill screen with background
     # Draw grass tile map background
+    
+    # Get mouse position
+    mouse_pos = pygame.mouse.get_pos()
+    
     # Calculate how many tiles we need to cover the screen
     tiles_x = (c.SCREEN_WIDTH + TILE - 1) // TILE  # Ceiling division to ensure full coverage
     tiles_y = (c.SCREEN_HEIGHT + TILE - 1) // TILE  # Ceiling division to ensure full coverage
@@ -2821,8 +2885,18 @@ while running:
         # Silently fail if gate banner drawing fails (non-critical)
         pass
     
-    # Get mouse position
-    mouse_pos = pygame.mouse.get_pos()
+    # Update selection highlight animation
+    if selection_highlight_timer:
+        if selection_highlight_timer.is_complete():
+            selection_highlight_building = None
+            selection_highlight_timer = None
+        else:
+            selection_highlight_timer.get_progress()  # Update timer
+    
+    # Update placement glow effects (remove expired ones)
+    import time as time_module
+    current_time = time_module.time()
+    placement_glow_tiles = [(pos, t) for pos, t in placement_glow_tiles if (current_time - t) < 0.1]  # 100ms glow
     
     ###################
     # Draw building construction menu background (bottom left)
@@ -2839,13 +2913,77 @@ while running:
         screen.blit(building_menu_bg, (menu_x, menu_y))
     
     ###################
-    # Handle button clicks and hover tooltips
+    # Handle button clicks and hover tooltips with animations
     ###################
     tooltip_shown = False
     active_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
     for building_class, button_data in buttons.items():
         button_obj = button_data['button']
-        if button_obj.draw(screen):
+        is_hovering = button_obj.rect.collidepoint(mouse_pos)
+        is_selected = (selected_building_type == building_class)
+        
+        # Handle button hover animation (1.00 -> 1.05 on hover, 80ms)
+        hover_key = (building_class, 'hover')
+        click_key = (building_class, 'click')
+        
+        if is_hovering:
+            if hover_key not in button_animations:
+                anim = AnimationTimer(duration=0.08)  # 80ms
+                anim.start()
+                button_animations[hover_key] = anim
+            hover_anim = button_animations[hover_key]
+            hover_scale = hover_anim.get_value(1.0, 1.05)
+        else:
+            if hover_key in button_animations:
+                hover_anim = button_animations[hover_key]
+                if hover_anim.is_active:
+                    hover_anim.stop()
+                del button_animations[hover_key]
+            hover_scale = 1.0
+        
+        # Handle button click animation (1.05 -> 0.95 -> 1.00, 30ms)
+        if click_key in button_animations:
+            click_anim = button_animations[click_key]
+            if click_anim.is_active:
+                click_progress = click_anim.get_progress()
+                if click_progress < 0.5:
+                    # First half: 1.05 -> 0.95
+                    click_scale = click_anim.get_value(1.05, 0.95)
+                else:
+                    # Second half: 0.95 -> 1.00
+                    click_scale = click_anim.get_value(0.95, 1.0)
+            else:
+                del button_animations[click_key]
+                click_scale = 1.0
+        else:
+            click_scale = 1.0
+        
+        # Combine scales (hover takes precedence if both active)
+        final_scale = hover_scale if is_hovering else click_scale
+        
+        # Draw button with scale
+        button_center = button_obj.rect.center
+        button_image = button_obj.image
+        if final_scale != 1.0:
+            # Scale button
+            scaled_size = (int(button_image.get_width() * final_scale), 
+                          int(button_image.get_height() * final_scale))
+            scaled_image = pygame.transform.scale(button_image, scaled_size)
+            scaled_rect = scaled_image.get_rect(center=button_center)
+            screen.blit(scaled_image, scaled_rect)
+        else:
+            screen.blit(button_image, button_obj.rect)
+        
+        # Handle click detection (check original rect, not scaled)
+        mouse_pressed = pygame.mouse.get_pressed()[0]
+        if is_hovering and mouse_pressed and not button_obj.clicked:
+            button_obj.clicked = True
+            # Start click animation
+            click_anim = AnimationTimer(duration=0.03)  # 30ms
+            click_anim.start()
+            button_animations[click_key] = click_anim
+            sound_system.play("button_click")
+            
             if selected_building_type == building_class:
                 # Deselect if clicking the same button
                 selected_building_type = None
@@ -2856,7 +2994,20 @@ while running:
                 build_mode = True
                 # Deselect any selected building when entering build mode
                 deselect_building()
-        if button_obj.rect.collidepoint(mouse_pos):
+        
+        # Reset clicked state when mouse released
+        if not mouse_pressed:
+            button_obj.clicked = False
+        
+        # Draw blue glow for selected building button
+        if is_selected:
+            glow_surface = pygame.Surface((button_obj.rect.width + 6, button_obj.rect.height + 6), pygame.SRCALPHA)
+            pygame.draw.rect(glow_surface, (100, 150, 255, 120), (0, 0, button_obj.rect.width + 6, button_obj.rect.height + 6), 3)
+            glow_rect = glow_surface.get_rect(center=button_center)
+            screen.blit(glow_surface, glow_rect)
+        
+        # Show tooltip on hover
+        if is_hovering:
             tooltip_manager.show_build_tooltip(
                 building_class,
                 button_obj.rect,
@@ -3098,7 +3249,7 @@ while running:
         
         # Check if enemy should be removed
         should_remove = False
-        if enemy.reached_bottom:
+        if hasattr(enemy, 'reached_bottom') and enemy.reached_bottom:
             should_remove = True
         elif not enemy.alive:
             # For enemies with sprite animations, wait for death animation to complete
@@ -3111,6 +3262,11 @@ while running:
         
         if should_remove:
             enemies_to_remove.append(enemy)
+    
+    # Debug: Print removal info if any enemies being removed
+    if enemies_to_remove and ('_last_remove_log' not in globals() or globals()['_last_remove_log'] != len(enemies_to_remove)):
+        globals()['_last_remove_log'] = len(enemies_to_remove)
+        print(f"DEBUG: Removing {len(enemies_to_remove)} enemies (before: {len(enemy_group)}, after: {len(enemy_group) - len(enemies_to_remove)})")
     
     # Drop coins when enemies are removed (ensures coins are always dropped)
     for enemy in enemies_to_remove:
@@ -3178,9 +3334,11 @@ while running:
             if neighbors:
                 enemy.apply_separation(dt, neighbors)
     
-    # Remove dead/reached-bottom enemies
+    # Remove dead/reached-bottom enemies (release to pool instead of deleting)
     for enemy in enemies_to_remove:
         enemy_group.remove(enemy)
+        # Release enemy back to pool for reuse
+        EnemyPool.release(enemy)
     
     ###################
     # Update nodes
@@ -3324,8 +3482,65 @@ while running:
     ###################
     # Draw enemies
     ###################
+    # Debug: Print enemy count periodically
+    if len(enemy_group) > 0:
+        if '_last_enemy_count_log' not in globals() or globals()['_last_enemy_count_log'] != len(enemy_group):
+            globals()['_last_enemy_count_log'] = len(enemy_group)
+            alive_count = sum(1 for e in enemy_group if hasattr(e, 'alive') and e.alive)
+            print(f"DEBUG: Drawing {alive_count}/{len(enemy_group)} enemies")
+    
     for enemy in enemy_group:
+        # Debug: Check if enemy is valid before drawing
+        if not hasattr(enemy, 'alive') or not enemy.alive:
+            continue  # Skip dead enemies (they'll be removed)
+        if not hasattr(enemy, 'pos'):
+            print(f"WARNING: Enemy missing pos attribute: {type(enemy).__name__}")
+            continue
+        if not hasattr(enemy, 'rect'):
+            print(f"WARNING: Enemy missing rect attribute: {type(enemy).__name__}")
+            continue
+        # Debug: Print first enemy position for testing
+        if enemy == list(enemy_group)[0] if enemy_group else None:
+            pos_key = (int(enemy.pos.x), int(enemy.pos.y))
+            if '_last_enemy_pos_log' not in globals() or globals()['_last_enemy_pos_log'] != pos_key:
+                globals()['_last_enemy_pos_log'] = pos_key
+                print(f"DEBUG: First enemy at ({int(enemy.pos.x)}, {int(enemy.pos.y)}), alive={enemy.alive}, has_image={hasattr(enemy, 'image')}")
         enemy.draw(screen)
+    
+    # Draw placement glow effects (after all world objects)
+    for grid_pos, glow_time in placement_glow_tiles:
+        elapsed = current_time - glow_time
+        if elapsed < 0.1:  # 100ms glow
+            alpha = int(255 * (1.0 - elapsed / 0.1))
+            # Get footprint from stored building type or default
+            w, h = (1, 1)  # Default footprint
+            # Try to find building at this position to get footprint
+            for building in building_group:
+                if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                    building.grid_x == grid_pos[0] and building.grid_y == grid_pos[1]):
+                    w, h = getattr(building, 'FOOTPRINT', (1, 1))
+                    break
+            gx, gy = grid_pos
+            px = gx * TILE
+            py = gy * TILE
+            glow_surface = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
+            glow_surface.fill((255, 255, 255, alpha))  # White glow
+            screen.blit(glow_surface, (px, py))
+    
+    # Draw selection highlight (white outline pulse)
+    if selection_highlight_building and selection_highlight_timer:
+        progress = selection_highlight_timer.get_progress()
+        if progress < 1.0:
+            # Fade from full alpha to 0 over 150ms
+            alpha = int(255 * (1.0 - progress))
+            building = selection_highlight_building
+            # Draw white outline
+            if hasattr(building, 'rect'):
+                outline_rect = building.rect.inflate(4, 4)
+                # Create outline surface with alpha
+                outline_surf = pygame.Surface((outline_rect.width, outline_rect.height), pygame.SRCALPHA)
+                pygame.draw.rect(outline_surf, (255, 255, 255, alpha), (0, 0, outline_rect.width, outline_rect.height), 3)
+                screen.blit(outline_surf, outline_rect)
     
     ###################
     # Apply night blue tint overlay
@@ -3402,25 +3617,44 @@ while running:
         difficulty_screen.draw(screen)
     
     ###################
-    # Draw preview when in build mode
+    # Draw preview when in build mode - use cached ghost position for responsiveness
     ###################
     if build_mode and selected_building_type:
-        grid_pos = pixel_to_grid(mouse_pos)
-        can_place = can_place_building(selected_building_type, grid_pos, grid)
+        # Use cached grid position (updated on MOUSEMOTION for instant response)
+        if build_ghost_grid_pos is None:
+            build_ghost_grid_pos = pixel_to_grid(mouse_pos)
+        grid_pos = build_ghost_grid_pos
+        can_place = build_ghost_can_place
         
-        # Check if we have enough resources (difficulty + modifiers)
-        preview_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
-        effective_cost = selected_building_type.get_scaled_cost(world=world, difficulty=preview_difficulty)
+        gx, gy = grid_pos
+        w, h = selected_building_type.FOOTPRINT
+        px = gx * TILE
+        py = gy * TILE
         
-        if (
-            resources.wood < effective_cost.wood
-            or resources.iron < effective_cost.iron
-            or resources.food < effective_cost.food
-            or resources.coins < effective_cost.coins
-        ):
-            can_place = False
+        # Draw tile highlights
+        for dx in range(w):
+            for dy in range(h):
+                tile_px = (gx + dx) * TILE
+                tile_py = (gy + dy) * TILE
+                highlight = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
+                if can_place:
+                    highlight.fill((100, 200, 255, 40))  # Soft light-blue tint
+                else:
+                    highlight.fill((255, 100, 100, 40))  # Soft red tint
+                screen.blit(highlight, (tile_px, tile_py))
         
-        draw_preview(screen, grid_pos, can_place, selected_building_type.FOOTPRINT)
+        # Draw preview ghost
+        if can_place:
+            color = (0, 255, 0, 100)
+            outline_color = (0, 255, 0)
+        else:
+            color = (255, 0, 0, 100)
+            outline_color = (255, 0, 0)
+        
+        preview_surface = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
+        preview_surface.fill(color)
+        screen.blit(preview_surface, (px, py))
+        pygame.draw.rect(screen, outline_color, (px, py, w * TILE, h * TILE), 2)
     
     ###################
     # Draw gather mode indicator
@@ -3510,8 +3744,31 @@ while running:
             if difficulty_screen.handle_event(event):
                 continue
         
+        # Handle MOUSEMOTION for responsive build ghost (NOT tied to frame rate)
+        if event.type == pygame.MOUSEMOTION:
+            if build_mode and selected_building_type:
+                # Update build ghost instantly on mouse movement
+                mouse_pos = event.pos
+                build_ghost_grid_pos = pixel_to_grid(mouse_pos)
+                build_ghost_can_place = can_place_building(selected_building_type, build_ghost_grid_pos, grid)
+                
+                # Check if we have enough resources
+                preview_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
+                effective_cost = selected_building_type.get_scaled_cost(world=world, difficulty=preview_difficulty)
+                
+                if (
+                    resources.wood < effective_cost.wood
+                    or resources.iron < effective_cost.iron
+                    or resources.food < effective_cost.food
+                    or resources.coins < effective_cost.coins
+                ):
+                    build_ghost_can_place = False
+        
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_pos = pygame.mouse.get_pos()
+            mouse_pos = event.pos
+            
+            # Add to input buffer for responsive handling
+            input_buffer.add_input('left_click', {'pos': mouse_pos, 'event': event})
             
             # Skip input if game over or paused
             if game_over_screen.is_visible:
@@ -3531,8 +3788,9 @@ while running:
                     debug_spawn_zombie_at_mouse(mouse_pos)
                     continue
             
-            # Handle research button click
+            # Handle research button click (with animation feedback)
             if research_button.handle_click(mouse_pos):
+                sound_system.play("button_click")
                 continue
             
             # Handle building panel clicks (upgrade/repair/sell)
@@ -3657,6 +3915,14 @@ while running:
                             build_mode = False  # Exit build mode after placing
                             selected_building_type = None
                             pending_construction = building
+                            
+                            # Add placement glow feedback (100ms white flash)
+                            import time as time_module
+                            placement_glow_tiles.append((grid_pos, time_module.time()))
+                            
+                            # Add white outline flash (1 frame)
+                            # This is handled by placement_glow_tiles above
+                            
                             sound_system.play("build_placed")
             else:
                 # Try to select a building
@@ -3666,12 +3932,15 @@ while running:
                     if selected_building:
                         building_panel.show(selected_building)
                         sound_system.play("button_click")
+                        # Selection highlight is handled in select_building()
                 else:
                     # No building clicked - deselect building and hide panel
                     deselect_building()
         
         # Handle right-click to dismiss panel and deselect building
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:  # Right mouse button
+            # Add to input buffer for responsive handling
+            input_buffer.add_input('right_click', {'pos': pygame.mouse.get_pos(), 'event': event})
             # Cancel build mode on right-click
             if build_mode and selected_building_type:
                 build_mode = False
@@ -3694,7 +3963,10 @@ while running:
                     continue
             
             if event.key == pygame.K_r:
+                # Add to input buffer for responsive handling
+                input_buffer.add_input('key_r', {})
                 launch_research_tree()
+                sound_system.play("button_click")
                 continue
             # F12: Toggle debug mode OR skip state
             # - When debug mode is OFF: Toggle debug mode ON
@@ -3728,9 +4000,12 @@ while running:
             
             # Toggle gather mode (G key) - only when not paused
             if event.key == pygame.K_g:
+                # Add to input buffer for responsive handling
+                input_buffer.add_input('key_g', {})
                 gather_mode = not gather_mode
                 build_mode = False  # Disable build mode when entering gather mode
                 selected_building_type = None
+                sound_system.play("button_click")
                 if gather_mode:
                     print("Gather mode enabled - Click on nodes to assign workers")
                 else:

@@ -57,6 +57,11 @@ class HUD:
         self.event_timer = 0.0
         self.event_duration = 3.0
         self.event_visible = False
+        
+        # Day/night counter pulse animation
+        self.day_night_pulse_anim = None  # PulseAnimation for day/night transitions
+        self.previous_day = None
+        self.previous_night = None
     
     def update(self, dt: float, day: int, night: int, state: str, wave_info: Dict, hq_hp: int = 0, hq_max_hp: int = 2000):
         """Update HUD information"""
@@ -66,6 +71,26 @@ class HUD:
         self.wave_info = wave_info
         self.hq_hp = hq_hp
         self.hq_max_hp = hq_max_hp
+        
+        # Detect day/night transitions for pulse animation
+        from core.animation_timer import PulseAnimation
+        if self.previous_day is None:
+            self.previous_day = day
+            self.previous_night = night
+        else:
+            # Check if day or night changed
+            if day != self.previous_day or night != self.previous_night:
+                # Start pulse animation (1.0 -> 1.15 -> 1.0, 120ms)
+                self.day_night_pulse_anim = PulseAnimation(duration=0.12, max_scale=1.15)
+                self.day_night_pulse_anim.start()
+            self.previous_day = day
+            self.previous_night = night
+        
+        # Update pulse animation
+        if self.day_night_pulse_anim:
+            pulse_scale = self.day_night_pulse_anim.get_scale()
+            if pulse_scale == 1.0 and self.day_night_pulse_anim.is_active == False:
+                self.day_night_pulse_anim = None  # Clean up when complete
         
         # Update day counter animation
         if self.daycounter_frames:
@@ -165,16 +190,30 @@ class HUD:
         """Draw HUD"""
         # Day/Night indicator area (top-right) - use animated sprite if available
         if self.daycounter_frames and len(self.daycounter_frames) > 0:
-            # Draw animated day counter sprite
+            # Draw animated day counter sprite with pulse animation
             current_frame = self.daycounter_frames[self.daycounter_current_frame]
-            # Position at top-right (256x128 sprite)
-            daycounter_rect = current_frame.get_rect(topright=(self.screen_width - 10, 10))
+            
+            # Apply pulse scale if active
+            pulse_scale = 1.0
+            if self.day_night_pulse_anim:
+                pulse_scale = self.day_night_pulse_anim.get_scale()
+            
+            # Scale frame if pulse animation is active
+            if pulse_scale != 1.0:
+                scaled_width = int(current_frame.get_width() * pulse_scale)
+                scaled_height = int(current_frame.get_height() * pulse_scale)
+                scaled_frame = pygame.transform.scale(current_frame, (scaled_width, scaled_height))
+                daycounter_rect = scaled_frame.get_rect(topright=(self.screen_width - 10, 10))
+            else:
+                daycounter_rect = current_frame.get_rect(topright=(self.screen_width - 10, 10))
+                scaled_frame = current_frame
+            
             # DEBUG: Draw overlay rectangle for day counter (256x128)
             if show_ui_rectangles:
                 overlay = pygame.Surface((256, 128), pygame.SRCALPHA)
                 overlay.fill((255, 0, 0, 80))  # Red overlay
                 surface.blit(overlay, (self.screen_width - 266, 10))
-            surface.blit(current_frame, daycounter_rect)
+            surface.blit(scaled_frame, daycounter_rect)
             
             # Draw day or night number on top of the day counter sprite
             # Only show one number at a time based on current state

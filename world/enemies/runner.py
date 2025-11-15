@@ -2,7 +2,7 @@
 Runner zombie enemy - fast, low HP.
 """
 import pygame
-from world.enemy import Enemy
+from world.enemy import Enemy, EnemyAssets
 from typing import Tuple, Optional
 
 class RunnerZombie(Enemy):
@@ -14,9 +14,6 @@ class RunnerZombie(Enemy):
     ATTACK_RANGE = 32.0
     ATTACK_COOLDOWN = 0.8  # seconds - faster attacks
     
-    # Class-level sprite sheet (set from main.py after loading)
-    sprite_sheet = None
-    
     # Animation frame ranges (0-indexed, same as BasicZombie)
     IDLE_FRAMES = (0, 3)      # Frames 1-4 (0-3)
     WALK_FRAMES = (4, 9)       # Frames 5-10 (4-9)
@@ -24,46 +21,53 @@ class RunnerZombie(Enemy):
     HURT_FRAMES = (19, 22)    # Frames 20-23 (19-22)
     DEATH_FRAMES = (23, 31)   # Frames 24-32 (23-31)
     
+    # Frame size for this enemy type
+    FRAME_SIZE = 48
+    
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, sprite_sheet=None):
         super().__init__(pos, hp)
         
-        # Use provided sprite_sheet or class-level sprite_sheet
-        self.sprite_sheet = sprite_sheet if sprite_sheet is not None else RunnerZombie.sprite_sheet
-        self.animation_frames = []
-        self.current_state = "idle"
-        self.frame_index = self.IDLE_FRAMES[0]  # Start at first idle frame
-        self.animation_timer = 0.0
-        self.animation_delay = 0.15  # seconds per frame
-        self.facing_right = True  # Default facing right
-        self.is_hurt = False
-        self.hurt_timer = 0.0
-        self.hurt_duration = 0.3  # seconds to show hurt animation
-        self.death_animation_complete = False
+        # Use cached sprite sheet from EnemyAssets
+        self.sprite_sheet = EnemyAssets.runner_sprite_sheet
+        if sprite_sheet is not None:
+            self.sprite_sheet = sprite_sheet
         
-        # Load animation frames if sprite sheet provided
+        # Load animation frames from cache
         if self.sprite_sheet:
-            self.load_animation_frames()
-            # Update image size to 48x48
+            self.animation_frames = EnemyAssets.load_frames(self.sprite_sheet, self.FRAME_SIZE)
             self.image = pygame.Surface((48, 48), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.animation_frames = []
+        
+        # Animation state
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.animation_delay = 0.15
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.3
+        self.death_animation_complete = False
         
         # Default to moving down if no buildings found
         self.set_direction((0, 1))
     
+    def on_reset(self):
+        """Reset animation state for reuse"""
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.death_animation_complete = False
+        self.set_direction((0, 1))
+    
     def load_animation_frames(self):
-        """Load all animation frames from sprite sheet"""
-        if not self.sprite_sheet:
-            return
-        
-        frame_size = 48  # Each frame is 48x48 pixels
-        sheet_width = self.sprite_sheet.get_width()
-        num_frames = sheet_width // frame_size  # Should be 32 frames
-        
-        self.animation_frames = []
-        for i in range(num_frames):
-            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
-            frame = self.sprite_sheet.subsurface(frame_rect)
-            self.animation_frames.append(frame)
+        """Legacy method - now uses cached frames from EnemyAssets"""
+        pass
     
     def get_current_frame_range(self):
         """Get the frame range for current animation state"""

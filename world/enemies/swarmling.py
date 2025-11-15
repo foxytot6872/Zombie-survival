@@ -2,7 +2,7 @@
 Swarmling zombie enemy - tiny HP, very fast.
 """
 import pygame
-from world.enemy import Enemy
+from world.enemy import Enemy, EnemyAssets
 from typing import Tuple, Optional
 
 class SwarmlingZombie(Enemy):
@@ -14,9 +14,6 @@ class SwarmlingZombie(Enemy):
     ATTACK_RANGE = 24.0  # pixels - small reach
     ATTACK_COOLDOWN = 0.5  # seconds - very fast attacks
     
-    # Class-level sprite sheet (set from main.py after loading)
-    sprite_sheet = None
-    
     # Animation frame ranges (0-indexed, same as other zombies)
     IDLE_FRAMES = (0, 3)      # Frames 1-4 (0-3)
     WALK_FRAMES = (4, 9)       # Frames 5-10 (4-9)
@@ -24,58 +21,64 @@ class SwarmlingZombie(Enemy):
     HURT_FRAMES = (19, 22)    # Frames 20-23 (19-22)
     DEATH_FRAMES = (23, 31)   # Frames 24-32 (23-31)
     
-    # Scale factor for swarmling (0.8 = 80% size)
-    SCALE_FACTOR = 0.8
+    # Frame size and scale factor
+    FRAME_SIZE = 48
+    SCALE_FACTOR = 0.8  # 80% size
     
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, sprite_sheet=None):
         super().__init__(pos, hp)
         
-        # Use provided sprite_sheet or class-level sprite_sheet
-        self.sprite_sheet = sprite_sheet if sprite_sheet is not None else SwarmlingZombie.sprite_sheet
-        self.animation_frames = []
-        self.current_state = "idle"
-        self.frame_index = self.IDLE_FRAMES[0]  # Start at first idle frame
-        self.animation_timer = 0.0
-        self.animation_delay = 0.15  # seconds per frame
-        self.facing_right = True  # Default facing right
-        self.is_hurt = False
-        self.hurt_timer = 0.0
-        self.hurt_duration = 0.3  # seconds to show hurt animation
-        self.death_animation_complete = False
+        # Use cached sprite sheet from EnemyAssets
+        self.sprite_sheet = EnemyAssets.swarmling_sprite_sheet
+        if sprite_sheet is not None:
+            self.sprite_sheet = sprite_sheet
         
-        # Load animation frames if sprite sheet provided
+        # Load animation frames from cache and scale them
         if self.sprite_sheet:
-            self.load_animation_frames()
-            # Update image size to scaled 48x48 (38x38 at 0.8 scale)
-            scaled_size = int(48 * self.SCALE_FACTOR)
+            # Get base frames from cache
+            base_frames = EnemyAssets.load_frames(self.sprite_sheet, self.FRAME_SIZE)
+            # Scale frames for swarmling
+            scaled_size = int(self.FRAME_SIZE * self.SCALE_FACTOR)  # 38x38
+            self.animation_frames = []
+            for frame in base_frames:
+                scaled_frame = pygame.transform.scale(frame, (scaled_size, scaled_size))
+                self.animation_frames.append(scaled_frame)
+            
             self.image = pygame.Surface((scaled_size, scaled_size), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
         else:
-            # Fallback to simple drawing if no sprite sheet
+            self.animation_frames = []
             self.image = pygame.Surface((20, 20), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
+        
+        # Animation state
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.animation_delay = 0.15
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.3
+        self.death_animation_complete = False
         
         # Default to moving down if no buildings found
         self.set_direction((0, 1))
     
+    def on_reset(self):
+        """Reset animation state for reuse"""
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.death_animation_complete = False
+        self.set_direction((0, 1))
+    
     def load_animation_frames(self):
-        """Load all animation frames from sprite sheet and scale them down"""
-        if not self.sprite_sheet:
-            return
-        
-        frame_size = 48  # Original frame size is 48x48 pixels
-        sheet_width = self.sprite_sheet.get_width()
-        num_frames = sheet_width // frame_size  # Should be 32 frames
-        
-        self.animation_frames = []
-        scaled_size = int(frame_size * self.SCALE_FACTOR)  # Scale to 0.8 (38x38)
-        
-        for i in range(num_frames):
-            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
-            frame = self.sprite_sheet.subsurface(frame_rect)
-            # Scale frame down to 0.8
-            scaled_frame = pygame.transform.scale(frame, (scaled_size, scaled_size))
-            self.animation_frames.append(scaled_frame)
+        """Legacy method - now uses cached frames from EnemyAssets"""
+        pass
     
     def get_current_frame_range(self):
         """Get the frame range for current animation state"""

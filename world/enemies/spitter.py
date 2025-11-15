@@ -2,7 +2,7 @@
 Spitter zombie enemy - ranged attacker.
 """
 import pygame
-from world.enemy import Enemy
+from world.enemy import Enemy, EnemyAssets
 from world.projectile import ZombieBullet
 from typing import Tuple, Optional
 
@@ -17,16 +17,15 @@ class SpitterZombie(Enemy):
     RANGED_DAMAGE = 12  # Ranged damage
     PROJECTILE_SPEED = 200.0  # pixels per second
     
-    # Class-level sprite sheet (set from main.py after loading)
-    sprite_sheet = None
-    
     # Animation frame ranges (0-indexed)
-    # 1-4 idle, 5-10 walk, 11-20 attack, 21-24 hurt, 24-31 death
     IDLE_FRAMES = (0, 3)      # Frames 1-4 (0-3)
     WALK_FRAMES = (4, 9)       # Frames 5-10 (4-9)
     ATTACK_FRAMES = (10, 19)  # Frames 11-20 (10-19) - projectile on last frame (19)
     HURT_FRAMES = (20, 23)    # Frames 21-24 (20-23)
     DEATH_FRAMES = (23, 30)   # Frames 24-31 (23-30) - overlaps with hurt at frame 24
+    
+    # Frame size for this enemy type
+    FRAME_SIZE = 64  # Spitter uses larger frames
     
     def __init__(self, pos: Tuple[float, float], hp: Optional[int] = None, sprite_sheet=None):
         super().__init__(pos, hp)
@@ -34,44 +33,49 @@ class SpitterZombie(Enemy):
         self.range_damage = self.RANGED_DAMAGE
         self.projectile_speed = self.PROJECTILE_SPEED
         
-        # Use provided sprite_sheet or class-level sprite_sheet
-        self.sprite_sheet = sprite_sheet if sprite_sheet is not None else SpitterZombie.sprite_sheet
-        self.animation_frames = []
-        self.current_state = "idle"
-        self.frame_index = self.IDLE_FRAMES[0]  # Start at first idle frame
-        self.animation_timer = 0.0
-        self.animation_delay = 0.15  # seconds per frame
-        self.facing_right = True  # Default facing right
-        self.is_hurt = False
-        self.hurt_timer = 0.0
-        self.hurt_duration = 0.3  # seconds to show hurt animation
-        self.death_animation_complete = False
-        self.projectile_fired = False  # Track if projectile was fired this attack cycle
+        # Use cached sprite sheet from EnemyAssets
+        self.sprite_sheet = EnemyAssets.spitter_sprite_sheet
+        if sprite_sheet is not None:
+            self.sprite_sheet = sprite_sheet
         
-        # Load animation frames if sprite sheet provided
+        # Load animation frames from cache
         if self.sprite_sheet:
-            self.load_animation_frames()
-            # Update image size to 64x64 (spitter uses larger frames)
+            self.animation_frames = EnemyAssets.load_frames(self.sprite_sheet, self.FRAME_SIZE)
             self.image = pygame.Surface((64, 64), pygame.SRCALPHA)
             self.rect = self.image.get_rect(center=self.pos)
+        else:
+            self.animation_frames = []
+        
+        # Animation state
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.animation_delay = 0.15
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.hurt_duration = 0.3
+        self.death_animation_complete = False
+        self.projectile_fired = False
         
         # Default to moving down if no buildings found
         self.set_direction((0, 1))
     
+    def on_reset(self):
+        """Reset animation state for reuse"""
+        self.current_state = "idle"
+        self.frame_index = self.IDLE_FRAMES[0]
+        self.animation_timer = 0.0
+        self.facing_right = True
+        self.is_hurt = False
+        self.hurt_timer = 0.0
+        self.death_animation_complete = False
+        self.projectile_fired = False
+        self.set_direction((0, 1))
+    
     def load_animation_frames(self):
-        """Load all animation frames from sprite sheet"""
-        if not self.sprite_sheet:
-            return
-        
-        frame_size = 64  # Each frame is 64x64 pixels
-        sheet_width = self.sprite_sheet.get_width()
-        num_frames = sheet_width // frame_size  # Should be 31 frames
-        
-        self.animation_frames = []
-        for i in range(num_frames):
-            frame_rect = pygame.Rect(i * frame_size, 0, frame_size, frame_size)
-            frame = self.sprite_sheet.subsurface(frame_rect)
-            self.animation_frames.append(frame)
+        """Legacy method - now uses cached frames from EnemyAssets"""
+        pass
     
     def get_current_frame_range(self):
         """Get the frame range for current animation state"""
