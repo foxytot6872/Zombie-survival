@@ -919,6 +919,14 @@ except Exception as e:
     print(f"Warning: Failed to load BuildingPanel.png: {e}")
     building_menu_bg = None
 
+# Load custom building button image
+try:
+    building_button_image = pygame.image.load('asset/hud/BuildingButton.png').convert_alpha()
+    print(f"Loaded building button image: {building_button_image.get_size()}")
+except Exception as e:
+    print(f"Warning: Failed to load BuildingButton.png: {e}")
+    building_button_image = None
+
 # Grass tile images (day and night variants)
 def load_grass_variants(sheet_path, default_color=(50, 100, 50)):
     """Load grass tile variants from a sheet. Returns list of 3 variants."""
@@ -2319,17 +2327,24 @@ debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rect
 # Helper functions for buttons
 ###################
 def create_button_image(text, color=(100, 150, 100), width=100, height=40, use_blue_font=False):
-    """Create a button image WITHOUT text (text is drawn dynamically on top)."""
-    button_img = pygame.Surface((width, height))
-    button_img.fill(color)
-    # Text is now drawn dynamically on top of buttons, so we don't draw it here
+    """Create a button image using custom button image, scaled to the specified size."""
+    global building_button_image
+    
+    if building_button_image:
+        # Scale the custom button image to the desired size
+        button_img = pygame.transform.scale(building_button_image, (width, height))
+    else:
+        # Fallback: create a colored surface if image not loaded
+        button_img = pygame.Surface((width, height))
+        button_img.fill(color)
+    # Text is drawn dynamically on top of buttons, so we don't draw it here
     return button_img
 
 ###################
 # Create buttons for all buildings
 ###################
 # Building buttons will be horizontal at bottom left
-button_x_start = 10
+button_x_start = 5  # Moved left from 10
 button_width = 150  # Increased from 100
 button_height = 60  # Increased from 40
 button_spacing = 160  # Width (150) + spacing (10)
@@ -2374,7 +2389,7 @@ def rebuild_building_buttons():
         button_img = create_button_image(label, color, button_width, button_height)
         # Position buttons horizontally at bottom left
         button_x = button_x_start + button_index * button_spacing
-        button_y = c.SCREEN_HEIGHT - button_height - 10  # 10px from bottom
+        button_y = c.SCREEN_HEIGHT - button_height - 15  # 25px from bottom (moved up from 10)
         button = Button(button_x, button_y, button_img)
         buttons[building_class] = {
             'button': button,
@@ -2773,7 +2788,7 @@ while running:
         # Calculate total width of button row
         num_buttons = len(buttons)
         total_button_width = num_buttons * button_spacing
-        button_row_y = c.SCREEN_HEIGHT - button_height - 10
+        button_row_y = c.SCREEN_HEIGHT - button_height - 15  # Match button_y position
         button_overlay = pygame.Surface((total_button_width, button_height), pygame.SRCALPHA)
         button_overlay.fill((255, 128, 0, 80))  # Orange overlay
         screen.blit(button_overlay, (button_x_start, button_row_y))
