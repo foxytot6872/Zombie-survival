@@ -119,16 +119,20 @@ class ResearchManager:
         
         return True
     
-    def apply_difficulty_scaling(self, target_total: float):
+    def apply_difficulty_scaling(self, target_total: float | None = None, multiplier: float | None = None):
         """
-        Scale research costs to approximate a desired total expenditure.
+        Scale research costs to approximate a desired total expenditure or apply a multiplier.
         """
         if not self.base_research_defs:
             self.base_research_defs = copy.deepcopy(self.research_defs)
+        factor = 1.0
         base_total = self._base_total_cost()
-        if base_total <= 0:
-            return
-        factor = target_total / base_total
+        if target_total and base_total > 0:
+            factor = target_total / base_total
+        elif multiplier:
+            factor = multiplier
+        if factor <= 0:
+            factor = 1.0
         self.research_cost_multiplier = factor
         for key, data in self.base_research_defs.items():
             base_cost = max(0, data.get("cost_coins", 0))

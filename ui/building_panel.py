@@ -4,6 +4,7 @@ Building panel UI for upgrade and repair.
 import pygame
 from typing import Optional, Callable
 from world.building import Building, BuildState
+from upgrade_config import get_next_turret_upgrade
 
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
@@ -65,6 +66,7 @@ class BuildingPanel:
         self.upgrade_button_animation_direction = 1  # 1 = forward, -1 = reverse
         self.upgrade_button_was_hovering = False  # Track previous hover state
         self.upgrade_button_animation_playing = False  # Track if animation is currently playing
+        self.upgrade_button_disabled = False  # Track disabled state
         
         self.demolish_button_frames = demolish_button_frames if demolish_button_frames else []
         self.demolish_button_rect = None  # Will be set when drawing
@@ -110,9 +112,12 @@ class BuildingPanel:
                 from world.buildings.wall_wood import WallWood
                 can_upgrade_to_iron = isinstance(self.selected_building, WallWood) and self.selected_building.state == BuildState.ACTIVE
                 can_upgrade_tier = self.selected_building.tier < self.selected_building.TIER_MAX and self.selected_building.state == BuildState.ACTIVE
+                is_turret = getattr(self.selected_building, "TYPE_ID", "").startswith("turret")
+                turret_info = get_next_turret_upgrade(self.selected_building) if is_turret else None
+                can_upgrade_turret = bool(turret_info and not turret_info.get("is_max"))
                 if can_upgrade_to_iron:
                     return "upgrade_to_iron"
-                elif can_upgrade_tier:
+                elif can_upgrade_tier or can_upgrade_turret:
                     return "upgrade"
             
             # Check demolish button click
@@ -137,6 +142,9 @@ class BuildingPanel:
             return
         
         building = self.selected_building
+        is_turret = getattr(building, "TYPE_ID", "").startswith("turret")
+        turret_upgrade_info = get_next_turret_upgrade(building) if is_turret else None
+        turret_can_upgrade = bool(turret_upgrade_info and not turret_upgrade_info.get("is_max"))
         
         # DEBUG: Draw overlay rectangle for building panel (497x742, bottom-right)
         if show_ui_rectangles:
@@ -214,7 +222,8 @@ class BuildingPanel:
             building.upgrade_progress = 0
         
         # Set up upgrade clickable area if building can be upgraded
-        if can_upgrade_to_iron or can_upgrade_tier:
+        can_upgrade_any = can_upgrade_to_iron or can_upgrade_tier or turret_can_upgrade
+        if can_upgrade_any:
             # Clickable area coordinates relative to panel background: (42, 404) to (450, 541)
             # Scale these coordinates by the panel scale factor
             clickable_left = int(42 * self.scale)
@@ -238,8 +247,10 @@ class BuildingPanel:
             # Register upgrade button
             if can_upgrade_to_iron:
                 self.button_rects["upgrade_to_iron"] = self.upgrade_panel_rect
-            else:
+            elif can_upgrade_tier or turret_can_upgrade:
                 self.button_rects["upgrade"] = self.upgrade_panel_rect
+        else:
+            self.upgrade_panel_rect = None
         
         # Draw upgrade button at position (74, 330) relative to panel
         if self.upgrade_button_frames and len(self.upgrade_button_frames) > 0:
@@ -310,6 +321,13 @@ class BuildingPanel:
             
             # Draw the upgrade button
             surface.blit(button_frame, (button_x, button_y))
+
+            # Apply disabled overlay if needed
+            self.upgrade_button_disabled = not can_upgrade_any
+            if self.upgrade_button_disabled:
+                overlay = pygame.Surface((button_width, button_height), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 160))
+                surface.blit(overlay, (button_x, button_y))
         
         # Draw demolish button at position (301, 0) relative to panel
         if self.demolish_button_frames and len(self.demolish_button_frames) > 0:

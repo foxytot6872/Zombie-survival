@@ -15,6 +15,7 @@ class GatlingTurret(Building):
     COST = Cost(wood=30, iron=20)
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
+    ALLOW_MAX_TIER_PROGRESS = True
     
     def __init__(self, grid_pos, sprite_sheets=None, base_images=None, tier=1, uid=None, turret_sheet=None, turret_image=None, base_image=None):
         """

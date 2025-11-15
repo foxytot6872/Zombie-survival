@@ -1,0 +1,54 @@
+{
+  "BallisticTurret": {
+    "name": "Ballista Turret",
+    "description": "Reliable single-target defense.",
+    "base_cost": {"wood": 40, "iron": 30},
+    "requires": []
+  },
+  "GatlingTurret": {
+    "name": "Gatling Turret",
+    "description": "Rapid-fire suppression.",
+    "base_cost": {"wood": 30, "iron": 20},
+    "requires": []
+  },
+  "PiercerTurret": {
+    "name": "Railgun Turret",
+    "description": "Pierces lines of enemies.",
+    "base_cost": {"wood": 50, "iron": 40},
+    "requires": ["railgun"],
+    "requires_display": ["Railgun Research"]
+  },
+  "Wall": {
+    "name": "Wooden Wall",
+    "description": "Basic barrier segment.",
+    "base_cost": {"wood": 30},
+    "requires": []
+  },
+  "Gate": {
+    "name": "Gate",
+    "description": "Allows survivor passage.",
+    "base_cost": {"wood": 30, "iron": 10},
+    "requires": []
+  },
+  "Farm": {
+    "name": "Farm",
+    "description": "Passive food production.",
+    "base_cost": {"wood": 60, "food": 0},
+    "requires": []
+  },
+  "Sawmill": {
+    "name": "Sawmill",
+    "description": "Generates wood over time.",
+    "base_cost": {"wood": 50, "iron": 10},
+    "requires": ["sawmill"],
+    "requires_display": ["Sawmill Research"]
+  },
+  "Smelter": {
+    "name": "Smelter",
+    "description": "Refines iron from scrap.",
+    "base_cost": {"wood": 40, "iron": 40},
+    "requires": ["smelter"],
+    "requires_display": ["Smelter Research"]
+  }
+}
+

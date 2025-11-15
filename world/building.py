@@ -5,6 +5,9 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Dict, Tuple, Optional, List, Union
 
+from difficulty_config import Difficulty
+from economy import scale_cost
+
 TILE = 32
 
 @dataclass
@@ -12,6 +15,7 @@ class Cost:
     wood: int = 0
     iron: int = 0
     food: int = 0
+    coins: int = 0
 
 @dataclass
 class Production:
@@ -40,6 +44,7 @@ class Building(pygame.sprite.Sprite):
     FOOTPRINT: Tuple[int,int] = (1,1)  # in tiles (w,h)
     TIER_MAX: int = 3
     PASSIVE: Production = Production()  # per minute when ACTIVE
+    ALLOW_MAX_TIER_PROGRESS: bool = False
 
     # Load config from JSON if available (per-class, not per-instance)
     _config_cache = {}  # Class-level cache: {class_name: config_data}
@@ -272,26 +277,44 @@ class Building(pygame.sprite.Sprite):
         return cost if isinstance(cost, Cost) else cls.COST
 
     @classmethod
-    def pay_cost(cls, resources, world=None) -> bool:
-        """Try deducting resources; return True if success (with day event modifiers)."""
-        c = cls.get_cost()
-        
-        # Apply build cost modifier from day events
+    def get_scaled_cost(cls, world=None, difficulty: Difficulty | None = None) -> Cost:
+        base_cost = cls.get_cost()
+        if difficulty is None:
+            if world and hasattr(world, "current_difficulty"):
+                difficulty = world.current_difficulty
+            else:
+                difficulty = Difficulty.EASY
+        scaled_dict = scale_cost(
+            {"wood": base_cost.wood, "iron": base_cost.iron, "food": base_cost.food, "coins": base_cost.coins},
+            difficulty,
+            cost_type="build",
+        )
+        cost_mult = 1.0
         if world and hasattr(world, 'modifiers'):
             cost_mult = world.modifiers.get("build_cost_mult", 1.0)
-            effective_wood = int(c.wood * cost_mult)
-            effective_iron = int(c.iron * cost_mult)
-            effective_food = int(c.food * cost_mult)
-        else:
-            effective_wood = c.wood
-            effective_iron = c.iron
-            effective_food = c.food
-        
-        if (resources.wood < effective_wood or resources.iron < effective_iron or resources.food < effective_food):
+        return Cost(
+            wood=int(scaled_dict.get("wood", 0) * cost_mult),
+            iron=int(scaled_dict.get("iron", 0) * cost_mult),
+            food=int(scaled_dict.get("food", 0) * cost_mult),
+            coins=scaled_dict.get("coins", 0),
+        )
+
+    @classmethod
+    def pay_cost(cls, resources, world=None) -> bool:
+        """Try deducting resources; return True if success (with difficulty/day-event modifiers)."""
+        c = cls.get_scaled_cost(world=world)
+        if (
+            resources.wood < c.wood
+            or resources.iron < c.iron
+            or resources.food < c.food
+            or resources.coins < c.coins
+        ):
             return False
-        resources.wood -= effective_wood
-        resources.iron -= effective_iron
-        resources.food -= effective_food
+        resources.wood -= c.wood
+        resources.iron -= c.iron
+        resources.food -= c.food
+        if c.coins:
+            resources.coins -= c.coins
         return True
 
     def refund_cost(self, resources, ratio: float = 1.0, world=None):
@@ -305,6 +328,8 @@ class Building(pygame.sprite.Sprite):
         resources.wood += int(c.wood * ratio)
         resources.iron += int(c.iron * ratio)
         resources.food += int(c.food * ratio)
+        if hasattr(c, "coins") and c.coins:
+            resources.coins += int(c.coins * ratio)
 
     # ----- Lifecycle -----
     def start_construction(self):
@@ -403,7 +428,16 @@ class Building(pygame.sprite.Sprite):
 
     def upgrade(self, world=None) -> bool:
         """Upgrade building - increments progress, increases tier when progress reaches 3"""
+        allow_max_progress = getattr(self, "ALLOW_MAX_TIER_PROGRESS", False)
         if self.tier >= self.TIER_MAX:
+            if allow_max_progress:
+                if not hasattr(self, 'upgrade_progress'):
+                    self.upgrade_progress = 0
+                if self.upgrade_progress >= 3:
+                    return False
+                self.upgrade_progress += 1
+                self.on_upgrade()
+                return True
             return False
         
         # Initialize upgrade_progress if not set (backwards compatibility)
