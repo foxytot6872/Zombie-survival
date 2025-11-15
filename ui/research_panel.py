@@ -45,7 +45,7 @@ class ResearchPanel:
         """Hide the panel."""
         self.visible = False
     
-    def draw(self, screen: pygame.Surface):
+    def draw(self, screen: pygame.Surface, show_ui_rectangles: bool = False):
         """Draw the research panel."""
         if not self.visible:
             return
@@ -56,9 +56,10 @@ class ResearchPanel:
         screen.blit(overlay, (0, 0))
         
         # DEBUG: Draw overlay rectangle for research panel (~600x800, center)
-        panel_overlay = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-        panel_overlay.fill((128, 255, 128, 100))  # Light green overlay
-        screen.blit(panel_overlay, self.rect)
+        if show_ui_rectangles:
+            panel_overlay = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+            panel_overlay.fill((128, 255, 128, 100))  # Light green overlay
+            screen.blit(panel_overlay, self.rect)
         
         # Draw panel background
         panel_bg = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)

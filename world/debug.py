@@ -15,6 +15,7 @@ class DebugSystem:
         self.show_fps = True
         self.show_counts = True
         self.show_footprints = False  # Toggle for showing building footprints
+        self.show_ui_rectangles = False  # Toggle for showing UI element rectangles
         
         # Debug actions (key -> function)
         self.actions = {}
@@ -144,9 +145,11 @@ class DebugSystem:
             ("2", "Unlock Research"),
             ("3", "Roll Event"),
             ("F", "Show Footprints"),
+            ("U", "Show UI Rects"),
             ("F9", "Skip Night"),
             ("F10", "Skip Summary"),
             ("F11", "Cycle Diff"),
+            ("F12", "Skip State"),
         ]
         
         # Draw in two columns (split list in half)

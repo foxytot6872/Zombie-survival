@@ -7,13 +7,15 @@ from typing import Optional, Dict
 class HUD:
     """HUD for displaying game information"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None):
         """
         Initialize HUD.
         Args:
             screen_width: Screen width in pixels
             screen_height: Screen height in pixels
-            daycounter_frames: List of pygame.Surface frames for animated day counter (5 frames, 200x85 each)
+            daycounter_frames: List of pygame.Surface frames for animated day counter (6 frames, 256x128 each)
+            red_number_frames: List of pygame.Surface frames for red numbers (10 frames, 42x74 each, 0-9)
+            blue_number_frames: List of pygame.Surface frames for blue numbers (10 frames, 42x74 each, 0-9)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -29,6 +31,10 @@ class HUD:
         self.previous_state = None  # Track previous game state to detect transitions
         self.is_transitioning = False  # Whether we're currently in a transition animation
         self.transition_animation_timer = 0.0
+        
+        # Number sprite frames (0-9)
+        self.red_number_frames = red_number_frames if red_number_frames else []
+        self.blue_number_frames = blue_number_frames if blue_number_frames else []
         
         # HUD elements
         self.day = 1
@@ -120,7 +126,34 @@ class HUD:
         """Show 'Starting Defenses' hint on Day 1"""
         self.show_event("Starting Defenses: Wall, Gate, and Turrets", duration=5.0)
     
-    def draw(self, surface: pygame.Surface):
+    def draw_number(self, surface: pygame.Surface, number: int, x: int, y: int, use_red: bool = True):
+        """
+        Draw a number using sprite frames.
+        Args:
+            surface: Surface to draw on
+            number: Number to draw (0-9, or multi-digit)
+            x: X position (left edge)
+            y: Y position (top edge)
+            use_red: If True, use red numbers; if False, use blue numbers
+        """
+        number_frames = self.red_number_frames if use_red else self.blue_number_frames
+        if not number_frames or len(number_frames) < 10:
+            return
+        
+        # Convert number to string to get individual digits
+        number_str = str(number)
+        current_x = x
+        
+        for digit_char in number_str:
+            digit = int(digit_char)
+            if 0 <= digit <= 9:
+                digit_frame = number_frames[digit]
+                surface.blit(digit_frame, (current_x, y))
+                # Move to next digit position (reduce gap from ~17px to 5px)
+                digit_width = digit_frame.get_width()
+                current_x += digit_width - 3  # Reduce movement by 12px to get 5px gap instead of 17px
+    
+    def draw(self, surface: pygame.Surface, show_ui_rectangles: bool = False):
         """Draw HUD"""
         # Day/Night indicator area (top-right) - use animated sprite if available
         if self.daycounter_frames and len(self.daycounter_frames) > 0:
@@ -129,10 +162,25 @@ class HUD:
             # Position at top-right (256x128 sprite)
             daycounter_rect = current_frame.get_rect(topright=(self.screen_width - 10, 10))
             # DEBUG: Draw overlay rectangle for day counter (256x128)
-            overlay = pygame.Surface((256, 128), pygame.SRCALPHA)
-            overlay.fill((255, 0, 0, 80))  # Red overlay
-            surface.blit(overlay, (self.screen_width - 266, 10))
+            if show_ui_rectangles:
+                overlay = pygame.Surface((256, 128), pygame.SRCALPHA)
+                overlay.fill((255, 0, 0, 80))  # Red overlay
+                surface.blit(overlay, (self.screen_width - 266, 10))
             surface.blit(current_frame, daycounter_rect)
+            
+            # Draw day or night number on top of the day counter sprite
+            # Only show one number at a time based on current state
+            if self.state == "DAY":
+                # Day time: show day number using blue numbers at (155, 43)
+                day_number_x = daycounter_rect.x + 155
+                day_number_y = daycounter_rect.y + 43
+                self.draw_number(surface, self.day, day_number_x, day_number_y, use_red=False)
+            elif self.state == "NIGHT":
+                # Night time: show night number using red numbers at (200, 43)
+                # Night number is the same as day number (night comes after day)
+                night_number_x = daycounter_rect.x + 183
+                night_number_y = daycounter_rect.y + 43
+                self.draw_number(surface, self.day, night_number_x, night_number_y, use_red=True)
         else:
             # Fallback to text if sprite not available
             state_text = f"Day {self.day} - Night {self.night}"
@@ -149,9 +197,10 @@ class HUD:
             state_surface = self.font_large.render(state_text, True, state_color)
             state_rect = state_surface.get_rect(topright=(self.screen_width - 10, 10))
             # Overlay rectangle for day/night indicator (estimated ~300x50)
-            overlay = pygame.Surface((300, 50), pygame.SRCALPHA)
-            overlay.fill((255, 0, 0, 80))  # Red overlay
-            surface.blit(overlay, (self.screen_width - 310, 10))
+            if show_ui_rectangles:
+                overlay = pygame.Surface((300, 50), pygame.SRCALPHA)
+                overlay.fill((255, 0, 0, 80))  # Red overlay
+                surface.blit(overlay, (self.screen_width - 310, 10))
             surface.blit(state_surface, state_rect)
         
         # Draw HQ HP (top-center, important!)
@@ -168,9 +217,10 @@ class HUD:
         hq_surface = self.font_large.render(hq_text, True, hq_color)
         hq_rect = hq_surface.get_rect(center=(self.screen_width // 2, 25))
         # Overlay rectangle for HQ HP text area (estimated ~400x50)
-        overlay = pygame.Surface((400, 50), pygame.SRCALPHA)
-        overlay.fill((0, 255, 0, 80))  # Green overlay
-        surface.blit(overlay, (self.screen_width // 2 - 200, 0))
+        if show_ui_rectangles:
+            overlay = pygame.Surface((400, 50), pygame.SRCALPHA)
+            overlay.fill((0, 255, 0, 80))  # Green overlay
+            surface.blit(overlay, (self.screen_width // 2 - 200, 0))
         surface.blit(hq_surface, hq_rect)
         
         # Draw HP bar below text
@@ -179,9 +229,10 @@ class HUD:
         bar_x = self.screen_width // 2 - bar_width // 2
         bar_y = 45
         # Overlay rectangle for HP bar (300x20)
-        overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 255, 80))  # Blue overlay
-        surface.blit(overlay, (bar_x, bar_y))
+        if show_ui_rectangles:
+            overlay = pygame.Surface((bar_width, bar_height), pygame.SRCALPHA)
+            overlay.fill((0, 0, 255, 80))  # Blue overlay
+            surface.blit(overlay, (bar_x, bar_y))
         # Background bar
         pygame.draw.rect(surface, (50, 50, 50), (bar_x, bar_y, bar_width, bar_height))
         # HP bar
@@ -198,9 +249,10 @@ class HUD:
             wave_y = 10 + 128 + 5 if (self.daycounter_frames and len(self.daycounter_frames) > 0) else 60
             wave_rect = wave_surface.get_rect(topright=(self.screen_width - 10, wave_y))
             # Overlay rectangle for wave info (estimated ~250x30)
-            overlay = pygame.Surface((250, 30), pygame.SRCALPHA)
-            overlay.fill((255, 255, 0, 80))  # Yellow overlay
-            surface.blit(overlay, (self.screen_width - 260, wave_y))
+            if show_ui_rectangles:
+                overlay = pygame.Surface((250, 30), pygame.SRCALPHA)
+                overlay.fill((255, 255, 0, 80))  # Yellow overlay
+                surface.blit(overlay, (self.screen_width - 260, wave_y))
             surface.blit(wave_surface, wave_rect)
         
         # Draw event banner (top-center, fades in/out)
@@ -220,8 +272,9 @@ class HUD:
             event_surface.set_alpha(alpha)
             event_rect = event_surface.get_rect(center=(self.screen_width // 2, 50))
             # Overlay rectangle for event banner (estimated ~600x60)
-            overlay = pygame.Surface((600, 60), pygame.SRCALPHA)
-            overlay.fill((255, 0, 255, 80))  # Magenta overlay
-            surface.blit(overlay, (self.screen_width // 2 - 300, 20))
+            if show_ui_rectangles:
+                overlay = pygame.Surface((600, 60), pygame.SRCALPHA)
+                overlay.fill((255, 0, 255, 80))  # Magenta overlay
+                surface.blit(overlay, (self.screen_width // 2 - 300, 20))
             surface.blit(event_surface, event_rect)
 

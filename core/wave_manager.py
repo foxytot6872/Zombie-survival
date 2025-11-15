@@ -103,7 +103,6 @@ class WaveManager:
                 if world and hasattr(world, 'enemy_group'):
                     if len(world.enemy_group) == 0:
                         self.start_summary()
-                        self.night += 1
                         
         elif self.state == self.STATE_SUMMARY:
             # Summary phase: wait for summary duration, then start next day

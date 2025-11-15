@@ -361,6 +361,124 @@ else:
         placeholder.fill((100, 100, 100, 255))
         daycounter_frames.append(placeholder)
 
+# Red number sprite sheet (10 frames, 42x74 each) - for day numbers
+red_number_sheet = load_image_or_placeholder(
+    'asset/hud/Rednumber-Sheet.png',
+    (42 * 10, 74),  # 10 frames * 42 pixels = 420 pixels wide, 74 pixels tall
+    (255, 0, 0, 255),
+    "Red number sprite sheet"
+)
+# Extract 10 frames (0-9) from the sheet
+red_number_frames = []
+if red_number_sheet:
+    # Get actual dimensions and calculate frame width
+    sheet_width = red_number_sheet.get_width()
+    sheet_height = red_number_sheet.get_height()
+    # Calculate frame width based on actual sheet dimensions (10 frames expected)
+    frame_width = sheet_width // 10
+    frame_height = sheet_height
+    print(f"Red number sheet: {sheet_width}x{sheet_height}, frame size: {frame_width}x{frame_height}")
+    
+    for i in range(10):
+        try:
+            frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            # Double-check bounds before creating subsurface
+            if (frame_rect.right <= sheet_width and frame_rect.bottom <= sheet_height and
+                frame_rect.x >= 0 and frame_rect.y >= 0):
+                frame = red_number_sheet.subsurface(frame_rect)
+                red_number_frames.append(frame)
+            else:
+                # Frame out of bounds, use placeholder
+                if red_number_frames:
+                    red_number_frames.append(red_number_frames[0])
+                else:
+                    placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                    placeholder.fill((255, 0, 0, 255))
+                    red_number_frames.append(placeholder)
+        except (ValueError, pygame.error) as e:
+            # If subsurface fails, use placeholder
+            print(f"Warning: Failed to extract red number frame {i}: {e}")
+            if red_number_frames:
+                red_number_frames.append(red_number_frames[0])
+            else:
+                placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                placeholder.fill((255, 0, 0, 255))
+                red_number_frames.append(placeholder)
+    
+    # Ensure we have exactly 10 frames
+    while len(red_number_frames) < 10:
+        if red_number_frames:
+            red_number_frames.append(red_number_frames[0])
+        else:
+            placeholder = pygame.Surface((42, 74), pygame.SRCALPHA)
+            placeholder.fill((255, 0, 0, 255))
+            red_number_frames.append(placeholder)
+else:
+    # Create placeholder frames if sheet not loaded
+    for i in range(10):
+        placeholder = pygame.Surface((42, 74), pygame.SRCALPHA)
+        placeholder.fill((255, 0, 0, 255))
+        red_number_frames.append(placeholder)
+
+# Blue number sprite sheet (10 frames, 42x74 each) - for night numbers
+blue_number_sheet = load_image_or_placeholder(
+    'asset/hud/Bluenumber-Sheet.png',
+    (42 * 10, 74),  # 10 frames * 42 pixels = 420 pixels wide, 74 pixels tall
+    (0, 0, 255, 255),
+    "Blue number sprite sheet"
+)
+# Extract 10 frames (0-9) from the sheet
+blue_number_frames = []
+if blue_number_sheet:
+    # Get actual dimensions and calculate frame width
+    sheet_width = blue_number_sheet.get_width()
+    sheet_height = blue_number_sheet.get_height()
+    # Calculate frame width based on actual sheet dimensions (10 frames expected)
+    frame_width = sheet_width // 10
+    frame_height = sheet_height
+    print(f"Blue number sheet: {sheet_width}x{sheet_height}, frame size: {frame_width}x{frame_height}")
+    
+    for i in range(10):
+        try:
+            frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            # Double-check bounds before creating subsurface
+            if (frame_rect.right <= sheet_width and frame_rect.bottom <= sheet_height and
+                frame_rect.x >= 0 and frame_rect.y >= 0):
+                frame = blue_number_sheet.subsurface(frame_rect)
+                blue_number_frames.append(frame)
+            else:
+                # Frame out of bounds, use placeholder
+                if blue_number_frames:
+                    blue_number_frames.append(blue_number_frames[0])
+                else:
+                    placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                    placeholder.fill((0, 0, 255, 255))
+                    blue_number_frames.append(placeholder)
+        except (ValueError, pygame.error) as e:
+            # If subsurface fails, use placeholder
+            print(f"Warning: Failed to extract blue number frame {i}: {e}")
+            if blue_number_frames:
+                blue_number_frames.append(blue_number_frames[0])
+            else:
+                placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+                placeholder.fill((0, 0, 255, 255))
+                blue_number_frames.append(placeholder)
+    
+    # Ensure we have exactly 10 frames
+    while len(blue_number_frames) < 10:
+        if blue_number_frames:
+            blue_number_frames.append(blue_number_frames[0])
+        else:
+            placeholder = pygame.Surface((42, 74), pygame.SRCALPHA)
+            placeholder.fill((0, 0, 255, 255))
+            blue_number_frames.append(placeholder)
+else:
+    # Create placeholder frames if sheet not loaded
+    for i in range(10):
+        placeholder = pygame.Surface((42, 74), pygame.SRCALPHA)
+        placeholder.fill((0, 0, 255, 255))
+        blue_number_frames.append(placeholder)
+
 # HQ building image
 hq_image = load_image_or_placeholder(
     'asset/base.png',
@@ -729,7 +847,7 @@ wave_manager = WaveManager(world, waves_config, difficulty="normal")
 world.wave_manager = wave_manager
 
 # Initialize UI components
-hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames)
+hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames)
 # Set HUD reference in world for day events
 world.hud = hud
 
@@ -1666,6 +1784,41 @@ def debug_toggle_footprints():
     status = "ON" if debug_system.show_footprints else "OFF"
     print(f"Debug: Show footprints {status}")
 
+def debug_toggle_ui_rectangles():
+    """Toggle showing UI element rectangles"""
+    debug_system.show_ui_rectangles = not debug_system.show_ui_rectangles
+    status = "ON" if debug_system.show_ui_rectangles else "OFF"
+    print(f"Debug: Show UI rectangles {status}")
+
+def debug_skip_state():
+    """Skip to the next game state (DAY -> NIGHT -> SUMMARY -> DAY)"""
+    current_state = wave_manager.state
+    if current_state == WaveManager.STATE_DAY:
+        # Skip to night
+        wave_manager.start_night()
+        recipe = wave_manager.get_wave_recipe()
+        spawn_config = waves_config["spawn"]
+        zombie_spawner.begin(recipe, spawn_config)
+        hud.show_event(f"Debug: Skipped to Night {wave_manager.night}", 3.0)
+        print(f"Debug: Skipped to night {wave_manager.night}")
+    elif current_state == WaveManager.STATE_NIGHT:
+        # Skip to summary (clear all enemies first)
+        for enemy in list(enemy_group):
+            enemy_group.remove(enemy)
+        zombie_spawner.done = True
+        zombie_spawner.active = False
+        wave_manager.start_summary()
+        hud.show_event("Debug: Skipped to Summary", 3.0)
+        print("Debug: Skipped to summary")
+    elif current_state == WaveManager.STATE_SUMMARY:
+        # Skip to next day
+        wave_manager.start_day()
+        if world.day_events:
+            world.day_events.roll_new_day_event(wave_manager.day)
+        spawn_daily_resource_nodes()
+        hud.show_event(f"Debug: Skipped to Day {wave_manager.day}", 3.0)
+        print(f"Debug: Skipped to day {wave_manager.day}")
+
 # Register debug actions
 debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources)
 debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build)
@@ -1680,8 +1833,9 @@ debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins)
 debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research)
 debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event)
 debug_system.register_action(pygame.K_f, "Toggle Footprints", debug_toggle_footprints)
+debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rectangles)
 # F9-F11: Wave skipping (handled in event loop)
-# F12: Toggle debug mode (handled in event loop)
+# F12: Skip state (handled in event loop)
 
 ###################
 # Helper functions for buttons
@@ -1902,9 +2056,10 @@ def draw_resources(screen, resources, font):
     start_y = c.SCREEN_HEIGHT - 45  # 45px from bottom (increased from 30)
     
     # DEBUG: Draw overlay rectangle for resource display area (horizontal span)
-    resource_overlay = pygame.Surface((total_width + 20, 45), pygame.SRCALPHA)
-    resource_overlay.fill((0, 255, 255, 80))  # Cyan overlay
-    screen.blit(resource_overlay, (start_x - 10, start_y - 5))
+    if debug_system.is_active() and debug_system.show_ui_rectangles:
+        resource_overlay = pygame.Surface((total_width + 20, 45), pygame.SRCALPHA)
+        resource_overlay.fill((0, 255, 255, 80))  # Cyan overlay
+        screen.blit(resource_overlay, (start_x - 10, start_y - 5))
     
     # Draw all resources horizontally
     current_x = start_x
@@ -2074,7 +2229,7 @@ while running:
                 deselect_building()
     
     # DEBUG: Draw overlay rectangles for build menu buttons (bottom-left)
-    if buttons:
+    if debug_system.is_active() and debug_system.show_ui_rectangles and buttons:
         # Calculate total width of button row
         num_buttons = len(buttons)
         total_button_width = num_buttons * button_spacing
@@ -2495,19 +2650,22 @@ while running:
         hud.show_starting_defenses_hint()
         hud._starting_hint_shown = True
     
-    hud.draw(screen)
+    # Get UI rectangle toggle state for passing to UI components
+    show_ui_rects = debug_system.is_active() and debug_system.show_ui_rectangles
+    
+    hud.draw(screen, show_ui_rects)
     
     ###################
     # Draw building panel
     ###################
     if building_panel.is_visible:
-        building_panel.draw(screen, resources, mouse_pos)
+        building_panel.draw(screen, resources, mouse_pos, show_ui_rects)
     
     ###################
     # Draw research button
     ###################
     # DEBUG: Draw overlay rectangle for research button (top-left, 10px padding)
-    if hasattr(research_button, 'rect'):
+    if debug_system.is_active() and debug_system.show_ui_rectangles and hasattr(research_button, 'rect'):
         research_overlay = pygame.Surface((research_button.rect.width, research_button.rect.height), pygame.SRCALPHA)
         research_overlay.fill((128, 0, 255, 80))  # Purple overlay
         screen.blit(research_overlay, research_button.rect)
@@ -2517,13 +2675,13 @@ while running:
     # Draw pause menu
     ###################
     if game_state_manager.is_paused():
-        pause_menu.draw(screen)
+        pause_menu.draw(screen, show_ui_rects)
     
     ###################
     # Draw game over screen
     ###################
     if game_over_screen.is_visible:
-        game_over_screen.draw(screen)
+        game_over_screen.draw(screen, show_ui_rects)
     
     ###################
     # Draw start screen (should not be visible during gameplay, but just in case)
@@ -2819,10 +2977,18 @@ while running:
             if event.key == pygame.K_r:
                 launch_research_tree()
                 continue
-            # F12: Toggle debug mode (works even when paused/over - always accessible)
+            # F12: Toggle debug mode OR skip state
+            # - When debug mode is OFF: Toggle debug mode ON
+            # - When debug mode is ON and game is playing: Skip to next state
+            # - When debug mode is ON but paused/over: Toggle debug mode OFF
             if event.key == pygame.K_F12:
-                debug_system.toggle()
-                print(f"Debug mode: {'ON' if debug_system.is_active() else 'OFF'}")
+                if debug_system.is_active() and not game_over_screen.is_visible and not game_state_manager.is_paused():
+                    # Debug mode is ON and game is playing - skip state instead
+                    debug_skip_state()
+                else:
+                    # Toggle debug mode
+                    debug_system.toggle()
+                    print(f"Debug mode: {'ON' if debug_system.is_active() else 'OFF'}")
                 continue
             
             # Handle game over screen
