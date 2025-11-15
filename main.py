@@ -493,16 +493,19 @@ hq_image = load_image_or_placeholder(
 HQ.building_image = hq_image
 
 # Upgrade panel image - extract 3 frames (375x475 each) - for upgrade progress indicator
+upgrade_panel_sheet = None
+frame_width = 375
+frame_height = 475
 try:
     upgrade_panel_sheet = pygame.image.load('asset/hud/UpgradePanel-Sheet.png').convert_alpha()
     sheet_width, sheet_height = upgrade_panel_sheet.get_size()
     print(f"Loaded upgrade panel sheet: {sheet_width}x{sheet_height}")
     
-    # Verify dimensions match expected size (3 frames * 375 = 1125 wide, 475 tall)
-    if sheet_width < 375 * 3 or sheet_height < 475:
-        print(f"Warning: Upgrade panel sheet size {sheet_width}x{sheet_height} doesn't match expected (1125x475)")
-        print(f"  Using actual dimensions: frame_width={sheet_width // 3}, frame_height={sheet_height}")
-        frame_width = sheet_width // 3
+    # Verify dimensions match expected size (4 frames * 375 = 1500 wide, 475 tall)
+    if sheet_width < 375 * 4 or sheet_height < 475:
+        print(f"Warning: Upgrade panel sheet size {sheet_width}x{sheet_height} doesn't match expected (1500x475)")
+        print(f"  Using actual dimensions: frame_width={sheet_width // 4}, frame_height={sheet_height}")
+        frame_width = sheet_width // 4
         frame_height = sheet_height
     else:
         frame_width = 375
@@ -511,17 +514,17 @@ except Exception as e:
     print(f"Error loading upgrade panel sheet: {e}")
     upgrade_panel_sheet = load_image_or_placeholder(
         'asset/hud/UpgradePanel-Sheet.png',
-        (375 * 3, 475),
+        (375 * 4, 475),
         (100, 100, 100, 255),
         "Upgrade panel sprite sheet"
     )
     frame_width = 375
     frame_height = 475
 
-# Extract 3 frames from the sheet
+# Extract 4 frames from the sheet
 upgrade_panel_frames = []
 if upgrade_panel_sheet:
-    for i in range(3):
+    for i in range(4):
         try:
             frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
             frame = upgrade_panel_sheet.subsurface(frame_rect)
@@ -534,11 +537,11 @@ if upgrade_panel_sheet:
             placeholder.fill((100, 100, 100, 255))
             upgrade_panel_frames.append(placeholder)
 
-# Upgrade panel darkened image - extract 3 frames
+# Upgrade panel darkened image - extract 4 frames
 # Create darkened version programmatically from the main sheet
 upgrade_panel_darken_frames = []
 if upgrade_panel_sheet:
-    for i in range(3):
+    for i in range(4):
         try:
             frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
             frame = upgrade_panel_sheet.subsurface(frame_rect).copy()
@@ -638,6 +641,159 @@ if demolish_button_sheet:
             placeholder = pygame.Surface((demolish_frame_width, demolish_frame_height), pygame.SRCALPHA)
             placeholder.fill((100, 100, 100, 255))
             demolish_button_frames.append(placeholder)
+
+# Health bar image - extract 11 frames (280x27 each) - for health display (0% to 100% in 10% increments)
+try:
+    health_bar_sheet = pygame.image.load('asset/hud/HealthBar-Sheet.png').convert_alpha()
+    health_sheet_width, health_sheet_height = health_bar_sheet.get_size()
+    print(f"Loaded health bar sheet: {health_sheet_width}x{health_sheet_height}")
+    
+    # Verify dimensions match expected size (11 frames * 280 = 3080 wide, 27 tall)
+    if health_sheet_width < 280 * 11 or health_sheet_height < 27:
+        print(f"Warning: Health bar sheet size {health_sheet_width}x{health_sheet_height} doesn't match expected (3080x27)")
+        print(f"  Using actual dimensions: health_frame_width={health_sheet_width // 11}, health_frame_height={health_sheet_height}")
+        health_frame_width = health_sheet_width // 11
+        health_frame_height = health_sheet_height
+    else:
+        health_frame_width = 280
+        health_frame_height = 27
+except Exception as e:
+    print(f"Error loading health bar sheet: {e}")
+    health_bar_sheet = load_image_or_placeholder(
+        'asset/hud/HealthBar-Sheet.png',
+        (280 * 11, 27),
+        (100, 100, 100, 255),
+        "Health bar sprite sheet"
+    )
+    health_frame_width = 280
+    health_frame_height = 27
+
+# Extract 11 frames from the health bar sheet (0% to 100% in 10% increments)
+health_bar_frames = []
+if health_bar_sheet:
+    for i in range(11):
+        try:
+            frame_rect = pygame.Rect(i * health_frame_width, 0, health_frame_width, health_frame_height)
+            frame = health_bar_sheet.subsurface(frame_rect)
+            health_bar_frames.append(frame)
+            print(f"Extracted health bar frame {i+1} ({i*10}%): {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting health bar frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((health_frame_width, health_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            health_bar_frames.append(placeholder)
+
+# Current level number image - extract 3 frames (70x80 each) - for tier display (1, 2, 3)
+# Note: Frames have 16x16 padding from top left corner
+try:
+    current_level_sheet = pygame.image.load('asset/hud/CurrentLevelNumber-Sheet.png').convert_alpha()
+    level_sheet_width, level_sheet_height = current_level_sheet.get_size()
+    print(f"Loaded current level number sheet: {level_sheet_width}x{level_sheet_height}")
+    
+    # Frame dimensions
+    level_frame_width = 70
+    level_frame_height = 80
+    padding = 16  # 16x16 padding from top left
+    
+    # Verify dimensions match expected size
+    # With padding: 16 + 70*3 = 226 wide, 16 + 80 = 96 tall
+    expected_width = padding + level_frame_width * 3
+    expected_height = padding + level_frame_height
+    
+    if level_sheet_width < expected_width or level_sheet_height < expected_height:
+        print(f"Warning: Current level sheet size {level_sheet_width}x{level_sheet_height} doesn't match expected ({expected_width}x{expected_height})")
+        # Try to calculate actual frame size
+        if level_sheet_width >= padding:
+            level_frame_width = (level_sheet_width - padding) // 3
+        if level_sheet_height >= padding:
+            level_frame_height = level_sheet_height - padding
+except Exception as e:
+    print(f"Error loading current level number sheet: {e}")
+    current_level_sheet = load_image_or_placeholder(
+        'asset/hud/CurrentLevelNumber-Sheet.png',
+        (padding + level_frame_width * 3, padding + level_frame_height),
+        (100, 100, 100, 255),
+        "Current level number sprite sheet"
+    )
+    level_frame_width = 70
+    level_frame_height = 80
+    padding = 16
+
+# Extract 3 frames from the current level number sheet (accounting for 16x16 padding)
+current_level_frames = []
+if current_level_sheet:
+    for i in range(3):
+        try:
+            # Frame positions: (16, 16), (86, 16), (156, 16) accounting for padding
+            frame_x = padding + (i * level_frame_width)
+            frame_y = padding
+            frame_rect = pygame.Rect(frame_x, frame_y, level_frame_width, level_frame_height)
+            frame = current_level_sheet.subsurface(frame_rect)
+            current_level_frames.append(frame)
+            print(f"Extracted current level frame {i+1} (number {i+1}): {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting current level frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((level_frame_width, level_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            current_level_frames.append(placeholder)
+
+# Next level number image - extract 3 frames (70x80 each) - for next tier display (1, 2, 3)
+# Note: Frames have 16x16 padding from top left corner
+try:
+    next_level_sheet = pygame.image.load('asset/hud/NextLevelNumber-Sheet.png').convert_alpha()
+    next_level_sheet_width, next_level_sheet_height = next_level_sheet.get_size()
+    print(f"Loaded next level number sheet: {next_level_sheet_width}x{next_level_sheet_height}")
+    
+    # Use same frame dimensions as current level
+    # Frame dimensions
+    next_level_frame_width = 70
+    next_level_frame_height = 80
+    next_padding = 16  # 16x16 padding from top left
+    
+    # Verify dimensions match expected size
+    # With padding: 16 + 70*3 = 226 wide, 16 + 80 = 96 tall
+    next_expected_width = next_padding + next_level_frame_width * 3
+    next_expected_height = next_padding + next_level_frame_height
+    
+    if next_level_sheet_width < next_expected_width or next_level_sheet_height < next_expected_height:
+        print(f"Warning: Next level sheet size {next_level_sheet_width}x{next_level_sheet_height} doesn't match expected ({next_expected_width}x{next_expected_height})")
+        # Try to calculate actual frame size
+        if next_level_sheet_width >= next_padding:
+            next_level_frame_width = (next_level_sheet_width - next_padding) // 3
+        if next_level_sheet_height >= next_padding:
+            next_level_frame_height = next_level_sheet_height - next_padding
+except Exception as e:
+    print(f"Error loading next level number sheet: {e}")
+    next_level_sheet = load_image_or_placeholder(
+        'asset/hud/NextLevelNumber-Sheet.png',
+        (next_padding + next_level_frame_width * 3, next_padding + next_level_frame_height),
+        (100, 100, 100, 255),
+        "Next level number sprite sheet"
+    )
+    next_level_frame_width = 70
+    next_level_frame_height = 80
+    next_padding = 16
+
+# Extract 3 frames from the next level number sheet (accounting for 16x16 padding)
+next_level_frames = []
+if next_level_sheet:
+    for i in range(3):
+        try:
+            # Frame positions: (16, 16), (86, 16), (156, 16) accounting for padding
+            frame_x = next_padding + (i * next_level_frame_width)
+            frame_y = next_padding
+            frame_rect = pygame.Rect(frame_x, frame_y, next_level_frame_width, next_level_frame_height)
+            frame = next_level_sheet.subsurface(frame_rect)
+            next_level_frames.append(frame)
+            print(f"Extracted next level frame {i+1} (number {i+1}): {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting next level frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((next_level_frame_width, next_level_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            next_level_frames.append(placeholder)
 
 # Load building construction menu background (bottom left)
 try:
@@ -946,7 +1102,7 @@ game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames)
+building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames, health_bar_frames, current_level_frames, next_level_frames)
 
 
 # Set UI callbacks
