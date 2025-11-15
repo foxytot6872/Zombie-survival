@@ -8,7 +8,7 @@ from world.building import Building, BuildState
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None):
         """
         Initialize building panel.
         Args:
@@ -17,6 +17,8 @@ class BuildingPanel:
             upgrade_panel_frames: List of 3 frames for upgrade progress panel
             upgrade_panel_darken_frames: List of 3 darkened frames for upgrade progress panel
             panel_background_frames: List of 3 frames (497x742 each) for building detail panel background
+            upgrade_button_frames: List of 4 frames (277x84 each) for upgrade button with hover/press animation
+            demolish_button_frames: List of 4 frames (91x68 each) for demolish button with pulsing animation
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -28,24 +30,46 @@ class BuildingPanel:
         self.is_visible = False
         self.selected_building: Optional[Building] = None
         
-        # Set panel size based on background frames if available
+        # Set panel size based on upgrade panel frames or background frames if available
         self.panel_background_frames = panel_background_frames if panel_background_frames else []
-        if self.panel_background_frames and len(self.panel_background_frames) > 0:
+        self.upgrade_panel_frames = upgrade_panel_frames if upgrade_panel_frames else []
+        
+        if self.upgrade_panel_frames and len(self.upgrade_panel_frames) > 0:
+            # Use upgrade panel frame size (375x475)
+            bg_width, bg_height = self.upgrade_panel_frames[0].get_size()
+            self.panel_rect = pygame.Rect(0, 0, bg_width, bg_height)
+        elif self.panel_background_frames and len(self.panel_background_frames) > 0:
             bg_width, bg_height = self.panel_background_frames[0].get_size()
             self.panel_rect = pygame.Rect(0, 0, bg_width, bg_height)
         else:
             # Fallback size (scaled up)
             self.panel_rect = pygame.Rect(0, 0, int(300 * 1.2), int(400 * 1.2))
         
-        self.panel_rect.bottomright = (screen_width - 10, screen_height - 10)
+
+
+        #Placement for the panel
+        self.panel_rect.bottomright = (screen_width - 10, screen_height - 140)
         
         # Scale factor for internal elements (1.2x - slightly bigger than original)
         self.scale = 1.2
         self.button_rects = {}  # Store button rects for click detection
         
-        self.upgrade_panel_frames = upgrade_panel_frames if upgrade_panel_frames else []
         self.upgrade_panel_darken_frames = upgrade_panel_darken_frames if upgrade_panel_darken_frames else []
         self.upgrade_panel_rect = None  # Will be set when drawing
+        
+        self.upgrade_button_frames = upgrade_button_frames if upgrade_button_frames else []
+        self.upgrade_button_rect = None  # Will be set when drawing
+        self.upgrade_button_pressed = False  # Track if button is being pressed
+        self.upgrade_button_animation_timer = 0.0  # Timer for animation
+        self.upgrade_button_animation_speed = 0.1  # Time per frame (seconds)
+        self.upgrade_button_animation_direction = 1  # 1 = forward, -1 = reverse
+        self.upgrade_button_was_hovering = False  # Track previous hover state
+        self.upgrade_button_animation_playing = False  # Track if animation is currently playing
+        
+        self.demolish_button_frames = demolish_button_frames if demolish_button_frames else []
+        self.demolish_button_rect = None  # Will be set when drawing
+        self.demolish_button_animation_timer = 0.0  # Timer for pulsing animation
+        self.demolish_button_animation_speed = 0.15  # Time per frame (seconds) for pulsing
         
         self.on_upgrade: Optional[Callable] = None
         self.on_repair: Optional[Callable] = None
@@ -79,15 +103,35 @@ class BuildingPanel:
                 self.hide()
                 return "close"
             
-            # Check button clicks
+            # Check upgrade button click (if upgrade button is drawn)
+            if self.upgrade_button_rect and self.upgrade_button_rect.collidepoint(mouse_pos):
+                self.upgrade_button_pressed = True
+                # Check if building can be upgraded
+                from world.buildings.wall_wood import WallWood
+                can_upgrade_to_iron = isinstance(self.selected_building, WallWood) and self.selected_building.state == BuildState.ACTIVE
+                can_upgrade_tier = self.selected_building.tier < self.selected_building.TIER_MAX and self.selected_building.state == BuildState.ACTIVE
+                if can_upgrade_to_iron:
+                    return "upgrade_to_iron"
+                elif can_upgrade_tier:
+                    return "upgrade"
+            
+            # Check demolish button click
+            if self.demolish_button_rect and self.demolish_button_rect.collidepoint(mouse_pos):
+                return "demolish"
+            
+            # Check other button clicks
             if hasattr(self, 'button_rects'):
                 for button_name, button_rect in self.button_rects.items():
                     if button_rect.collidepoint(mouse_pos):
                         return button_name
         
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            # Reset button press state
+            self.upgrade_button_pressed = False
+        
         return None
     
-    def draw(self, surface: pygame.Surface, resources, mouse_pos=None, show_ui_rectangles: bool = False):
+    def draw(self, surface: pygame.Surface, resources, mouse_pos=None, show_ui_rectangles: bool = False, dt: float = 0.016):
         """Draw building panel"""
         if not self.is_visible or not self.selected_building:
             return
@@ -100,14 +144,21 @@ class BuildingPanel:
             panel_overlay.fill((255, 0, 128, 80))  # Pink overlay
             surface.blit(panel_overlay, self.panel_rect)
         
-        # Draw panel background using upgrade panel asset - select frame based on upgrade progress
+        # Draw panel background using upgrade panel frames - select frame based on upgrade progress
         # Initialize upgrade_progress if not set (backwards compatibility)
         if not hasattr(building, 'upgrade_progress'):
             building.upgrade_progress = 0
         
-        # Select frame based on upgrade progress (0, 1, 2) or tier if at max progress
-        if self.panel_background_frames and len(self.panel_background_frames) > 0:
-            # Use upgrade_progress to select frame (0, 1, 2)
+        # Use upgrade panel frames as the panel background
+        if self.upgrade_panel_frames and len(self.upgrade_panel_frames) > 0:
+            # Select frame based on upgrade progress (0, 1, 2)
+            frame_index = min(building.upgrade_progress, len(self.upgrade_panel_frames) - 1)
+            current_background = self.upgrade_panel_frames[frame_index]
+            
+            # Draw at natural size (375x475) at the panel position
+            surface.blit(current_background, self.panel_rect)
+        elif self.panel_background_frames and len(self.panel_background_frames) > 0:
+            # Fallback to panel_background_frames if upgrade_panel_frames not available
             frame_index = min(building.upgrade_progress, len(self.panel_background_frames) - 1)
             current_background = self.panel_background_frames[frame_index]
             surface.blit(current_background, self.panel_rect)
@@ -189,6 +240,124 @@ class BuildingPanel:
                 self.button_rects["upgrade_to_iron"] = self.upgrade_panel_rect
             else:
                 self.button_rects["upgrade"] = self.upgrade_panel_rect
+        
+        # Draw upgrade button at position (74, 330) relative to panel
+        if self.upgrade_button_frames and len(self.upgrade_button_frames) > 0:
+            button_x = self.panel_rect.x + 74
+            button_y = self.panel_rect.y + 330
+            
+            # Get button dimensions from first frame
+            button_width, button_height = self.upgrade_button_frames[0].get_size()
+            
+            # Create or update button rect for click detection
+            self.upgrade_button_rect = pygame.Rect(button_x, button_y, button_width, button_height)
+            
+            # Check if mouse is hovering over upgrade button
+            is_hovering = mouse_pos and self.upgrade_button_rect.collidepoint(mouse_pos)
+            frame_count = len(self.upgrade_button_frames)
+            max_time = self.upgrade_button_animation_speed * (frame_count - 1)  # Time to reach last frame
+            
+            # Detect hover state changes
+            if is_hovering and not self.upgrade_button_was_hovering:
+                # Mouse just entered - start forward animation
+                self.upgrade_button_animation_direction = 1
+                self.upgrade_button_animation_playing = True
+                self.upgrade_button_animation_timer = 0.0
+            elif not is_hovering and self.upgrade_button_was_hovering:
+                # Mouse just left - start reverse animation
+                self.upgrade_button_animation_direction = -1
+                self.upgrade_button_animation_playing = True
+                # Start from current position (or last frame if we were at the end)
+                if self.upgrade_button_animation_timer >= max_time:
+                    self.upgrade_button_animation_timer = max_time
+            
+            # Update animation timer if playing
+            if self.upgrade_button_animation_playing:
+                self.upgrade_button_animation_timer += dt * self.upgrade_button_animation_direction
+                
+                # Check if forward animation finished
+                if self.upgrade_button_animation_direction == 1 and self.upgrade_button_animation_timer >= max_time:
+                    self.upgrade_button_animation_timer = max_time
+                    self.upgrade_button_animation_playing = False
+                    # Stay on last frame if still hovering
+                    if is_hovering:
+                        frame_index = frame_count - 1
+                    else:
+                        frame_index = int(self.upgrade_button_animation_timer / self.upgrade_button_animation_speed)
+                # Check if reverse animation finished
+                elif self.upgrade_button_animation_direction == -1 and self.upgrade_button_animation_timer <= 0.0:
+                    self.upgrade_button_animation_timer = 0.0
+                    self.upgrade_button_animation_playing = False
+                    frame_index = 0
+                else:
+                    # Animation still playing
+                    frame_index = int(self.upgrade_button_animation_timer / self.upgrade_button_animation_speed)
+                    frame_index = max(0, min(frame_count - 1, frame_index))  # Clamp to valid range
+            else:
+                # Animation not playing - determine frame based on current state
+                if is_hovering:
+                    # Stay on last frame if hovering and animation finished
+                    frame_index = frame_count - 1
+                else:
+                    # Stay on first frame if not hovering
+                    frame_index = 0
+            
+            # Update previous hover state
+            self.upgrade_button_was_hovering = is_hovering
+            
+            # Get the button frame
+            button_frame = self.upgrade_button_frames[frame_index]
+            
+            # Draw the upgrade button
+            surface.blit(button_frame, (button_x, button_y))
+        
+        # Draw demolish button at position (301, 0) relative to panel
+        if self.demolish_button_frames and len(self.demolish_button_frames) > 0:
+            demolish_button_x = self.panel_rect.x + 301
+            demolish_button_y = self.panel_rect.y - 7
+            
+            # Get button dimensions from first frame
+            demolish_button_width, demolish_button_height = self.demolish_button_frames[0].get_size()
+            
+            # Create or update button rect for click detection
+            self.demolish_button_rect = pygame.Rect(demolish_button_x, demolish_button_y, demolish_button_width, demolish_button_height)
+            
+            # Check if mouse is hovering over demolish button
+            is_hovering_demolish = mouse_pos and self.demolish_button_rect.collidepoint(mouse_pos)
+            
+            # Rubber band pulsing animation when hovering
+            if is_hovering_demolish:
+                # Update animation timer
+                self.demolish_button_animation_timer += dt
+                
+                # Create rubber band effect: go forward then backward repeatedly
+                # Use triangle wave for smooth forward-backward pulsing motion
+                demolish_frame_count = len(self.demolish_button_frames)
+                max_time = self.demolish_button_animation_speed * (demolish_frame_count - 1)
+                cycle_time = max_time * 2  # Full cycle: forward + backward
+                
+                # Create triangle wave: 0 -> max_time -> 0 -> max_time...
+                cycle_position = self.demolish_button_animation_timer % cycle_time
+                if cycle_position <= max_time:
+                    # Forward: 0 to max_time
+                    normalized_time = cycle_position
+                else:
+                    # Backward: max_time to 0
+                    normalized_time = max_time - (cycle_position - max_time)
+                
+                # Calculate frame index based on normalized time
+                demolish_frame_index = int(normalized_time / self.demolish_button_animation_speed)
+                demolish_frame_index = max(0, min(demolish_frame_count - 1, demolish_frame_index))
+            else:
+                # Reset to first frame when not hovering
+                self.demolish_button_animation_timer = 0.0
+                demolish_frame_index = 0
+            
+            # Get the demolish button frame
+            demolish_button_frame = self.demolish_button_frames[demolish_frame_index]
+            
+            # Draw the demolish button
+            surface.blit(demolish_button_frame, (demolish_button_x, demolish_button_y))
     
     def _get_upgrade_cost(self, building: Building):
         """Get upgrade cost for building (per progress step, not per tier)"""

@@ -492,80 +492,160 @@ hq_image = load_image_or_placeholder(
 # Set image for HQ class
 HQ.building_image = hq_image
 
-# Upgrade panel image - extract 3 frames (384x386 each) - for upgrade progress indicator
-upgrade_panel_sheet = load_image_or_placeholder(
-    'asset/upgrade_1-2_panel.png',
-    (384 * 3, 386),  # 3 frames * 384 pixels = 1152 pixels wide, 386 pixels tall
-    (100, 100, 100, 255),
-    "Upgrade panel sprite sheet"
-)
+# Upgrade panel image - extract 3 frames (375x475 each) - for upgrade progress indicator
+try:
+    upgrade_panel_sheet = pygame.image.load('asset/hud/UpgradePanel-Sheet.png').convert_alpha()
+    sheet_width, sheet_height = upgrade_panel_sheet.get_size()
+    print(f"Loaded upgrade panel sheet: {sheet_width}x{sheet_height}")
+    
+    # Verify dimensions match expected size (3 frames * 375 = 1125 wide, 475 tall)
+    if sheet_width < 375 * 3 or sheet_height < 475:
+        print(f"Warning: Upgrade panel sheet size {sheet_width}x{sheet_height} doesn't match expected (1125x475)")
+        print(f"  Using actual dimensions: frame_width={sheet_width // 3}, frame_height={sheet_height}")
+        frame_width = sheet_width // 3
+        frame_height = sheet_height
+    else:
+        frame_width = 375
+        frame_height = 475
+except Exception as e:
+    print(f"Error loading upgrade panel sheet: {e}")
+    upgrade_panel_sheet = load_image_or_placeholder(
+        'asset/hud/UpgradePanel-Sheet.png',
+        (375 * 3, 475),
+        (100, 100, 100, 255),
+        "Upgrade panel sprite sheet"
+    )
+    frame_width = 375
+    frame_height = 475
+
 # Extract 3 frames from the sheet
 upgrade_panel_frames = []
 if upgrade_panel_sheet:
-    frame_width = 384
-    frame_height = 386
     for i in range(3):
-        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
-        frame = upgrade_panel_sheet.subsurface(frame_rect)
-        upgrade_panel_frames.append(frame)
+        try:
+            frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            frame = upgrade_panel_sheet.subsurface(frame_rect)
+            upgrade_panel_frames.append(frame)
+            print(f"Extracted upgrade panel frame {i+1}: {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            upgrade_panel_frames.append(placeholder)
 
-# Upgrade panel darkened image - extract 3 frames (384x386 each)
-upgrade_panel_darken_sheet = load_image_or_placeholder(
-    'asset/upgrade_1-2_panel_darken.png',
-    (384 * 3, 386),  # 3 frames * 384 pixels = 1152 pixels wide, 386 pixels tall
-    (100, 100, 100, 255),
-    "Upgrade panel darkened sprite sheet"
-)
-# Extract 3 frames from the darkened sheet
+# Upgrade panel darkened image - extract 3 frames
+# Create darkened version programmatically from the main sheet
 upgrade_panel_darken_frames = []
-if upgrade_panel_darken_sheet:
-    frame_width = 384
-    frame_height = 386
+if upgrade_panel_sheet:
     for i in range(3):
-        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
-        frame = upgrade_panel_darken_sheet.subsurface(frame_rect)
-        upgrade_panel_darken_frames.append(frame)
+        try:
+            frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
+            frame = upgrade_panel_sheet.subsurface(frame_rect).copy()
+            # Darken the frame by applying a semi-transparent black overlay
+            darken_overlay = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+            darken_overlay.fill((0, 0, 0, 128))  # 50% opacity black overlay
+            frame.blit(darken_overlay, (0, 0))
+            upgrade_panel_darken_frames.append(frame)
+        except Exception as e:
+            print(f"Error creating darkened frame {i+1}: {e}")
+            # Create placeholder darkened frame
+            placeholder = pygame.Surface((frame_width, frame_height), pygame.SRCALPHA)
+            placeholder.fill((50, 50, 50, 255))  # Darker placeholder
+            upgrade_panel_darken_frames.append(placeholder)
 
-# New upgrade panel sheet for building detail panel background - extract 3 frames (497x742 each)
-# Scale factor for making panel bigger (1.2x - slightly bigger than original)
-PANEL_SCALE = 1.2
-building_panel_sheet = load_image_or_placeholder(
-    'asset/upgrade_panel_Sheet.png',
-    (497 * 3, 742),  # 3 frames * 497 pixels = 1491 pixels wide, 742 pixels tall
-    (50, 50, 50, 255),
-    "Building detail panel background sheet"
-)
-# Extract 3 frames from the sheet and scale them up
-building_panel_frames = []
-if building_panel_sheet:
-    frame_width = 497
-    frame_height = 742
-    scaled_width = int(frame_width * PANEL_SCALE)
-    scaled_height = int(frame_height * PANEL_SCALE)
-    for i in range(3):
-        frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
-        if frame_rect.right <= building_panel_sheet.get_width():
-            frame = building_panel_sheet.subsurface(frame_rect)
-            # Scale the frame up
-            scaled_frame = pygame.transform.scale(frame, (scaled_width, scaled_height))
-            building_panel_frames.append(scaled_frame)
-        else:
-            # If frame doesn't exist, use first frame as fallback
-            if building_panel_frames:
-                building_panel_frames.append(building_panel_frames[0])
-            else:
-                # Create placeholder if no frames available
-                placeholder = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
-                placeholder.fill((50, 50, 50, 255))
-                building_panel_frames.append(placeholder)
-else:
-    # Create placeholder frames if sheet not loaded
-    scaled_width = int(497 * PANEL_SCALE)
-    scaled_height = int(742 * PANEL_SCALE)
-    for i in range(3):
-        placeholder = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
-        placeholder.fill((50, 50, 50, 255))
-        building_panel_frames.append(placeholder)
+
+# Upgrade button image - extract 4 frames (277x84 each) - for hover and press animation
+try:
+    upgrade_button_sheet = pygame.image.load('asset/hud/UpgradeButton-Sheet.png').convert_alpha()
+    button_sheet_width, button_sheet_height = upgrade_button_sheet.get_size()
+    print(f"Loaded upgrade button sheet: {button_sheet_width}x{button_sheet_height}")
+    
+    # Verify dimensions match expected size (4 frames * 277 = 1108 wide, 84 tall)
+    if button_sheet_width < 277 * 4 or button_sheet_height < 84:
+        print(f"Warning: Upgrade button sheet size {button_sheet_width}x{button_sheet_height} doesn't match expected (1108x84)")
+        print(f"  Using actual dimensions: button_frame_width={button_sheet_width // 4}, button_frame_height={button_sheet_height}")
+        button_frame_width = button_sheet_width // 4
+        button_frame_height = button_sheet_height
+    else:
+        button_frame_width = 277
+        button_frame_height = 84
+except Exception as e:
+    print(f"Error loading upgrade button sheet: {e}")
+    upgrade_button_sheet = load_image_or_placeholder(
+        'asset/hud/UpgradeButton-Sheet.png',
+        (277 * 4, 84),
+        (100, 100, 100, 255),
+        "Upgrade button sprite sheet"
+    )
+    button_frame_width = 277
+    button_frame_height = 84
+
+# Extract 4 frames from the upgrade button sheet
+upgrade_button_frames = []
+if upgrade_button_sheet:
+    for i in range(4):
+        try:
+            frame_rect = pygame.Rect(i * button_frame_width, 0, button_frame_width, button_frame_height)
+            frame = upgrade_button_sheet.subsurface(frame_rect)
+            upgrade_button_frames.append(frame)
+            print(f"Extracted upgrade button frame {i+1}: {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting upgrade button frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((button_frame_width, button_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            upgrade_button_frames.append(placeholder)
+
+# Demolish button image - extract 4 frames (91x68 each) - for pulsing animation
+try:
+    demolish_button_sheet = pygame.image.load('asset/hud/DemolishButton-Sheet.png').convert_alpha()
+    demolish_sheet_width, demolish_sheet_height = demolish_button_sheet.get_size()
+    print(f"Loaded demolish button sheet: {demolish_sheet_width}x{demolish_sheet_height}")
+    
+    # Verify dimensions match expected size (4 frames * 91 = 364 wide, 68 tall)
+    if demolish_sheet_width < 91 * 4 or demolish_sheet_height < 68:
+        print(f"Warning: Demolish button sheet size {demolish_sheet_width}x{demolish_sheet_height} doesn't match expected (364x68)")
+        print(f"  Using actual dimensions: demolish_frame_width={demolish_sheet_width // 4}, demolish_frame_height={demolish_sheet_height}")
+        demolish_frame_width = demolish_sheet_width // 4
+        demolish_frame_height = demolish_sheet_height
+    else:
+        demolish_frame_width = 91
+        demolish_frame_height = 68
+except Exception as e:
+    print(f"Error loading demolish button sheet: {e}")
+    demolish_button_sheet = load_image_or_placeholder(
+        'asset/hud/DemolishButton-Sheet.png',
+        (91 * 4, 68),
+        (100, 100, 100, 255),
+        "Demolish button sprite sheet"
+    )
+    demolish_frame_width = 91
+    demolish_frame_height = 68
+
+# Extract 4 frames from the demolish button sheet
+demolish_button_frames = []
+if demolish_button_sheet:
+    for i in range(4):
+        try:
+            frame_rect = pygame.Rect(i * demolish_frame_width, 0, demolish_frame_width, demolish_frame_height)
+            frame = demolish_button_sheet.subsurface(frame_rect)
+            demolish_button_frames.append(frame)
+            print(f"Extracted demolish button frame {i+1}: {frame.get_size()}")
+        except Exception as e:
+            print(f"Error extracting demolish button frame {i+1}: {e}")
+            # Create placeholder frame
+            placeholder = pygame.Surface((demolish_frame_width, demolish_frame_height), pygame.SRCALPHA)
+            placeholder.fill((100, 100, 100, 255))
+            demolish_button_frames.append(placeholder)
+
+# Load building construction menu background (bottom left)
+try:
+    building_menu_bg = pygame.image.load('asset/hud/BuildingPanel.png').convert_alpha()
+    print(f"Loaded building menu background: {building_menu_bg.get_size()}")
+except Exception as e:
+    print(f"Warning: Failed to load BuildingPanel.png: {e}")
+    building_menu_bg = None
 
 # Grass tile images (day and night variants)
 def load_grass_variants(sheet_path, default_color=(50, 100, 50)):
@@ -866,7 +946,7 @@ game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, building_panel_frames)
+building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames)
 
 
 # Set UI callbacks
@@ -1717,6 +1797,23 @@ def sell_building(building):
         sound_system.play("button_click")
         print(f"Sold {building.TYPE_ID}")
 
+def demolish_building(building):
+    """Demolish building (no refund)"""
+    if building:
+        # Prevent demolishing HQ (main base)
+        if isinstance(building, HQ):
+            print("Cannot demolish HQ - it's the main base!")
+            return
+        # Demolish without refund
+        grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
+        world.unregister_building(building)
+        building_group.remove(building)
+        if building in turret_group:
+            turret_group.remove(building)
+        building_panel.hide()
+        sound_system.play("button_click")
+        print(f"Demolished {building.TYPE_ID}")
+
 ###################
 # Debug functions
 ###################
@@ -2271,6 +2368,20 @@ while running:
     mouse_pos = pygame.mouse.get_pos()
     
     ###################
+    # Draw building construction menu background (bottom left)
+    ###################
+    if building_menu_bg and buttons:
+        # Calculate button area bounds
+        num_buttons = len(buttons)
+        menu_width = max(building_menu_bg.get_width(), num_buttons * button_spacing + 20)
+        menu_height = building_menu_bg.get_height()
+        menu_x = 0  # Bottom left
+        menu_y = c.SCREEN_HEIGHT - menu_height
+        
+        # Draw the background
+        screen.blit(building_menu_bg, (menu_x, menu_y))
+    
+    ###################
     # Handle button clicks
     ###################
     for building_class, button_data in buttons.items():
@@ -2717,7 +2828,7 @@ while running:
     # Draw building panel
     ###################
     if building_panel.is_visible:
-        building_panel.draw(screen, resources, mouse_pos, show_ui_rects)
+        building_panel.draw(screen, resources, mouse_pos, show_ui_rects, dt)
     
     ###################
     # Draw research button
@@ -2906,6 +3017,12 @@ while running:
                     if building:
                         sell_building(building)
                         # Building is sold, so deselect it
+                        deselect_building()
+                elif button_clicked == "demolish":
+                    building = building_panel.selected_building
+                    if building:
+                        demolish_building(building)
+                        # Building is demolished, so deselect it
                         deselect_building()
                 continue
             
