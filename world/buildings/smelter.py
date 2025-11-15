@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import pygame
+from typing import List, Union
 
 from world.building import Building, Cost, Production
 
@@ -32,7 +33,7 @@ def load_smelter_sprite(path: str) -> pygame.Surface:
     return surface
 
 
-def prepare_frames(surface: pygame.Surface, frame_width: int = 96) -> list[pygame.Surface] | pygame.Surface:
+def prepare_frames(surface: pygame.Surface, frame_width: int = 96) -> Union[List[pygame.Surface], pygame.Surface]:
     """
     Split horizontal sprite sheet into frames.
     For smelter: 96x96 per frame, 4 frames = 384x96 sprite sheet.

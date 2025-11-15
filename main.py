@@ -1846,10 +1846,7 @@ def apply_difficulty_settings(difficulty: Difficulty, *, reset_resources: bool =
     world.production_multipliers["sawmill"] = settings.sawmill_yield_multiplier
     world.production_multipliers["smelter"] = settings.smelter_yield_multiplier
     world.current_difficulty = difficulty
-    if hasattr(game_state_manager, "difficulty"):
-        game_state_manager.difficulty = difficulty
-    else:
-        game_state_manager.difficulty = difficulty
+    game_state_manager.difficulty = difficulty
     if 'tooltip_manager' in globals() and tooltip_manager:
         tooltip_manager.set_difficulty(difficulty)
     if hasattr(wave_manager, "difficulty"):
@@ -1980,15 +1977,13 @@ def upgrade_building(building):
         return (
             resources.wood >= cost_dict.get("wood", 0) and
             resources.iron >= cost_dict.get("iron", 0) and
-            resources.food >= cost_dict.get("food", 0) and
-            resources.coins >= cost_dict.get("coins", 0)
+            resources.food >= cost_dict.get("food", 0)
         )
 
     def pay_resources(cost_dict):
         resources.wood -= cost_dict.get("wood", 0)
         resources.iron -= cost_dict.get("iron", 0)
         resources.food -= cost_dict.get("food", 0)
-        resources.coins -= cost_dict.get("coins", 0)
 
     if is_turret_building:
         upgrade_info = get_next_turret_upgrade(building)

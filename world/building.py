@@ -112,7 +112,7 @@ class Building(pygame.sprite.Sprite):
             return config_data[key]
         return default
 
-    def __init__(self, grid_pos: Tuple[int,int], tier: int = 1, uid: str | None = None):
+    def __init__(self, grid_pos: Tuple[int,int], tier: int = 1, uid: Optional[str] = None):
         # Production batch system
         self.production_timer: float = 0.0  # Timer for batch production
         self.production_interval: float = 5.0  # Seconds between batches
@@ -277,7 +277,7 @@ class Building(pygame.sprite.Sprite):
         return cost if isinstance(cost, Cost) else cls.COST
 
     @classmethod
-    def get_scaled_cost(cls, world=None, difficulty: Difficulty | None = None) -> Cost:
+    def get_scaled_cost(cls, world=None, difficulty: Optional[Difficulty] = None) -> Cost:
         base_cost = cls.get_cost()
         if difficulty is None:
             if world and hasattr(world, "current_difficulty"):

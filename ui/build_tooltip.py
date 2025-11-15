@@ -38,7 +38,7 @@ class BuildTooltipManager:
         resources,
         research_manager,
         world=None,
-        difficulty: Difficulty | None = None,
+        difficulty: Optional[Difficulty] = None,
     ):
         item_key = building_class.__name__
         cfg = self.item_config.get(item_key, {})

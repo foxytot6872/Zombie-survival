@@ -8,19 +8,19 @@ UPGRADE_STEPS_PER_TIER = 3
 
 TURRET_UPGRADE_CONFIG: Dict[str, list] = {
     "tier_1": [
-        {"step": 1, "base_cost": {"wood": 30, "iron": 10, "coins": 15}},
-        {"step": 2, "base_cost": {"wood": 40, "iron": 15, "coins": 20}},
-        {"step": 3, "base_cost": {"wood": 50, "iron": 20, "coins": 25}},
+        {"step": 1, "base_cost": {"wood": 30, "iron": 10}},
+        {"step": 2, "base_cost": {"wood": 40, "iron": 15}},
+        {"step": 3, "base_cost": {"wood": 50, "iron": 20}},
     ],
     "tier_2": [
-        {"step": 1, "base_cost": {"wood": 60, "iron": 25, "coins": 30}},
-        {"step": 2, "base_cost": {"wood": 70, "iron": 30, "coins": 35}},
-        {"step": 3, "base_cost": {"wood": 80, "iron": 35, "coins": 40}},
+        {"step": 1, "base_cost": {"wood": 60, "iron": 25}},
+        {"step": 2, "base_cost": {"wood": 70, "iron": 30}},
+        {"step": 3, "base_cost": {"wood": 80, "iron": 35}},
     ],
     "tier_3": [
-        {"step": 1, "base_cost": {"wood": 90, "iron": 40, "coins": 45}},
-        {"step": 2, "base_cost": {"wood": 100, "iron": 45, "coins": 50}},
-        {"step": 3, "base_cost": {"wood": 120, "iron": 50, "coins": 60}},
+        {"step": 1, "base_cost": {"wood": 90, "iron": 40}},
+        {"step": 2, "base_cost": {"wood": 100, "iron": 45}},
+        {"step": 3, "base_cost": {"wood": 120, "iron": 50}},
     ],
 }
 

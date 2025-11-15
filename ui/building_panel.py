@@ -100,6 +100,8 @@ class BuildingPanel:
         """Show building panel"""
         self.is_visible = True
         self.selected_building = building
+        # Reset button states
+        self.upgrade_button_disabled = False
     
     def hide(self):
         """Hide building panel"""
@@ -126,6 +128,10 @@ class BuildingPanel:
             
             # Check upgrade button click (if upgrade button is drawn)
             if self.upgrade_button_rect and self.upgrade_button_rect.collidepoint(mouse_pos):
+                # Check if button is disabled - if so, don't process click
+                if self.upgrade_button_disabled:
+                    return None
+                
                 self.upgrade_button_pressed = True
                 # Check if building can be upgraded
                 from world.buildings.wall_wood import WallWood

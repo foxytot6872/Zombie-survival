@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Dict
+from typing import Dict, Optional
 
 
 class Difficulty(Enum):
@@ -21,7 +21,7 @@ class DifficultySettings:
     smelter_yield_multiplier: float
     build_cost_multiplier: float
     research_cost_multiplier: float
-    research_total_target: float | None = None
+    research_total_target: Optional[float] = None
 
 
 DIFFICULTY_CONFIG: Dict[Difficulty, DifficultySettings] = {

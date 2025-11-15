@@ -4,7 +4,7 @@ Research system for unlocking buildings and upgrades.
 import copy
 import json
 import os
-from typing import Set, Dict
+from typing import Set, Dict, Optional
 
 class ResearchManager:
     """Manages research unlocks and research definitions."""
@@ -119,7 +119,7 @@ class ResearchManager:
         
         return True
     
-    def apply_difficulty_scaling(self, target_total: float | None = None, multiplier: float | None = None):
+    def apply_difficulty_scaling(self, target_total: Optional[float] = None, multiplier: Optional[float] = None):
         """
         Scale research costs to approximate a desired total expenditure or apply a multiplier.
         """
