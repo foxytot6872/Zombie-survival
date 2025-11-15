@@ -7,17 +7,19 @@ from typing import Optional, Callable
 class StartScreen:
     """Start screen with background and title"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, font_large=None, font_medium=None):
         """
         Initialize start screen.
         Args:
             screen_width: Screen width in pixels
             screen_height: Screen height in pixels
+            font_large: Optional pygame.font.Font for large text (defaults to system font)
+            font_medium: Optional pygame.font.Font for medium text (defaults to system font)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.font_large = pygame.font.Font(None, 72)
-        self.font_medium = pygame.font.Font(None, 48)
+        self.font_large = font_large if font_large else pygame.font.Font(None, 72)
+        self.font_medium = font_medium if font_medium else pygame.font.Font(None, 48)
         
         self.is_visible = True
         

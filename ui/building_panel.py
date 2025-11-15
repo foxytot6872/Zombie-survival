@@ -8,7 +8,7 @@ from world.building import Building, BuildState
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None, font_large=None, font_medium=None, font_small=None):
         """
         Initialize building panel.
         Args:
@@ -22,13 +22,25 @@ class BuildingPanel:
             health_bar_frames: List of 11 frames (280x27 each) for health bar display (0% to 100% in 10% increments)
             current_level_frames: List of 3 frames (70x80 each) for current tier/level display (1, 2, 3)
             next_level_frames: List of 3 frames (70x80 each) for next tier/level display (1, 2, 3)
+            font_large: Optional pygame.font.Font for large text (defaults to system font)
+            font_medium: Optional pygame.font.Font for medium text (defaults to system font)
+            font_small: Optional pygame.font.Font for small text (defaults to system font)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
-        # Scale fonts up (1.2x - slightly bigger than original)
-        self.font_large = pygame.font.Font(None, int(48 * 1.2))  # ~58
-        self.font_medium = pygame.font.Font(None, int(32 * 1.2))  # ~38
-        self.font_small = pygame.font.Font(None, int(24 * 1.2))  # ~29
+        # Scale fonts up (1.2x - slightly bigger than original) or use provided fonts
+        if font_large:
+            self.font_large = font_large
+        else:
+            self.font_large = pygame.font.Font(None, int(48 * 1.2))  # ~58
+        if font_medium:
+            self.font_medium = font_medium
+        else:
+            self.font_medium = pygame.font.Font(None, int(32 * 1.2))  # ~38
+        if font_small:
+            self.font_small = font_small
+        else:
+            self.font_small = pygame.font.Font(None, int(24 * 1.2))  # ~29
         
         self.is_visible = False
         self.selected_building: Optional[Building] = None

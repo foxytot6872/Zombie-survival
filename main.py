@@ -60,6 +60,50 @@ def load_image_or_placeholder(path, size, fill_color=(100, 100, 100, 255), label
         return placeholder
 
 
+def load_pixel_font(font_path, size, fallback_size=None):
+    """
+    Load a pixel font from file, with fallback to default font.
+    
+    Args:
+        font_path: Path to the .ttf font file (e.g., 'asset/fonts/PressStart2P.ttf')
+        size: Font size
+        fallback_size: Size for fallback font (defaults to size)
+    
+    Returns:
+        pygame.font.Font object
+    """
+    if fallback_size is None:
+        fallback_size = size
+    
+    try:
+        font = pygame.font.Font(font_path, size)
+        return font
+    except (pygame.error, FileNotFoundError):
+        # Fallback to default system font
+        print(f"Warning: Pixel font not found at {font_path}, using default font")
+        return pygame.font.Font(None, fallback_size)
+
+
+###################
+# Load pixel font
+###################
+# Try to load a pixel font - you can download free pixel fonts from Google Fonts:
+# - Press Start 2P: https://fonts.google.com/specimen/Press+Start+2P
+# - VT323: https://fonts.google.com/specimen/VT323
+# - Pixelify Sans: https://fonts.google.com/specimen/Pixelify+Sans
+# - Silkscreen: https://fonts.google.com/specimen/Silkscreen
+# 
+# Place the .ttf file in asset/fonts/ and update the path below
+PIXEL_FONT_PATH = 'asset/fonts/PressStart2P-Regular.ttf'  # Press Start 2P pixel font
+
+# Load fonts with fallback - these will be used throughout the game
+# If the font file doesn't exist, it will fall back to the default system font
+font_large = load_pixel_font(PIXEL_FONT_PATH, 48)
+font_medium = load_pixel_font(PIXEL_FONT_PATH, 32)
+font_small = load_pixel_font(PIXEL_FONT_PATH, 24)
+font_tiny = load_pixel_font(PIXEL_FONT_PATH, 20)
+font_huge = load_pixel_font(PIXEL_FONT_PATH, 72)
+
 ###################
 # Load images
 ###################
@@ -1090,19 +1134,19 @@ wave_manager = WaveManager(world, waves_config, difficulty="normal")
 # Update world with wave_manager reference
 world.wave_manager = wave_manager
 
-# Initialize UI components
-hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames)
+# Initialize UI components with pixel fonts
+hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, font_large, font_medium, font_small)
 # Set HUD reference in world for day events
 world.hud = hud
 
 # Initialize day event manager
 day_event_manager = DayEventManager(world)
 world.day_events = day_event_manager
-game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium, font_small)
+pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
+start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames, health_bar_frames, current_level_frames, next_level_frames)
+building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames, health_bar_frames, current_level_frames, next_level_frames, font_large, font_medium, font_small)
 
 
 # Set UI callbacks
@@ -2145,7 +2189,7 @@ def create_button_image(text, color=(100, 150, 100), width=100, height=40):
     button_img = pygame.Surface((width, height))
     button_img.fill(color)
     # Use larger font for bigger buttons
-    font = pygame.font.Font(None, int(20 * 1.5))  # Scale font with button size
+    font = font_tiny  # Use pixel font for button text
     text_surface = font.render(text, True, (255, 255, 255))
     text_rect = text_surface.get_rect(center=(width//2, height//2))
     button_img.blit(text_surface, text_rect)
@@ -2305,8 +2349,8 @@ def draw_resources(screen, resources, font):
     """Draw resource display (including coins) at bottom, spanning horizontally."""
     padding = 10
     item_spacing = 30  # Space between items horizontally (increased from 20)
-    # Use larger font for resources
-    resource_font = pygame.font.Font(None, 36)  # Increased from 24
+    # Use smaller font for resources
+    resource_font = font_small  # Use pixel font for resource display
     
     # Handle NaN values by converting to 0
     import math
@@ -2415,7 +2459,7 @@ spawn_daily_resource_nodes()
 ###################
 # Main game loop
 ###################
-font = pygame.font.Font(None, 24)
+font = font_small  # Use pixel font for debug/info text
 fps_counter = 0
 fps_timer = 0.0
 current_fps = 60.0
@@ -2508,7 +2552,7 @@ while running:
             gate_center_x_px = gate_building.pos.x
             gate_pixel_y = gate_building.pos.y - 25  # Above the gate
             # Draw simple "GATE" text banner
-            gate_font = pygame.font.Font(None, 20)
+            gate_font = font_tiny  # Use pixel font for gate label
             gate_text = gate_font.render("GATE", True, (200, 200, 100))
             gate_text_rect = gate_text.get_rect(center=(gate_center_x_px, gate_pixel_y))
             # Draw background for text

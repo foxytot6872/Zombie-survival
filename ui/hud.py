@@ -7,7 +7,7 @@ from typing import Optional, Dict
 class HUD:
     """HUD for displaying game information"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None, font_large=None, font_medium=None, font_small=None):
         """
         Initialize HUD.
         Args:
@@ -16,12 +16,15 @@ class HUD:
             daycounter_frames: List of pygame.Surface frames for animated day counter (6 frames, 256x128 each)
             red_number_frames: List of pygame.Surface frames for red numbers (10 frames, 42x74 each, 0-9)
             blue_number_frames: List of pygame.Surface frames for blue numbers (10 frames, 42x74 each, 0-9)
+            font_large: Optional pygame.font.Font for large text (defaults to system font)
+            font_medium: Optional pygame.font.Font for medium text (defaults to system font)
+            font_small: Optional pygame.font.Font for small text (defaults to system font)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
-        self.font_large = pygame.font.Font(None, 48)
-        self.font_medium = pygame.font.Font(None, 32)
-        self.font_small = pygame.font.Font(None, 24)
+        self.font_large = font_large if font_large else pygame.font.Font(None, 48)
+        self.font_medium = font_medium if font_medium else pygame.font.Font(None, 32)
+        self.font_small = font_small if font_small else pygame.font.Font(None, 24)
         
         # Day counter animation
         self.daycounter_frames = daycounter_frames if daycounter_frames else []

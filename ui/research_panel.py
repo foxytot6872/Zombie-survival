@@ -7,7 +7,7 @@ from typing import Optional
 class ResearchPanel:
     """Panel for displaying and purchasing research items."""
     
-    def __init__(self, world, research_manager, screen_width: int = 1920, screen_height: int = 1080):
+    def __init__(self, world, research_manager, screen_width: int = 1920, screen_height: int = 1080, font_large=None, font_medium=None, font_small=None):
         """
         Initialize research panel.
         Args:
@@ -15,6 +15,9 @@ class ResearchPanel:
             research_manager: ResearchManager instance
             screen_width: Screen width
             screen_height: Screen height
+            font_large: Optional pygame.font.Font for large text (defaults to system font)
+            font_medium: Optional pygame.font.Font for medium text (defaults to system font)
+            font_small: Optional pygame.font.Font for small text (defaults to system font)
         """
         self.world = world
         self.research = research_manager
@@ -30,9 +33,9 @@ class ResearchPanel:
         self.rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
         
         # Fonts
-        self.font_large = pygame.font.Font(None, 36)
-        self.font_medium = pygame.font.Font(None, 28)
-        self.font_small = pygame.font.Font(None, 24)
+        self.font_large = font_large if font_large else pygame.font.Font(None, 36)
+        self.font_medium = font_medium if font_medium else pygame.font.Font(None, 28)
+        self.font_small = font_small if font_small else pygame.font.Font(None, 24)
         
         # Store button rects for click detection
         self.button_rects = {}
