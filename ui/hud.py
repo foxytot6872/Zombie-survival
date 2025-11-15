@@ -149,9 +149,9 @@ class HUD:
             if 0 <= digit <= 9:
                 digit_frame = number_frames[digit]
                 surface.blit(digit_frame, (current_x, y))
-                # Move to next digit position (reduce gap from ~17px to 5px)
+                # Move to next digit position
                 digit_width = digit_frame.get_width()
-                current_x += digit_width - 3  # Reduce movement by 12px to get 5px gap instead of 17px
+                current_x += digit_width - 0 #increase gap by 0 (more number = more gap)
     
     def draw(self, surface: pygame.Surface, show_ui_rectangles: bool = False):
         """Draw HUD"""

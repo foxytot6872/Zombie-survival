@@ -13,7 +13,6 @@ import pygame
 # ---------------------------------------------------------------------------
 OVERLAY_COLOR = (0, 0, 0, 200)
 PANEL_COLOR = (26, 26, 26, 245)
-<<<<<<< Updated upstream
 SECTION_BG = (32, 32, 32)  # Darker background (#202020)
 SECTION_BORDER = (100, 100, 100)  # Thicker borders
 TEXT_COLOR = (220, 220, 220)
@@ -34,25 +33,6 @@ TOOLTIP_BORDER = (140, 140, 140)
 NODE_WIDTH = 180  # 20% bigger (150 * 1.2)
 NODE_HEIGHT = 72  # 20% bigger (60 * 1.2)
 NODE_RADIUS = 6  # Rounded corners
-=======
-SECTION_BG = (40, 40, 40)
-SECTION_BORDER = (70, 70, 70)
-TEXT_COLOR = (220, 220, 220)
-LOCKED_FILL = (30, 30, 30)
-LOCKED_BORDER = (80, 80, 80)
-UNLOCKABLE_FILL = (30, 70, 30)
-UNLOCKABLE_BORDER = (80, 200, 120)
-UNLOCKED_FILL = (60, 60, 20)
-UNLOCKED_BORDER = (220, 200, 120)
-LINE_LOCKED = (60, 60, 60)
-LINE_UNLOCKABLE = (80, 200, 120)
-LINE_UNLOCKED = (220, 200, 120)
-TOOLTIP_BG = (20, 20, 20)
-TOOLTIP_BORDER = (140, 140, 140)
-
-NODE_WIDTH = 150
-NODE_HEIGHT = 60
->>>>>>> Stashed changes
 ICON_SIZE = 40
 
 
@@ -86,11 +66,7 @@ RESEARCH_BUILDING_UPGRADES: Dict[str, List[Tuple[str, int]]] = {
     "forge": [("smelter", 3)],
 }
 
-<<<<<<< Updated upstream
 # Persist node states between openings (deprecated - now uses ResearchManager)
-=======
-# Persist node states between openings
->>>>>>> Stashed changes
 GLOBAL_NODE_STATES: Dict[str, str] = {}
 
 
@@ -103,17 +79,12 @@ class ResearchNode:
     position: Tuple[int, int]
     parents: List[str]
     category: str
-<<<<<<< Updated upstream
     tier: int = 1
     state: str = "locked"
     rect: pygame.Rect = field(init=False)
     scale: float = 1.0  # For unlock animation
     flash_timer: float = 0.0  # For click feedback
     flash_color: Optional[Tuple[int, int, int]] = None
-=======
-    state: str = "locked"
-    rect: pygame.Rect = field(init=False)
->>>>>>> Stashed changes
 
     def __post_init__(self):
         x, y = self.position
@@ -141,7 +112,6 @@ class ResearchTreeUI:
         self.running = False
         self.hover_node: Optional[ResearchNode] = None
         self.tooltip_surface: Optional[pygame.Surface] = None
-<<<<<<< Updated upstream
         
         # Animation state
         self.fade_alpha = 0.0
@@ -153,21 +123,11 @@ class ResearchTreeUI:
         self.font_medium = pygame.font.Font(None, 26)
         self.font_large = pygame.font.Font(None, 36)
         self.font_bold = pygame.font.Font(None, 24)  # For node names
-=======
-
-        self.font_small = pygame.font.Font(None, 20)
-        self.font_medium = pygame.font.Font(None, 26)
-        self.font_large = pygame.font.Font(None, 36)
->>>>>>> Stashed changes
 
         self.panel_rect = self._build_panel_rect()
         self.sections = self._build_sections()
         self.nodes: Dict[str, ResearchNode] = {}
-<<<<<<< Updated upstream
         self._create_nodes_from_json()
-=======
-        self._create_nodes()
->>>>>>> Stashed changes
 
     # ------------------------------------------------------------------
     # Layout helpers
@@ -184,7 +144,6 @@ class ResearchTreeUI:
         header = 70
         section_width = (self.panel_rect.width - margin * 3) // 2
         section_height = (self.panel_rect.height - header - margin * 3) // 2
-<<<<<<< Updated upstream
         padding = 8  # Internal padding for sections
 
         sections = {}
@@ -211,38 +170,10 @@ class ResearchTreeUI:
             sections["npc"].y,
             section_width - padding * 2,
             section_height - padding * 2,
-=======
-
-        sections = {}
-        sections["resource"] = pygame.Rect(
-            self.panel_rect.x + margin,
-            self.panel_rect.y + header,
-            section_width,
-            section_height,
-        )
-        sections["turret"] = pygame.Rect(
-            sections["resource"].right + margin,
-            sections["resource"].y,
-            section_width,
-            section_height,
-        )
-        sections["npc"] = pygame.Rect(
-            self.panel_rect.x + margin,
-            sections["resource"].bottom + margin,
-            section_width,
-            section_height,
-        )
-        sections["base"] = pygame.Rect(
-            sections["npc"].right + margin,
-            sections["npc"].y,
-            section_width,
-            section_height,
->>>>>>> Stashed changes
         )
         return sections
 
     # ------------------------------------------------------------------
-<<<<<<< Updated upstream
     # Node creation from JSON
     # ------------------------------------------------------------------
     def _create_nodes_from_json(self):
@@ -309,61 +240,12 @@ class ResearchTreeUI:
                     )
                     self.nodes[key] = node
         
-=======
-    # Node creation
-    # ------------------------------------------------------------------
-    def _create_nodes(self):
-        node_specs = []
-
-        def add_node(node_id, name, desc, cost, category, rel_x, rel_y, parents):
-            section = self.sections[category]
-            pos = (section.x + rel_x, section.y + rel_y)
-            state = GLOBAL_NODE_STATES.get(node_id, "locked")
-            node_specs.append(ResearchNode(node_id, name, desc, cost, pos, parents, category, state))
-
-        # Resource tree
-        add_node("sawmill", "Sawmill", "Unlock sawmill building.", 100, "resource", 140, 90, [])
-        add_node("adv_wood", "Advanced Woodcutting", "+15% wood income.", 200, "resource", 330, 90, ["sawmill"])
-        add_node("lumber_bot", "Auto Lumber Bot", "Automated wood harvesting.", 350, "resource", 520, 90, ["adv_wood"])
-
-        add_node("smelter", "Smelter", "Unlock smelter building.", 120, "resource", 140, 230, [])
-        add_node("alloy", "Alloy Research", "Improved iron yield.", 220, "resource", 330, 230, ["smelter"])
-        add_node("forge", "High-Tech Forge", "Unlock high tier materials.", 380, "resource", 520, 230, ["alloy"])
-
-        # Turret tree (vertical)
-        turret_section = self.sections["turret"]
-        tx = turret_section.centerx - turret_section.x
-        add_node("turret_t1", "Tier 1 Turret", "Basic projectile turret.", 150, "turret", tx, 80, [])
-        add_node("turret_t2", "Tier 2 Turret", "Enhanced damage.", 250, "turret", tx, 190, ["turret_t1"])
-        add_node("railgun", "Railgun Turret", "Long-range piercing shot.", 400, "turret", tx, 300, ["turret_t2"])
-        add_node("flamethrower", "Flamethrower Tower", "Area denial flames.", 500, "turret", tx, 410, ["railgun"])
-
-        # NPC tree (horizontal)
-        npc_section = self.sections["npc"]
-        npc_y = npc_section.y + npc_section.height // 2
-        add_node("worker_plus", "Worker NPC +1", "Add another worker slot.", 120, "npc", 120, npc_y - npc_section.y, [])
-        add_node("npc_eff", "NPC Efficiency +10%", "Workers gather faster.", 220, "npc", 310, npc_y - npc_section.y, ["worker_plus"])
-        add_node("gather_speed", "Gathering Speed +20%", "Further gather boost.", 320, "npc", 500, npc_y - npc_section.y, ["npc_eff"])
-        add_node("combat_npc", "Combat NPC", "Unlock guard NPC patrol.", 420, "npc", 690, npc_y - npc_section.y, ["gather_speed"])
-
-        # HQ/Base tree
-        base_section = self.sections["base"]
-        add_node("hq_reinforce", "HQ Reinforcement", "+20% HQ HP.", 180, "base", 150, 90, [])
-        add_node("perimeter", "Perimeter Walls", "Unlock perimeter upgrades.", 260, "base", 150, 210, ["hq_reinforce"])
-        add_node("auto_repair", "Auto-Repair System", "Slow passive repairs.", 320, "base", 320, 330, ["perimeter"])
-        add_node("radar", "Radar System", "Reveal incoming hordes.", 320, "base", 480, 330, ["perimeter"])
-
-        for node in node_specs:
-            self.nodes[node.node_id] = node
-
->>>>>>> Stashed changes
         self.update_node_states(force=True)
 
     # ------------------------------------------------------------------
     # State helpers
     # ------------------------------------------------------------------
     def update_node_states(self, force: bool = False):
-<<<<<<< Updated upstream
         """Update node states based on ResearchManager and prerequisites."""
         coins = getattr(self.resources, "coins", 0)
         
@@ -378,22 +260,11 @@ class ResearchTreeUI:
                 (self.research_manager and self.research_manager.is_research_purchased(parent_id)) or
                 (parent_id in self.nodes and self.nodes[parent_id].state == "unlocked")
                 for parent_id in node.parents
-=======
-        coins = getattr(self.resources, "coins", 0)
-        for node in self.nodes.values():
-            if GLOBAL_NODE_STATES.get(node.node_id) == "unlocked":
-                node.state = "unlocked"
-                continue
-
-            parent_unlocked = all(
-                self.nodes[parent_id].state == "unlocked" for parent_id in node.parents
->>>>>>> Stashed changes
             )
             if not node.parents:
                 parent_unlocked = True
 
             if parent_unlocked:
-<<<<<<< Updated upstream
                 if coins >= node.cost:
                     node.state = "unlockable"
                 else:
@@ -440,62 +311,21 @@ class ResearchTreeUI:
     def apply_research_effect(self, node: ResearchNode):
         """Apply research effects (now handled by ResearchManager.unlock)."""
         # Effects are now applied in ResearchManager.unlock()
-=======
-                node.state = "unlockable" if coins >= node.cost else "locked"
-            else:
-                node.state = "locked"
-
-        if force:
-            for node in self.nodes.values():
-                saved_state = GLOBAL_NODE_STATES.get(node.node_id)
-                if saved_state == "unlocked":
-                    node.state = "unlocked"
-
-    def attempt_unlock(self, node: ResearchNode):
-        if node.state != "unlockable":
-            return
-        if getattr(self.resources, "coins", 0) < node.cost:
-            return
-        if not self.resources.spend_coins(node.cost):
-            return
-
-        node.state = "unlocked"
-        GLOBAL_NODE_STATES[node.node_id] = "unlocked"
-        self.apply_research_effect(node)
-        self.update_node_states()
-
-    def apply_research_effect(self, node: ResearchNode):
-        """Placeholder hook for future gameplay integration."""
-        if self.research_manager:
-            self.research_manager.unlocked.add(node.node_id)
-
-        if self.world:
-            targets = RESEARCH_BUILDING_UPGRADES.get(node.node_id, [])
-            for building_type, level in targets:
-                if hasattr(self.world, "upgrade_buildings"):
-                    self.world.upgrade_buildings(building_type, level)
->>>>>>> Stashed changes
         print(f"[ResearchTree] Unlocked {node.name}")
 
     # ------------------------------------------------------------------
     # Main loop
     # ------------------------------------------------------------------
     def open_loop(self):
-<<<<<<< Updated upstream
         """Open the research tree with fade-in animation."""
-=======
->>>>>>> Stashed changes
         was_paused = self.game_state_manager.is_paused() if self.game_state_manager else False
         if self.game_state_manager and not was_paused:
             self.game_state_manager.pause()
 
         self.running = True
-<<<<<<< Updated upstream
         self.fade_alpha = 0.0
         self.fade_direction = 1.0
         
-=======
->>>>>>> Stashed changes
         while self.running:
             dt = self.clock.tick(60) / 1000.0
             for event in pygame.event.get():
@@ -514,7 +344,6 @@ class ResearchTreeUI:
 
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_ESCAPE, pygame.K_r):
-<<<<<<< Updated upstream
                 self.fade_direction = -1.0  # Start fade out
                 return
             # Zoom controls
@@ -522,10 +351,6 @@ class ResearchTreeUI:
                 self.zoom_scale = min(1.1, self.zoom_scale + 0.1)
             elif event.key == pygame.K_MINUS:
                 self.zoom_scale = max(0.9, self.zoom_scale - 0.1)
-=======
-                self.running = False
-                return
->>>>>>> Stashed changes
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             mouse_pos = pygame.mouse.get_pos()
@@ -542,7 +367,6 @@ class ResearchTreeUI:
             self._update_hover_node(event.pos)
 
     def update(self, dt: float):
-<<<<<<< Updated upstream
         """Update animations and node states."""
         # Fade animation
         if self.fade_direction > 0:  # Fading in
@@ -564,15 +388,12 @@ class ResearchTreeUI:
                 if node.flash_timer <= 0:
                     node.flash_color = None
         
-=======
->>>>>>> Stashed changes
         self.update_node_states()
 
     # ------------------------------------------------------------------
     # Drawing
     # ------------------------------------------------------------------
     def draw(self):
-<<<<<<< Updated upstream
         # Apply fade
         overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         overlay.fill((*OVERLAY_COLOR[:3], int(self.fade_alpha * OVERLAY_COLOR[3] / 255)))
@@ -592,12 +413,6 @@ class ResearchTreeUI:
             zoom_offset_x = 0
             zoom_offset_y = 0
 
-=======
-        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
-        overlay.fill(OVERLAY_COLOR)
-        self.screen.blit(overlay, (0, 0))
-
->>>>>>> Stashed changes
         panel = pygame.Surface(self.panel_rect.size, pygame.SRCALPHA)
         panel.fill(PANEL_COLOR)
         self.screen.blit(panel, self.panel_rect)
@@ -609,13 +424,10 @@ class ResearchTreeUI:
         coins_text = self.font_medium.render(f"Coins: {int(getattr(self.resources, 'coins', 0))}", True, (255, 215, 0))
         self.screen.blit(coins_text, (self.panel_rect.x + 30, self.panel_rect.y + 30))
 
-<<<<<<< Updated upstream
         # ESC hint in top right
         esc_hint = self.font_small.render("Press ESC to close", True, (180, 180, 180))
         self.screen.blit(esc_hint, (self.panel_rect.right - esc_hint.get_width() - 20, self.panel_rect.y + 20))
 
-=======
->>>>>>> Stashed changes
         section_titles = {
             "resource": "RESOURCE TREE",
             "turret": "TURRET TREE",
@@ -624,7 +436,6 @@ class ResearchTreeUI:
         }
 
         for key, rect in self.sections.items():
-<<<<<<< Updated upstream
             # Draw section background with darker color and thicker border
             pygame.draw.rect(self.screen, SECTION_BG, rect)
             pygame.draw.rect(self.screen, SECTION_BORDER, rect, 4)  # Thicker border
@@ -633,17 +444,10 @@ class ResearchTreeUI:
             
             # Draw tier labels
             self._draw_tier_labels(key, rect)
-=======
-            pygame.draw.rect(self.screen, SECTION_BG, rect)
-            pygame.draw.rect(self.screen, SECTION_BORDER, rect, 2)
-            label = self.font_medium.render(section_titles[key], True, TEXT_COLOR)
-            self.screen.blit(label, (rect.centerx - label.get_width() // 2, rect.y - 28))
->>>>>>> Stashed changes
 
         self._draw_connections()
         self._draw_nodes()
         self._draw_tooltip()
-<<<<<<< Updated upstream
         
         # Minimap placeholder (simple box in bottom right)
         minimap_rect = pygame.Rect(self.panel_rect.right - 120, self.panel_rect.bottom - 80, 100, 60)
@@ -714,45 +518,17 @@ class ResearchTreeUI:
     
     def _draw_nodes(self):
         """Draw research nodes with improved visuals."""
-=======
-
-        hint = self.font_small.render("Press ESC or Right Click to close", True, (180, 180, 180))
-        self.screen.blit(
-            hint,
-            (self.panel_rect.centerx - hint.get_width() // 2, self.panel_rect.bottom - 30),
-        )
-
-    def _draw_connections(self):
-        for node in self.nodes.values():
-            for parent_id in node.parents:
-                parent = self.nodes[parent_id]
-                if node.state == "unlocked" and parent.state == "unlocked":
-                    color = LINE_UNLOCKED
-                elif node.state == "unlockable" and parent.state == "unlocked":
-                    color = LINE_UNLOCKABLE
-                else:
-                    color = LINE_LOCKED
-                start = parent.rect.center
-                end = node.rect.center
-                pygame.draw.line(self.screen, color, start, end, 4)
-
-    def _draw_nodes(self):
->>>>>>> Stashed changes
         mouse_pos = pygame.mouse.get_pos()
         self._update_hover_node(mouse_pos)
 
         for node in self.nodes.values():
-<<<<<<< Updated upstream
             # Determine colors based on state
-=======
->>>>>>> Stashed changes
             if node.state == "unlocked":
                 fill = UNLOCKED_FILL
                 border = UNLOCKED_BORDER
             elif node.state == "unlockable":
                 fill = UNLOCKABLE_FILL
                 border = UNLOCKABLE_BORDER
-<<<<<<< Updated upstream
             elif node.state == "locked_unaffordable":
                 fill = LOCKED_UNAFFORDABLE_FILL
                 border = LOCKED_UNAFFORDABLE_BORDER
@@ -814,36 +590,6 @@ class ResearchTreeUI:
                 self.screen.blit(hover_surface, scaled_rect.topleft)
                 # White outline
                 self._draw_rounded_rect(self.screen, (255, 255, 255), scaled_rect, NODE_RADIUS, 2)
-=======
-            else:
-                fill = LOCKED_FILL
-                border = LOCKED_BORDER
-
-            pygame.draw.rect(self.screen, fill, node.rect)
-            pygame.draw.rect(self.screen, border, node.rect, 3)
-
-            if node.state == "unlocked":
-                check = self.font_small.render("✓", True, (255, 255, 255))
-                self.screen.blit(check, (node.rect.right - 18, node.rect.y + 8))
-
-            icon = ICON_MAP.get(node.node_id)
-            if icon:
-                icon_rect = icon.get_rect()
-                icon_rect.centery = node.rect.centery
-                icon_rect.x = node.rect.x + 6
-                self.screen.blit(icon, icon_rect)
-                text_x = icon_rect.right + 6
-            else:
-                text_x = node.rect.centerx - NODE_WIDTH // 2 + 10
-
-            name_surface = self.font_small.render(node.name, True, TEXT_COLOR)
-            self.screen.blit(name_surface, (text_x, node.rect.y + 8))
-            cost_surface = self.font_small.render(f"{node.cost} c", True, (200, 200, 200))
-            self.screen.blit(cost_surface, (text_x, node.rect.y + 30))
-
-            if node == self.hover_node:
-                pygame.draw.rect(self.screen, (255, 255, 255), node.rect, 2)
->>>>>>> Stashed changes
 
     def _update_hover_node(self, mouse_pos: Tuple[int, int]):
         self.hover_node = None
@@ -853,15 +599,11 @@ class ResearchTreeUI:
                 break
 
     def _draw_tooltip(self):
-<<<<<<< Updated upstream
         """Draw tooltip with description when hovering over node."""
-=======
->>>>>>> Stashed changes
         node = self.hover_node
         if not node:
             return
 
-<<<<<<< Updated upstream
         lines = [node.name]
         if node.description:
             lines.append(node.description)
@@ -889,21 +631,6 @@ class ResearchTreeUI:
         tooltip_rect = pygame.Rect(
             min(max(node.rect.centerx - width // 2, self.panel_rect.x + 10), self.panel_rect.right - width - 10),
             node.rect.bottom + 10,  # Below the node
-=======
-        lines = [
-            node.name,
-            node.description,
-            f"Cost: {node.cost} coins",
-            f"State: {node.state.title()}",
-        ]
-        padding = 8
-        width = max(self.font_small.render(line, True, TEXT_COLOR).get_width() for line in lines) + padding * 2
-        height = len(lines) * 20 + padding * 2
-
-        tooltip_rect = pygame.Rect(
-            min(max(node.rect.centerx - width // 2, self.panel_rect.x + 10), self.panel_rect.right - width - 10),
-            self.panel_rect.bottom - height - 20,
->>>>>>> Stashed changes
             width,
             height,
         )
@@ -912,16 +639,10 @@ class ResearchTreeUI:
 
         y = tooltip_rect.y + padding
         for line in lines:
-<<<<<<< Updated upstream
             if line:  # Skip empty lines
                 surf = self.font_small.render(line, True, TEXT_COLOR)
                 self.screen.blit(surf, (tooltip_rect.x + padding, y))
                 y += 20
-=======
-            surf = self.font_small.render(line, True, TEXT_COLOR)
-            self.screen.blit(surf, (tooltip_rect.x + padding, y))
-            y += 20
->>>>>>> Stashed changes
 
 
 def open_research_tree(screen, world, research_manager=None, game_state_manager=None):
