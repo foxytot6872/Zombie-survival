@@ -9,7 +9,7 @@ from upgrade_config import get_next_turret_upgrade
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None):
         """
         Initialize building panel.
         Args:
@@ -20,6 +20,9 @@ class BuildingPanel:
             panel_background_frames: List of 3 frames (497x742 each) for building detail panel background
             upgrade_button_frames: List of 4 frames (277x84 each) for upgrade button with hover/press animation
             demolish_button_frames: List of 4 frames (91x68 each) for demolish button with pulsing animation
+            health_bar_frames: List of 11 frames (280x27 each) for health bar display (0% to 100% in 10% increments)
+            current_level_frames: List of 3 frames (70x80 each) for current tier/level display (1, 2, 3)
+            next_level_frames: List of 3 frames (70x80 each) for next tier/level display (1, 2, 3)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -72,6 +75,10 @@ class BuildingPanel:
         self.demolish_button_rect = None  # Will be set when drawing
         self.demolish_button_animation_timer = 0.0  # Timer for pulsing animation
         self.demolish_button_animation_speed = 0.15  # Time per frame (seconds) for pulsing
+        
+        self.health_bar_frames = health_bar_frames if health_bar_frames else []
+        self.current_level_frames = current_level_frames if current_level_frames else []
+        self.next_level_frames = next_level_frames if next_level_frames else []
         
         self.on_upgrade: Optional[Callable] = None
         self.on_repair: Optional[Callable] = None
@@ -159,8 +166,18 @@ class BuildingPanel:
         
         # Use upgrade panel frames as the panel background
         if self.upgrade_panel_frames and len(self.upgrade_panel_frames) > 0:
-            # Select frame based on upgrade progress (0, 1, 2)
-            frame_index = min(building.upgrade_progress, len(self.upgrade_panel_frames) - 1)
+            # Select frame based on upgrade progress and tier
+            # Frame 0-2: upgrade progress states (0, 1, 2)
+            # Frame 3: max upgraded state (when tier == 3 or TIER_MAX)
+            if building.tier >= building.TIER_MAX:
+                # Building is at max tier - use last frame (frame 3)
+                frame_index = len(self.upgrade_panel_frames) - 1
+            else:
+                # Use upgrade progress (0, 1, 2)
+                frame_index = min(building.upgrade_progress, len(self.upgrade_panel_frames) - 2)
+            
+            # Ensure frame index is within bounds
+            frame_index = min(frame_index, len(self.upgrade_panel_frames) - 1)
             current_background = self.upgrade_panel_frames[frame_index]
             
             # Draw at natural size (375x475) at the panel position
@@ -188,25 +205,113 @@ class BuildingPanel:
         surface.blit(name_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         y_offset += line_height + int(10 * self.scale)
         
-        # HP bar
+        # HP text
         hp_text = f"HP: {building.hp} / {building.max_hp}"
         hp_surface = self.font_medium.render(hp_text, True, (255, 255, 255))
         surface.blit(hp_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         y_offset += line_height
         
-        # Draw HP bar (scaled)
-        hp_bar_rect = pygame.Rect(self.panel_rect.x + int(10 * self.scale), y_offset, 
-                                  self.panel_rect.width - int(20 * self.scale), int(20 * self.scale))
-        hp_percent = building.hp / building.max_hp if building.max_hp > 0 else 0
-        hp_color = (0, 255, 0) if hp_percent > 0.5 else (255, 255, 0) if hp_percent > 0.25 else (255, 0, 0)
-        pygame.draw.rect(surface, (0, 0, 0), hp_bar_rect)
-        pygame.draw.rect(surface, hp_color, (hp_bar_rect.x, hp_bar_rect.y, int(hp_bar_rect.width * hp_percent), hp_bar_rect.height))
+        # Draw HP bar using health bar frames at position (48, 115) relative to panel
+        if self.health_bar_frames and len(self.health_bar_frames) > 0:
+            hp_percent = building.hp / building.max_hp if building.max_hp > 0 else 0
+            # Calculate frame index: 0% = frame 0, 10% = frame 1, ..., 100% = frame 10
+            # Clamp hp_percent to 0-1 range and convert to frame index (0-10)
+            frame_index = int(hp_percent * 10)
+            frame_index = max(0, min(len(self.health_bar_frames) - 1, frame_index))
+            
+            # Position at (48, 115) relative to panel
+            health_bar_x = self.panel_rect.x + 48
+            health_bar_y = self.panel_rect.y + 115
+            
+            # Get the health bar frame
+            health_bar_frame = self.health_bar_frames[frame_index]
+            
+            # Draw the health bar
+            surface.blit(health_bar_frame, (health_bar_x, health_bar_y))
+        else:
+            # Fallback: draw HP bar (scaled) if frames not loaded
+            hp_bar_rect = pygame.Rect(self.panel_rect.x + int(10 * self.scale), y_offset, 
+                                      self.panel_rect.width - int(20 * self.scale), int(20 * self.scale))
+            hp_percent = building.hp / building.max_hp if building.max_hp > 0 else 0
+            hp_color = (0, 255, 0) if hp_percent > 0.5 else (255, 255, 0) if hp_percent > 0.25 else (255, 0, 0)
+            pygame.draw.rect(surface, (0, 0, 0), hp_bar_rect)
+            pygame.draw.rect(surface, hp_color, (hp_bar_rect.x, hp_bar_rect.y, int(hp_bar_rect.width * hp_percent), hp_bar_rect.height))
+        
         y_offset += line_height + int(10 * self.scale)
         
-        # Tier
-        tier_text = f"Tier: {building.tier} / {building.TIER_MAX}"
-        tier_surface = self.font_medium.render(tier_text, True, (255, 255, 255))
-        surface.blit(tier_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
+        # Tier - draw current level number
+        if self.current_level_frames and len(self.current_level_frames) > 0:
+            # Get tier (1, 2, or 3) - convert to frame index (0, 1, or 2)
+            tier = building.tier
+            level_frame_index = tier - 1  # tier 1 = frame 0, tier 2 = frame 1, tier 3 = frame 2
+            level_frame_index = max(0, min(len(self.current_level_frames) - 1, level_frame_index))
+            
+            # Check if we're on the last upgrade panel frame (max upgraded)
+            is_max_upgraded = building.tier >= building.TIER_MAX
+            
+            if is_max_upgraded:
+                # Use position (170, 195) for max upgraded state
+                # Adjust for wider numbers (2 and 3) - move them left
+                base_x = 168
+                if level_frame_index == 1:  # Number 2
+                    x_offset = -5  # Move left by 5 pixels
+                elif level_frame_index == 2:  # Number 3
+                    x_offset = -14  # Move left by 14 pixels
+                else:  # Number 1
+                    x_offset = 0
+                
+                level_x = self.panel_rect.x + base_x + x_offset
+                level_y = self.panel_rect.y + 195
+            else:
+                # Base position - frame 1 (number 1) is at x=52, y=170
+                base_x = 52
+                # Adjust for wider numbers (2 and 3) - move them left
+                if level_frame_index == 1:  # Number 2
+                    x_offset = -5  # Move left by 5 pixels
+                elif level_frame_index == 2:  # Number 3
+                    x_offset = -14  # Move left by 14 pixels
+                else:  # Number 1
+                    x_offset = 0
+                
+                level_x = self.panel_rect.x + base_x + x_offset
+                level_y = self.panel_rect.y + 170
+            
+            # Get the level frame
+            level_frame = self.current_level_frames[level_frame_index]
+            
+            # Draw the current level number
+            surface.blit(level_frame, (level_x, level_y))
+            
+            # Draw next level number at x=285, same y as current level
+            if self.next_level_frames and len(self.next_level_frames) > 0 and building.tier < building.TIER_MAX:
+                # Get next tier (current tier + 1)
+                next_tier = building.tier + 1
+                next_level_frame_index = next_tier - 1  # tier 2 = frame 1, tier 3 = frame 2
+                next_level_frame_index = max(0, min(len(self.next_level_frames) - 1, next_level_frame_index))
+                
+                # Base position - frame 1 (number 1) is at x=285
+                next_base_x = 285
+                # Adjust for wider numbers (2 and 3) - move them left (same offsets as current level)
+                if next_level_frame_index == 1:  # Number 2
+                    next_x_offset = -5  # Move left by 5 pixels
+                elif next_level_frame_index == 2:  # Number 3
+                    next_x_offset = -14  # Move left by 14 pixels
+                else:  # Number 1
+                    next_x_offset = 0
+                
+                next_level_x = self.panel_rect.x + next_base_x + next_x_offset
+                next_level_y = level_y  # Same y as current level
+                
+                # Get the next level frame
+                next_level_frame = self.next_level_frames[next_level_frame_index]
+                
+                # Draw the next level number
+                surface.blit(next_level_frame, (next_level_x, next_level_y))
+        else:
+            # Fallback: draw tier text if frames not loaded
+            tier_text = f"Tier: {building.tier} / {building.TIER_MAX}"
+            tier_surface = self.font_medium.render(tier_text, True, (255, 255, 255))
+            surface.blit(tier_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         
         # Buttons (store rects for click detection)
         self.button_rects = {}
