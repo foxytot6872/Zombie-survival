@@ -9,7 +9,7 @@ from upgrade_config import get_next_turret_upgrade
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None, font_large=None, font_medium=None, font_small=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None, font_large=None, font_medium=None, font_small=None, font_blue=None, font_red=None, font_yellow=None):
         """
         Initialize building panel.
         Args:
@@ -42,6 +42,11 @@ class BuildingPanel:
             self.font_small = font_small
         else:
             self.font_small = pygame.font.Font(None, int(24 * 1.2))  # ~29
+        
+        # Color fonts for different states
+        self.font_blue = font_blue if font_blue else self.font_medium  # For hover/selection
+        self.font_red = font_red if font_red else self.font_medium  # For demolish/unavailable
+        self.font_yellow = font_yellow if font_yellow else self.font_medium  # Default
         
         self.is_visible = False
         self.selected_building: Optional[Building] = None
@@ -217,13 +222,13 @@ class BuildingPanel:
         y_offset = self.panel_rect.y + int(20 * self.scale)
         line_height = int(30 * self.scale)
         
-        # Building name (use larger font)
+        # Building name (use larger font - default yellow)
         building_name = building.TYPE_ID.replace('_', ' ').title()
         name_surface = self.font_large.render(building_name, True, (255, 255, 255))
         surface.blit(name_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
         y_offset += line_height + int(10 * self.scale)
         
-        # HP text
+        # HP text (default yellow)
         hp_text = f"HP: {building.hp} / {building.max_hp}"
         hp_surface = self.font_medium.render(hp_text, True, (255, 255, 255))
         surface.blit(hp_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))

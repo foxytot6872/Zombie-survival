@@ -1,7 +1,7 @@
 ﻿import pygame
 import json
 import os
-from typing import Dict
+from typing import Dict, Optional
 import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
@@ -28,6 +28,7 @@ from ui.research_button import ResearchButton
 from ui.start_screen import StartScreen
 from ui.difficulty_screen import SelectDifficultyScreen
 from ui.build_tooltip import BuildTooltipManager
+from ui.custom_font import load_custom_font, CustomFont
 from upgrade_config import get_next_turret_upgrade, scale_upgrade_cost
 from research_tree import open_research_tree
 from world.research import ResearchManager
@@ -101,11 +102,63 @@ PIXEL_FONT_PATH = 'asset/fonts/PressStart2P-Regular.ttf'  # Press Start 2P pixel
 
 # Load fonts with fallback - these will be used throughout the game
 # If the font file doesn't exist, it will fall back to the default system font
-font_large = load_pixel_font(PIXEL_FONT_PATH, 48)
-font_medium = load_pixel_font(PIXEL_FONT_PATH, 32)
-font_small = load_pixel_font(PIXEL_FONT_PATH, 24)
-font_tiny = load_pixel_font(PIXEL_FONT_PATH, 20)
-font_huge = load_pixel_font(PIXEL_FONT_PATH, 72)
+# First load the pixel fonts as fallback
+font_large_fallback = load_pixel_font(PIXEL_FONT_PATH, 48)
+font_medium_fallback = load_pixel_font(PIXEL_FONT_PATH, 32)
+font_small_fallback = load_pixel_font(PIXEL_FONT_PATH, 24)
+font_tiny_fallback = load_pixel_font(PIXEL_FONT_PATH, 20)
+font_huge_fallback = load_pixel_font(PIXEL_FONT_PATH, 72)
+
+###################
+# Load custom letter fonts from sprite sheets
+###################
+# Extract frames: 17x22, 26 frames (A-Z)
+custom_font_yellow = load_custom_font('asset/fonts/YellowFont-Sheet.png', letter_width=17, letter_height=22, number_font_size=22)
+custom_font_red = load_custom_font('asset/fonts/RedFont-Sheet.png', letter_width=17, letter_height=22, number_font_size=22)
+custom_font_blue = load_custom_font('asset/fonts/BlueFont-Sheet.png', letter_width=17, letter_height=22, number_font_size=22)
+
+# Use yellow font as default custom font
+custom_font = custom_font_yellow if custom_font_yellow else None
+
+# Create scaled versions if needed (for different sizes, we'll scale the letter frames)
+def create_scaled_custom_font(base_font: Optional[CustomFont], scale: float, number_font_size: int) -> Optional[CustomFont]:
+    """Create a scaled version of a custom font."""
+    if base_font is None:
+        return None
+    
+    try:
+        # Scale letter frames
+        scaled_letter_frames = {}
+        for letter, frame in base_font.letter_frames.items():
+            scaled_width = int(frame.get_width() * scale)
+            scaled_height = int(frame.get_height() * scale)
+            scaled_frame = pygame.transform.scale(frame, (scaled_width, scaled_height))
+            scaled_letter_frames[letter] = scaled_frame
+        
+        # Create new number font with scaled size
+        try:
+            scaled_number_font = pygame.font.SysFont("arial", number_font_size)
+        except:
+            scaled_number_font = pygame.font.Font(None, number_font_size)
+        
+        return CustomFont(scaled_letter_frames, scaled_number_font)
+    except Exception as e:
+        print(f"Error creating scaled custom font: {e}")
+        return None
+
+# Create scaled versions for different sizes
+custom_font_large = create_scaled_custom_font(custom_font_yellow, 2.18, 48) if custom_font_yellow else None  # ~48px
+custom_font_medium = create_scaled_custom_font(custom_font_yellow, 1.45, 32) if custom_font_yellow else None  # ~32px
+custom_font_small = create_scaled_custom_font(custom_font_yellow, 1.09, 24) if custom_font_yellow else None  # ~24px
+custom_font_tiny = create_scaled_custom_font(custom_font_yellow, 0.91, 20) if custom_font_yellow else None  # ~20px
+custom_font_huge = create_scaled_custom_font(custom_font_yellow, 3.27, 72) if custom_font_yellow else None  # ~72px
+
+# Use custom fonts if available, otherwise fall back to pixel fonts
+font_large = custom_font_large if custom_font_large else font_large_fallback
+font_medium = custom_font_medium if custom_font_medium else font_medium_fallback
+font_small = custom_font_small if custom_font_small else font_small_fallback
+font_tiny = custom_font_tiny if custom_font_tiny else font_tiny_fallback
+font_huge = custom_font_huge if custom_font_huge else font_huge_fallback
 
 def load_build_item_config(path: str = os.path.join("data", "config", "build_items.json")) -> Dict:
     """Load build item metadata for tooltips."""
@@ -1166,8 +1219,36 @@ game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, fo
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
-building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames, health_bar_frames, current_level_frames, next_level_frames, font_large, font_medium, font_small)
-tooltip_manager = BuildTooltipManager(build_item_config, (c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
+# Create scaled versions for building panel fonts
+custom_font_blue_large = create_scaled_custom_font(custom_font_blue, 2.18, 48) if custom_font_blue else None  # ~48px
+custom_font_blue_medium_panel = create_scaled_custom_font(custom_font_blue, 1.45, 32) if custom_font_blue else None  # ~32px
+custom_font_red_medium_panel = create_scaled_custom_font(custom_font_red, 1.45, 32) if custom_font_red else None  # ~32px for unavailable
+
+building_panel = BuildingPanel(
+    c.SCREEN_WIDTH, c.SCREEN_HEIGHT, 
+    upgrade_panel_frames, upgrade_panel_darken_frames, [], 
+    upgrade_button_frames, demolish_button_frames, 
+    health_bar_frames, current_level_frames, next_level_frames, 
+    font_large=custom_font_large if custom_font_large else font_large,
+    font_medium=custom_font_medium if custom_font_medium else font_medium,
+    font_small=custom_font_small if custom_font_small else font_small,
+    font_blue=custom_font_blue_medium_panel if custom_font_blue_medium_panel else custom_font_medium if custom_font_medium else font_medium,  # Blue for hover
+    font_red=custom_font_red_medium_panel if custom_font_red_medium_panel else font_medium,  # Red for demolish/unavailable
+    font_yellow=custom_font_medium if custom_font_medium else font_medium  # Yellow for default
+)
+# Create scaled versions for tooltip fonts
+custom_font_blue_medium = create_scaled_custom_font(custom_font_blue, 1.45, 32) if custom_font_blue else None  # ~32px for tooltips
+custom_font_blue_small = create_scaled_custom_font(custom_font_blue, 1.09, 24) if custom_font_blue else None  # ~24px for tooltips
+custom_font_red_medium = create_scaled_custom_font(custom_font_red, 1.45, 32) if custom_font_red else None  # ~32px for warnings
+custom_font_red_small = create_scaled_custom_font(custom_font_red, 1.09, 24) if custom_font_red else None  # ~24px for warnings
+
+tooltip_manager = BuildTooltipManager(
+    build_item_config, 
+    (c.SCREEN_WIDTH, c.SCREEN_HEIGHT),
+    font_blue=custom_font_blue_medium if custom_font_blue_medium else custom_font_medium,  # Blue for hover/selection
+    font_red=custom_font_red_small if custom_font_red_small else font_small,  # Red for warnings/unavailable
+    font_yellow=custom_font_small if custom_font_small else font_small  # Yellow for default
+)
 
 
 # Set UI callbacks
@@ -2237,15 +2318,11 @@ debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rect
 ###################
 # Helper functions for buttons
 ###################
-def create_button_image(text, color=(100, 150, 100), width=100, height=40):
-    """Create a button image with text"""
+def create_button_image(text, color=(100, 150, 100), width=100, height=40, use_blue_font=False):
+    """Create a button image WITHOUT text (text is drawn dynamically on top)."""
     button_img = pygame.Surface((width, height))
     button_img.fill(color)
-    # Use larger font for bigger buttons
-    font = font_tiny  # Use pixel font for button text
-    text_surface = font.render(text, True, (255, 255, 255))
-    text_rect = text_surface.get_rect(center=(width//2, height//2))
-    button_img.blit(text_surface, text_rect)
+    # Text is now drawn dynamically on top of buttons, so we don't draw it here
     return button_img
 
 ###################
@@ -2434,15 +2511,20 @@ def draw_resources(screen, resources, font):
     text_surfaces = []
     total_width = 0
     for text in texts:
-        # Use gold color for coins, red for zombies, white for others
+        # Use gold color for coins, red custom font for zombies, white for others
         if "Coins" in text:
             color = (255, 215, 0)
+            text_surface = resource_font.render(text, True, color)
+            text_surfaces.append((text_surface, color))
         elif "Zombies" in text:
-            color = (255, 0, 0)
+            # Use red custom font for zombie counter
+            zombie_font = create_scaled_custom_font(custom_font_red, 1.09, 24) if custom_font_red else resource_font
+            text_surface = zombie_font.render(text, True, (255, 255, 255))  # White color, red font
+            text_surfaces.append((text_surface, (255, 0, 0)))  # Store red color for reference
         else:
             color = (255, 255, 255)
-        text_surface = resource_font.render(text, True, color)
-        text_surfaces.append((text_surface, color))
+            text_surface = resource_font.render(text, True, color)
+            text_surfaces.append((text_surface, color))
         total_width += text_surface.get_width() + item_spacing
     
     # Remove last spacing
@@ -2604,9 +2686,14 @@ while running:
             gate_building = gate_buildings[0]
             gate_center_x_px = gate_building.pos.x
             gate_pixel_y = gate_building.pos.y - 25  # Above the gate
-            # Draw simple "GATE" text banner
-            gate_font = font_tiny  # Use pixel font for gate label
-            gate_text = gate_font.render("GATE", True, (200, 200, 100))
+            # Draw simple "GATE" text banner (use blue font for selection/identification)
+            gate_font = custom_font_tiny if custom_font_blue and hasattr(custom_font_blue, 'render') else font_tiny
+            if custom_font_blue and hasattr(custom_font_blue, 'render'):
+                # Use scaled blue font for gate label
+                gate_font_scaled = create_scaled_custom_font(custom_font_blue, 0.91, 20) if custom_font_blue else font_tiny
+                gate_text = gate_font_scaled.render("GATE", True, (200, 200, 100)) if gate_font_scaled else font_tiny.render("GATE", True, (200, 200, 100))
+            else:
+                gate_text = font_tiny.render("GATE", True, (200, 200, 100))
             gate_text_rect = gate_text.get_rect(center=(gate_center_x_px, gate_pixel_y))
             # Draw background for text
             banner_bg = pygame.Surface((64, 20), pygame.SRCALPHA)
@@ -2691,12 +2778,48 @@ while running:
         button_overlay.fill((255, 128, 0, 80))  # Orange overlay
         screen.blit(button_overlay, (button_x_start, button_row_y))
     
-    # Highlight selected button
-    if selected_building_type:
-        if selected_building_type in buttons:
-            button = buttons[selected_building_type]['button']
-            # Draw highlight
-            pygame.draw.rect(screen, (255, 255, 0), button.rect, 3)
+    # Highlight selected button and draw button text with appropriate colors
+    active_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
+    for building_class, button_data in buttons.items():
+        button_obj = button_data['button']
+        label = button_data['label']
+        
+        # Determine font color: Blue if selected (build mode), Red if not enough resources, Yellow if enough resources
+        is_selected = (selected_building_type == building_class)
+        has_enough_resources = True
+        
+        if not is_selected:
+            # Check if we have enough resources to build
+            effective_cost = building_class.get_scaled_cost(world=world, difficulty=active_difficulty)
+            has_enough_resources = (
+                resources.wood >= effective_cost.wood and
+                resources.iron >= effective_cost.iron and
+                resources.food >= effective_cost.food and
+                resources.coins >= effective_cost.coins
+            )
+        
+        # Select appropriate font based on state
+        if is_selected:
+            # Blue font for selected (build mode)
+            button_font = create_scaled_custom_font(custom_font_blue, 0.91, 20) if custom_font_blue else font_tiny
+            text_color = (255, 255, 255)  # White color with blue font
+        elif not has_enough_resources:
+            # Red font for not enough resources
+            button_font = create_scaled_custom_font(custom_font_red, 0.91, 20) if custom_font_red else font_tiny
+            text_color = (255, 255, 255)  # White color with red font
+        else:
+            # Yellow font for enough resources (default)
+            button_font = custom_font_tiny if custom_font_tiny else font_tiny
+            text_color = (255, 255, 255)  # White color with yellow font
+        
+        # Draw text on top of button
+        text_surface = button_font.render(label, True, text_color)
+        text_rect = text_surface.get_rect(center=button_obj.rect.center)
+        screen.blit(text_surface, text_rect)
+        
+        # Draw highlight for selected button
+        if is_selected:
+            pygame.draw.rect(screen, (255, 255, 0), button_obj.rect, 3)
 
     tooltip_manager.draw(screen)
     

@@ -16,12 +16,15 @@ class BuildTooltipManager:
     WARNING_COLOR = (255, 120, 120)
     INFO_COLOR = (140, 210, 255)
 
-    def __init__(self, item_config: Dict, screen_size: Tuple[int, int]):
+    def __init__(self, item_config: Dict, screen_size: Tuple[int, int], 
+                 font_blue=None, font_red=None, font_yellow=None):
         pygame.font.init()
         self.item_config = item_config
         self.screen_width, self.screen_height = screen_size
-        self.title_font = pygame.font.Font(None, 32)
-        self.body_font = pygame.font.Font(None, 24)
+        # Use custom fonts if available, otherwise fallback to default
+        self.title_font = font_blue if font_blue else pygame.font.Font(None, 32)
+        self.body_font = font_blue if font_blue else pygame.font.Font(None, 24)
+        self.warning_font = font_red if font_red else pygame.font.Font(None, 24)  # Red for warnings
         self.visible = False
         self.surface: Optional[pygame.Surface] = None
         self.rect = pygame.Rect(0, 0, 0, 0)
@@ -116,8 +119,11 @@ class BuildTooltipManager:
                 lines.append((f" ❌ {req}", self.WARNING_COLOR))
 
         padding = 10
-        line_height = self.body_font.get_linesize()
-        width = max(self.title_font.size(lines[0][0])[0], max((self.body_font.size(text)[0] for text, _ in lines[1:]), default=0))
+        line_height = self.body_font.get_linesize() if hasattr(self.body_font, 'get_linesize') else 24
+        # Both CustomFont and pygame.font.Font have size() method
+        first_line_width = self.title_font.size(lines[0][0])[0] if hasattr(self.title_font, 'size') else 0
+        body_widths = [self.body_font.size(text)[0] if hasattr(self.body_font, 'size') else 0 for text, _ in lines[1:]]
+        width = max(first_line_width, max(body_widths, default=0))
         width += padding * 2
         height = padding * 2 + line_height * len(lines)
 
@@ -129,7 +135,11 @@ class BuildTooltipManager:
 
         y = padding
         for idx, (text, color) in enumerate(lines):
-            font = self.title_font if idx == 0 else self.body_font
+            # Use warning font (red) for warning color, title font for first line, body font for others
+            if color == self.WARNING_COLOR:
+                font = self.warning_font
+            else:
+                font = self.title_font if idx == 0 else self.body_font
             rendered = font.render(text, True, color)
             surface.blit(rendered, (padding, y))
             y += line_height
@@ -170,8 +180,15 @@ class BuildTooltipManager:
 
     def _render_lines(self, lines: List[Tuple[str, Tuple[int, int, int]]]) -> pygame.Surface:
         padding = 10
-        line_height = self.body_font.get_linesize()
-        width = max(self.title_font.size(lines[0][0])[0], max((self.body_font.size(text)[0] for text, _ in lines[1:]), default=0))
+        # Get line height from body font
+        line_height = self.body_font.get_linesize() if hasattr(self.body_font, 'get_linesize') else 24
+        if hasattr(self.body_font, 'size'):
+            # For custom font, get size using size method
+            first_line_size = self.title_font.size(lines[0][0]) if hasattr(self.title_font, 'size') else (self.title_font.get_rect(lines[0][0]).width, line_height)
+        else:
+            first_line_size = self.title_font.get_rect(lines[0][0]).size if hasattr(self.title_font, 'get_rect') else (0, line_height)
+        
+        width = max(first_line_size[0], max((self.body_font.size(text)[0] if hasattr(self.body_font, 'size') else (self.body_font.get_rect(text).width if hasattr(self.body_font, 'get_rect') else 0) for text, _ in lines[1:]), default=0))
         width += padding * 2
         height = padding * 2 + line_height * len(lines)
 
@@ -183,7 +200,11 @@ class BuildTooltipManager:
 
         y = padding
         for idx, (text, color) in enumerate(lines):
-            font = self.title_font if idx == 0 else self.body_font
+            # Use warning font (red) for warning color, title font for first line, body font for others
+            if color == self.WARNING_COLOR:
+                font = self.warning_font
+            else:
+                font = self.title_font if idx == 0 else self.body_font
             rendered = font.render(text, True, color)
             surface.blit(rendered, (padding, y))
             y += line_height
