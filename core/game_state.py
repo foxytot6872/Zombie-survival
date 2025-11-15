@@ -7,6 +7,7 @@ from typing import Optional
 class GameState(Enum):
     """Game state enumeration"""
     MENU = "menu"
+    SELECT_DIFFICULTY = "select_difficulty"
     PLAYING = "playing"
     PAUSED = "paused"
     DAY = "day"

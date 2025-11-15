@@ -25,8 +25,10 @@ from ui.building_panel import BuildingPanel
 from ui.hud import HUD
 from ui.research_button import ResearchButton
 from ui.start_screen import StartScreen
+from ui.difficulty_screen import SelectDifficultyScreen
 from research_tree import open_research_tree
 from world.research import ResearchManager
+from difficulty_config import Difficulty, DIFFICULTY_CONFIG
 # Nodes and survivors
 from world.nodes import TreePatch, ScrapPile, spawn_daily_nodes
 from world.survivor import Worker, Guard
@@ -545,7 +547,8 @@ except:
 
 # Create grid and resources
 grid = Grid(GRID_WIDTH, GRID_HEIGHT, c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upper_fraction)
-resources = Resources(wood=500, iron=300, food=200)  # Starting resources
+resources = Resources(wood=0, iron=0, food=0, coins=0)
+current_difficulty = Difficulty.EASY
 
 # Building groups
 building_group = pygame.sprite.Group()
@@ -632,6 +635,9 @@ class World:
         self.hud = None
         self.nodes = node_group if node_group else pygame.sprite.Group()
         self.survivor_group = survivor_group if survivor_group else pygame.sprite.Group()
+        self.production_multipliers = {"sawmill": 1.0, "smelter": 1.0}
+        self.current_difficulty = Difficulty.EASY
+        self.sawmill_level = 0
         self.buildings_by_type: Dict[str, list] = {}
     
     def enemy_count(self):
@@ -739,6 +745,7 @@ world.day_events = day_event_manager
 game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, building_panel_frames)
 
 
@@ -1407,6 +1414,22 @@ def spawn_daily_resource_nodes():
     
     print(f"Spawned {len(new_nodes)} resource nodes in clusters around compound ({trees_spawned} trees, {scrap_spawned} scrap)")
 
+def apply_difficulty_settings(difficulty: Difficulty, *, reset_resources: bool = True):
+    """Apply the selected difficulty to resources, economy, and research scaling."""
+    settings = DIFFICULTY_CONFIG[difficulty]
+    if reset_resources:
+        resources.wood = settings.starting_resources.get("wood", resources.wood)
+        resources.iron = settings.starting_resources.get("iron", resources.iron)
+        resources.food = settings.starting_resources.get("food", resources.food)
+        resources.coins = 0
+    world.production_multipliers["sawmill"] = settings.sawmill_yield_multiplier
+    world.production_multipliers["smelter"] = settings.smelter_yield_multiplier
+    world.current_difficulty = difficulty
+    if hasattr(wave_manager, "difficulty"):
+        wave_manager.difficulty = difficulty.name.lower()
+    research_manager.apply_difficulty_scaling(settings.research_total_target)
+
+
 def restart_game():
     """Restart game"""
     global building_group, turret_group, enemy_group, projectile_group, resources, wave_manager, game_state_manager, node_group, survivor_group
@@ -1418,9 +1441,6 @@ def restart_game():
     node_group.empty()
     survivor_group.empty()
     grid.clear()
-    resources.wood = 500
-    resources.iron = 300
-    resources.food = 200
     wave_manager.reset()
     game_state_manager.reset()
     game_over_screen.hide()
@@ -1432,6 +1452,7 @@ def restart_game():
     spawn_initial_workers()
     # Spawn daily nodes
     spawn_daily_resource_nodes()
+    apply_difficulty_settings(current_difficulty, reset_resources=True)
     print("Game restarted")
 
 def load_game():
@@ -1478,21 +1499,45 @@ def quit_game():
 
 game_over_screen.on_restart = restart_game
 game_over_screen.on_quit = quit_game
+
+
 def resume_game():
     """Resume game"""
     game_state_manager.resume()
     pause_menu.hide()
 
+
 pause_menu.on_restart = restart_game
 pause_menu.on_quit = quit_game
 pause_menu.on_resume = resume_game  # For ESC key in pause menu
 
-def start_game():
-    """Start the game from menu"""
-    game_state_manager.set_state(GameState.PLAYING)
-    start_screen.hide()
 
-start_screen.on_start = start_game
+def open_difficulty_selection():
+    """Transition from start screen to difficulty selection."""
+    start_screen.hide()
+    difficulty_screen.show()
+    game_state_manager.set_state(GameState.SELECT_DIFFICULTY)
+
+
+def handle_difficulty_selected(selection: Difficulty):
+    """Apply difficulty and start gameplay."""
+    global current_difficulty
+    current_difficulty = selection
+    apply_difficulty_settings(selection, reset_resources=True)
+    difficulty_screen.hide()
+    game_state_manager.set_state(GameState.PLAYING)
+
+
+def handle_difficulty_cancel():
+    """Return to start screen from difficulty selection."""
+    difficulty_screen.hide()
+    start_screen.show()
+    game_state_manager.set_state(GameState.MENU)
+
+
+start_screen.on_start = open_difficulty_selection
+difficulty_screen.on_select = handle_difficulty_selected
+difficulty_screen.on_cancel = handle_difficulty_cancel
 
 # Building panel callbacks (will be set up in game loop)
 def upgrade_building(building):
@@ -2004,6 +2049,17 @@ while running:
             else:
                 start_screen.handle_event(event)
         
+        pygame.display.flip()
+        continue
+    
+    if game_state_manager.get_state() == GameState.SELECT_DIFFICULTY:
+        difficulty_screen.update(dt)
+        difficulty_screen.draw(screen)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            else:
+                difficulty_screen.handle_event(event)
         pygame.display.flip()
         continue
     
@@ -2530,6 +2586,8 @@ while running:
     ###################
     if start_screen.is_visible:
         start_screen.draw(screen)
+    if difficulty_screen.is_visible:
+        difficulty_screen.draw(screen)
     
     ###################
     # Draw preview when in build mode
@@ -2638,6 +2696,11 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+            continue
+        
+        if game_state_manager.get_state() == GameState.SELECT_DIFFICULTY:
+            if difficulty_screen.handle_event(event):
+                continue
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = pygame.mouse.get_pos()

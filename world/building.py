@@ -319,8 +319,15 @@ class Building(pygame.sprite.Sprite):
                 
                 # Check if it's time to produce a batch
                 if self.production_timer >= self.production_interval:
-                    # Calculate batch amount (scaled by tier and modifiers)
-                    batch_amount = int(self.base_batch_amount * tier_mult * prod_mult)
+                    # Calculate batch amount (scaled by tier, difficulty, and modifiers)
+                    type_id = getattr(self, "TYPE_ID", "").lower()
+                    prod_multiplier = 1.0
+                    if hasattr(world, "production_multipliers"):
+                        if type_id == "sawmill":
+                            prod_multiplier = world.production_multipliers.get("sawmill", 1.0)
+                        elif type_id == "smelter":
+                            prod_multiplier = world.production_multipliers.get("smelter", 1.0)
+                    batch_amount = int(self.base_batch_amount * tier_mult * prod_mult * prod_multiplier)
                     
                     # Get what this building produces
                     p = self._current_production()

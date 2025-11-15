@@ -1,6 +1,7 @@
 """
 Research system for unlocking buildings and upgrades.
 """
+import copy
 import json
 import os
 from typing import Set, Dict
@@ -18,6 +19,8 @@ class ResearchManager:
         self.unlocked: Set[str] = set()  # Unlocked items (e.g., "sawmill", "railgun_turret")
         self.purchased: Set[str] = set()  # Purchased research keys (e.g., "sawmill_unlock")
         self.research_defs: Dict = {}
+        self.base_research_defs: Dict = {}
+        self.research_cost_multiplier: float = 1.0
         self.research_modifiers: Dict[str, float] = {}  # Permanent research modifiers
         self._cached_effective_modifiers: Dict[str, float] = {}  # Cached effective modifiers
         self._modifiers_dirty: bool = True  # Flag to indicate if modifiers need recalculation
@@ -28,11 +31,13 @@ class ResearchManager:
             if os.path.exists(path):
                 with open(path, "r") as f:
                     self.research_defs = json.load(f)
+                    self.base_research_defs = copy.deepcopy(self.research_defs)
             else:
                 print(f"Warning: Research config not found at {path}, using empty definitions")
         except Exception as e:
             print(f"Error loading research config: {e}")
             self.research_defs = {}
+            self.base_research_defs = {}
     
     def is_unlocked(self, key: str) -> bool:
         """
@@ -113,6 +118,29 @@ class ResearchManager:
         self._modifiers_dirty = True
         
         return True
+    
+    def apply_difficulty_scaling(self, target_total: float):
+        """
+        Scale research costs to approximate a desired total expenditure.
+        """
+        if not self.base_research_defs:
+            self.base_research_defs = copy.deepcopy(self.research_defs)
+        base_total = self._base_total_cost()
+        if base_total <= 0:
+            return
+        factor = target_total / base_total
+        self.research_cost_multiplier = factor
+        for key, data in self.base_research_defs.items():
+            base_cost = max(0, data.get("cost_coins", 0))
+            scaled_cost = max(1, int(round(base_cost * factor)))
+            if key not in self.research_defs:
+                self.research_defs[key] = data.copy()
+            self.research_defs[key]["cost_coins"] = scaled_cost
+    
+    def _base_total_cost(self) -> float:
+        if not self.base_research_defs:
+            return 0.0
+        return sum(max(0, data.get("cost_coins", 0)) for data in self.base_research_defs.values())
     
     def get_research_list(self) -> Dict:
         """Get all research definitions."""
