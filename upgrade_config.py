@@ -4,24 +4,18 @@ from typing import Dict, Optional, Union
 
 from difficulty_config import Difficulty
 
-UPGRADE_STEPS_PER_TIER = 3
+UPGRADE_STEPS_PER_TIER = 2  # Changed from 3 to 2: 1->2->MAX(3) means 2 steps per tier
 
 TURRET_UPGRADE_CONFIG: Dict[str, list] = {
     "tier_1": [
         {"step": 1, "base_cost": {"wood": 30, "iron": 10}},
-        {"step": 2, "base_cost": {"wood": 40, "iron": 15}},
-        {"step": 3, "base_cost": {"wood": 50, "iron": 20}},
+        {"step": 2, "base_cost": {"wood": 50, "iron": 20}},  # Step 2 upgrades to tier 2
     ],
     "tier_2": [
         {"step": 1, "base_cost": {"wood": 60, "iron": 25}},
-        {"step": 2, "base_cost": {"wood": 70, "iron": 30}},
-        {"step": 3, "base_cost": {"wood": 80, "iron": 35}},
+        {"step": 2, "base_cost": {"wood": 80, "iron": 35}},  # Step 2 upgrades to tier 3 (MAX)
     ],
-    "tier_3": [
-        {"step": 1, "base_cost": {"wood": 90, "iron": 40}},
-        {"step": 2, "base_cost": {"wood": 100, "iron": 45}},
-        {"step": 3, "base_cost": {"wood": 120, "iron": 50}},
-    ],
+    # Tier 3 is MAX - no upgrades available
 }
 
 DIFFICULTY_UPGRADE_MULTIPLIER: Dict[Difficulty, float] = {

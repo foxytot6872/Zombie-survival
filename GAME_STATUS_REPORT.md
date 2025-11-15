@@ -1,474 +1,494 @@
-# Zombie Survival Game - Implementation Status Report
-**Date:** Current  
-**Project Type:** Tower Defense / Base Building Game  
-**Engine:** Python 3.9 + Pygame  
-**Screen Resolution:** 1920x1080 (Full HD)  
-**Grid System:** 32x32 pixel tiles (60x33.75 tiles total)
+# 🎮 Zombie Survival - Game Status Report
+
+**Report Generated:** Current  
+**Game Version:** Active Development  
+**Engine:** Pygame  
+**Resolution:** 1920x1080 @ 60 FPS
 
 ---
 
-## Executive Summary
+## 📋 Executive Summary
 
-The game is a **zombie survival tower defense** game where players build and defend a base against waves of zombies. The game features:
-- **8 Building Types** (HQ, Walls, Gates, Housing, Farms, Sawmills, Smelters, Turrets)
-- **Building Construction System** with resource costs and build times
-- **Zombie Enemy AI** that targets and attacks buildings
-- **Turret Defense System** with projectile-based combat
-- **Resource Management** (Wood, Iron, Food)
-- **Debug Mode** for testing and development
-- **Data-Driven Configuration** via JSON files
-
-**Current Status:** ✅ **Fully Playable Core Systems Implemented**
+**Zombie Survival** is a tower defense/strategy survival game built with Python and Pygame. The game features day/night cycle mechanics, wave-based combat, resource management, building construction, research trees, and a comprehensive upgrade system. The game is in active development with most core systems implemented and functional.
 
 ---
 
-## 1. Architecture & Code Structure
+## 🎯 Core Gameplay Systems
 
-### 1.1 Project Organization
+### **1. Game States**
+- ✅ **Menu State**: Start screen with animated background
+- ✅ **Difficulty Selection**: 4 difficulty levels (Easy, Medium, Hard, Extreme)
+- ✅ **Playing State**: Main gameplay loop
+- ✅ **Paused State**: Pause menu with resume/restart/quit options
+- ✅ **Game Over State**: Win/loss screen with statistics
+- ✅ **Save/Load System**: Automatic saves after each night
+
+### **2. Day/Night Cycle**
+- ✅ **Day Phase**: Resource gathering, building, research (30 seconds)
+- ✅ **Night Phase**: Wave-based combat with zombie spawning
+- ✅ **Summary Phase**: Brief transition showing night results
+- ✅ **Dynamic Transitions**: Smooth state changes with visual feedback
+
+### **3. Wave Management**
+- ✅ **Progressive Difficulty**: Waves scale with day number
+- ✅ **Enemy Spawning**: Configurable spawn rates and enemy types
+- ✅ **Wave Tracking**: Monitors enemies spawned, killed, night progress
+- ✅ **Win Condition**: Survive all nights (configurable)
+- ✅ **Wave Skip**: Debug feature to skip forward (F9-F11)
+
+---
+
+## 🏗️ Building System
+
+### **Building Types**
+
+#### **Defensive Structures:**
+1. **HQ (Headquarters)**
+   - Starting building, main base
+   - HP: 2000
+   - Cannot be sold/demolished
+   - Game ends if destroyed
+
+2. **Turrets** (3 types, all upgradeable):
+   - **Ballistic Turret**: Standard damage dealer
+   - **Gatling Turret**: High fire rate, rapid damage
+   - **Piercer Turret** (Railgun): Piercing projectiles, high damage
+   - All have 3 tiers with sprite-based visual upgrades
+   - Tier system: **1 → 2 → MAX(3)** (2 upgrade steps per tier)
+
+3. **Walls:**
+   - **Wall**: Standard defensive wall (280 HP)
+   - **Wall Wood**: Upgrade variant
+   - **Wall Iron**: Upgrade variant
+   - Auto-tiling system for seamless connections
+
+4. **Gate**: Special passable wall for unit movement (300 HP)
+
+#### **Production Buildings:**
+1. **Farm**: Produces Food (120/min)
+2. **Sawmill**: Produces Wood (120/min)
+3. **Smelter**: Produces Iron (120/min)
+   - Unlocked via research tree
+
+#### **Building Features:**
+- ✅ **Tier System**: 3 tiers per building (1→2→MAX)
+- ✅ **Upgrade System**: 2 upgrade steps per tier
+- ✅ **Repair System**: Pay wood to restore HP
+- ✅ **Sell System**: 60% resource refund
+- ✅ **Demolish System**: Remove without refund
+- ✅ **Construction Time**: Buildings require time to complete
+- ✅ **Footprint System**: Grid-based placement with collision
+- ✅ **Resource Nodes**: Workers can gather from TreePatches and ScrapPiles
+
+---
+
+## 👹 Enemy System
+
+### **Enemy Types** (8 total):
+
+#### **Zombies:**
+1. **Basic Zombie** (Walker): Standard enemy
+2. **Runner Zombie**: Fast movement
+3. **Brute Zombie**: High HP, slow
+4. **Spitter Zombie**: Ranged attack
+5. **Swarmling Zombie**: Fast, low HP, swarms
+
+#### **Skeletons:**
+6. **Skeleton**: Basic undead
+7. **Archer Skeleton**: Ranged attacks
+8. **Warrior Skeleton**: Melee fighter
+
+### **Enemy Features:**
+- ✅ **Pathfinding**: A* pathfinding to HQ
+- ✅ **Sprite Animations**: Walking, death animations
+- ✅ **Separation Behavior**: Avoids crowding using spatial grids
+- ✅ **Coin Drops**: Enemies drop coins on death (1-5 based on type)
+- ✅ **Damage System**: HP-based with death states
+- ✅ **Reached Bottom**: Enemies damage HQ if they reach it
+
+---
+
+## 💰 Resource Management
+
+### **Resource Types:**
+1. **Wood**: Primary building material
+2. **Iron**: Advanced building material
+3. **Food**: Production resource
+4. **Coins**: Earned from killing enemies, used for research
+
+### **Resource Features:**
+- ✅ **Production Buildings**: Farm, Sawmill, Smelter generate resources
+- ✅ **Worker System**: Survivors gather from resource nodes
+- ✅ **Difficulty Scaling**: Starting resources vary by difficulty
+- ✅ **Cost Modifiers**: Day events and research affect costs
+- ✅ **Resource Display**: HUD shows all resources in bottom-right
+
+---
+
+## 🔬 Research System
+
+### **Research Tree:**
+- ✅ **Visual UI**: Pixel-art friendly research tree interface
+- ✅ **Node System**: Clickable research nodes with prerequisites
+- ✅ **Unlock System**: Unlocks new buildings/upgrades
+- ✅ **Cost System**: Coins-based research purchases
+- ✅ **Difficulty Scaling**: Research costs scale with difficulty
+- ✅ **Categories**: Organized by research type
+
+### **Known Research Items:**
+- **Sawmill**: Unlocks Sawmill building
+- **Smelter**: Unlocks Smelter building  
+- **Railgun**: Unlocks Piercer Turret
+- **Smelter Upgrades**: Alloy, Forge (tier upgrades)
+
+### **Research Features:**
+- ✅ **Unlock State Tracking**: Visual indicators (locked/unlocked/affordable)
+- ✅ **Prerequisites**: Research chains require previous unlocks
+- ✅ **Modifier Application**: Research affects game modifiers (fire rate, HP, etc.)
+
+---
+
+## 🎨 UI Systems
+
+### **UI Components:**
+
+1. **HUD (Heads-Up Display)**
+   - Day/Night indicator
+   - HQ HP bar
+   - Wave information
+   - Event banners (day announcements at Y: 120)
+   - Resource display (bottom-right)
+
+2. **Building Panel**
+   - Shows selected building info
+   - HP display (position: 45, 75)
+   - Building name (position: 45, 45, "turret" removed)
+   - Upgrade button (hidden at max tier)
+   - Repair button
+   - Sell button
+   - Demolish button
+
+3. **Build Menu**
+   - Bottom-left button bar
+   - Dynamic text colors:
+     - **Yellow**: Enough resources (default)
+     - **Red**: Not enough resources
+     - **Blue**: Selected (build mode)
+   - Custom button image: `asset/hud/BuildingButton.png`
+   - Position: 5px from left, 15px from bottom
+
+4. **Research Button**
+   - Top-left (10, 10)
+   - Custom image: `asset/hud/Research_button.png`
+   - Opens research tree (R key)
+
+5. **Tooltips**
+   - Build tooltips on hover
+   - Upgrade tooltips on hover
+   - Color-coded warnings
+
+6. **Start Screen**: Animated menu
+7. **Difficulty Screen**: Difficulty selection with descriptions
+8. **Pause Menu**: Resume/Restart/Quit options
+9. **Game Over Screen**: Win/loss with statistics
+
+---
+
+## 🎨 Graphics & Assets
+
+### **Custom Font System:**
+- ✅ **Yellow Font**: Default text color
+- ✅ **Red Font**: Warnings, unavailable items, zombie counter
+- ✅ **Blue Font**: Hover/selection states
+- ✅ **Arial Numbers**: System font for digits
+- ✅ **Sprite Sheet Letters**: 26 frames (A-Z), 17x22 pixels
+- ✅ **Scalable**: Multiple sizes (tiny, small, medium, large, huge)
+
+### **Sprite Systems:**
+- ✅ **Building Sprites**: Multi-tier sprite sheets
+- ✅ **Turret Animations**: 4-frame rotation animations
+- ✅ **Enemy Animations**: Walking, death animations
+- ✅ **Projectile Sprites**: Various projectile types
+- ✅ **Day/Night Tiles**: Different grass tiles for day/night
+
+---
+
+## 🎮 Controls
+
+### **Mouse:**
+- **Left Click**: Select building, place building, interact with UI
+- **Right Click**: Cancel build mode, deselect building
+- **Hover**: Show tooltips
+
+### **Keyboard:**
+- **ESC**: Pause/Resume, cancel modes
+- **R**: Open research tree
+- **G**: Toggle gather mode
+- **U**: Upgrade selected building
+- **SPACE**: Debug spawn horde (testing)
+- **F12**: Toggle debug mode / Skip state (if debug enabled)
+- **F1-F8**: Debug actions (when debug enabled)
+- **F9-F11**: Debug wave skipping (when debug enabled)
+
+---
+
+## 🔧 Upgrade System
+
+### **Tier Progression:**
+- **Tier 1** → 2 upgrade steps → **Tier 2**
+- **Tier 2** → 2 upgrade steps → **Tier 3 (MAX)**
+- **Tier 3**: No further upgrades (upgrade button hidden)
+
+### **Upgrade Costs:**
+- **Turret Upgrades**: Configurable per tier/step in `upgrade_config.py`
+- **Other Buildings**: 1.25x base cost multiplier per tier
+- **Difficulty Scaling**: Costs scale with difficulty multiplier
+- **No Coin Requirement**: Upgrades use Wood/Iron/Food only
+
+### **Upgrade Effects:**
+- HP scaling (1.15x per tier)
+- Damage/range scaling (varies by building type)
+- Visual tier upgrades (sprite changes)
+
+---
+
+## 🌍 Day Events System
+
+### **Features:**
+- ✅ **Random Events**: Rolled each day
+- ✅ **Modifiers**: Affect resource production, costs, enemy stats
+- ✅ **Visual Feedback**: Event banners on screen
+- ✅ **Duration**: Typically last 1 day
+
+### **Known Modifiers:**
+- Resource production multiplier
+- Coin drop multiplier
+- Build cost multiplier
+- Turret fire rate multiplier
+- Building damage taken multiplier
+- Zombie spawn/speed/HP multipliers
+- Turret range multiplier
+- Special effects (node spawn bonus, lightning storm)
+
+---
+
+## 👥 Survivor System
+
+### **Survivor Types:**
+1. **Worker**: Gathers resources from nodes
+2. **Guard**: Defensive unit (if implemented)
+
+### **Features:**
+- ✅ **Pathfinding**: Movement to assigned nodes
+- ✅ **Gather Mode**: Press G, click nodes to assign workers
+- ✅ **Separation Behavior**: Workers avoid crowding
+- ✅ **Assignment System**: Assign workers to resource nodes
+
+---
+
+## 🎯 Difficulty System
+
+### **Difficulty Levels:**
+
+1. **Easy**
+   - Starting: 500 Wood, 500 Iron, 500 Food
+   - Build cost: 0.75x
+   - Research: 1.0x
+   - Resource yield: 1.0x
+
+2. **Medium** (Default)
+   - Starting: 375 Wood, 375 Iron, 375 Food
+   - Build cost: 1.0x
+   - Research: 1.10x
+   - Resource yield: 0.75x
+
+3. **Hard**
+   - Starting: 300 Wood, 300 Iron, 300 Food
+   - Build cost: 1.2x
+   - Research: 1.30x
+   - Resource yield: 0.6x
+
+4. **Extreme**
+   - Starting: 200 Wood, 200 Iron, 200 Food
+   - Build cost: 1.5x
+   - Research: 1.60x
+   - Resource yield: 0.4x
+
+---
+
+## 🐛 Debug System
+
+### **Debug Features:**
+- ✅ **F12**: Toggle debug mode
+- ✅ **F1**: Add +100 resources
+- ✅ **F2**: Instant build all
+- ✅ **F3**: Spawn zombie at mouse
+- ✅ **F4**: Clear all enemies
+- ✅ **F5**: Clear all buildings
+- ✅ **F6**: Toggle spawner
+- ✅ **F7**: Kill all enemies
+- ✅ **F8**: Complete all buildings
+- ✅ **1**: Add +100 coins
+- ✅ **2**: Unlock all research
+- ✅ **3**: Roll day event
+- ✅ **F**: Toggle footprint display
+- ✅ **U**: Toggle UI rectangles
+- ✅ **F9-F11**: Skip waves/states
+- ✅ **Debug Overlay**: Shows entity counts, state info, modifiers
+
+---
+
+## 💾 Save System
+
+### **Features:**
+- ✅ **Automatic Saves**: After each night clears
+- ✅ **Manual Saves**: Possible via save system API
+- ✅ **Save Location**: `data/saves/last_run.json`
+- ✅ **Save Data**: Buildings, resources, wave state, research unlocks
+
+---
+
+## 🔊 Sound System
+
+### **Sound Events:**
+- ✅ Button clicks
+- ✅ Build placed
+- ✅ Building destroyed
+- ✅ Enemy death
+- ✅ Upgrade
+- ✅ Repair
+- ✅ Wave start/clear
+- ✅ Game over
+
+---
+
+## 📁 Project Structure
+
 ```
 Zombie-survival/
-├── main.py                 # Main game loop and entry point
-├── constants.py            # Game constants (screen size, animation timing)
-├── world/
-│   ├── building.py        # Base Building class (OOP architecture)
-│   ├── enemy.py           # Base Enemy class (OOP architecture)
-│   ├── projectile.py      # Projectile system for turrets
-│   ├── resources.py       # Resource management (Wood, Iron, Food)
-│   ├── map.py             # Grid system for building placement
-│   ├── spawner.py         # Enemy spawner system
-│   ├── debug.py           # Debug mode system
-│   ├── buildings/         # Building subclasses
-│   │   ├── hq.py
-│   │   ├── wall.py
-│   │   ├── gate.py
-│   │   ├── housing.py
-│   │   ├── farm.py
-│   │   ├── sawmill.py
-│   │   ├── smelter.py
-│   │   └── turret.py      # BallisticTurret with combat system
-│   └── enemies/           # Enemy subclasses
-│       └── zombie.py      # BasicZombie enemy
+├── main.py                 # Main game loop (3718 lines)
+├── constants.py            # Game constants
+├── difficulty_config.py    # Difficulty settings
+├── economy.py              # Cost scaling
+├── upgrade_config.py       # Upgrade costs
+├── research_tree.py        # Research UI
+├── core/                   # Core systems
+│   ├── game_state.py       # State management
+│   ├── wave_manager.py     # Wave system
+│   ├── save_system.py      # Save/load
+│   ├── sound.py            # Audio system
+│   └── day_events.py       # Day events
+├── world/                  # Game world
+│   ├── building.py         # Building base class
+│   ├── buildings/          # Building types
+│   ├── enemies/            # Enemy types
+│   ├── nodes.py            # Resource nodes
+│   ├── survivor.py         # Survivors
+│   ├── projectile.py       # Projectiles
+│   ├── pathfinding.py      # A* pathfinding
+│   └── research.py         # Research manager
+├── ui/                     # UI components
+│   ├── hud.py              # Heads-up display
+│   ├── building_panel.py   # Building info panel
+│   ├── build_tooltip.py    # Tooltips
+│   ├── custom_font.py      # Custom font system
+│   ├── research_button.py  # Research button
+│   └── ...                 # Other UI components
 ├── data/
-│   └── config/
-│       └── buildings.json # Data-driven building configuration
-└── asset/                 # Image assets (turret sprites)
+│   ├── config/             # JSON configs
+│   └── saves/              # Save files
+└── asset/                  # Game assets
+    ├── fonts/              # Font sprite sheets
+    ├── hud/                # UI images
+    └── ...                 # Other assets
 ```
 
-### 1.2 Design Patterns
-- **Object-Oriented Programming (OOP)**: Base classes with inheritance
-- **Data-Driven Design**: JSON configuration for building stats
-- **Component System**: Sprite groups for buildings, enemies, projectiles
-- **State Management**: BuildState system (PLANNING, CONSTRUCTING, ACTIVE, DESTROYED)
-- **Event-Driven Architecture**: Pygame event loop with keyboard/mouse input
+---
+
+## ✅ Completed Features
+
+1. ✅ Core game loop (60 FPS)
+2. ✅ Building system with 11+ building types
+3. ✅ Enemy system with 8 enemy types
+4. ✅ Wave management system
+5. ✅ Resource management
+6. ✅ Research tree system
+7. ✅ Upgrade system (tier-based)
+8. ✅ Save/load system
+9. ✅ UI system (HUD, panels, tooltips)
+10. ✅ Custom font system (3 colors)
+11. ✅ Day/night cycle
+12. ✅ Day events system
+13. ✅ Difficulty system (4 levels)
+14. ✅ Worker/survivor system
+15. ✅ Pathfinding system
+16. ✅ Projectile system
+17. ✅ Sound system
+18. ✅ Debug system
 
 ---
 
-## 2. Core Systems
+## 🔨 Recent Changes
 
-### 2.1 Building System ✅ **COMPLETE**
-
-**Base Building Class** (`world/building.py`):
-- Common attributes: HP, tier, construction progress, costs, footprint
-- Lifecycle: PLANNING → CONSTRUCTING → ACTIVE → DESTROYED
-- Features:
-  - Placement validation (footprint checking, grid bounds)
-  - Resource payment/refund (60% refund on cancellation)
-  - Construction progress tracking
-  - Damage/repair system
-  - Upgrade system (tier 1-3)
-  - Passive resource production (per minute)
-  - Save/load serialization (to_dict/from_dict)
-  - JSON configuration loading (per-building-class cache)
-
-**Building Types Implemented:**
-1. **HQ** - Headquarters (base building)
-2. **Wall** - Defensive structure
-3. **Gate** - Entry point
-4. **Housing** - Population/resource building
-5. **Farm** - Food production (120 food/min)
-6. **Sawmill** - Wood production (120 wood/min)
-7. **Smelter** - Iron production (120 iron/min)
-8. **BallisticTurret** - Combat turret with targeting system
-
-**Building Features:**
-- ✅ Resource costs (Wood, Iron, Food)
-- ✅ Build time system (seconds)
-- ✅ Construction progress bar
-- ✅ HP system with visual HP bar
-- ✅ Tier system (up to tier 3)
-- ✅ Passive resource production
-- ✅ Grid-based placement validation
-- ✅ Footprint blocking system
-- ✅ Destruction system (removes from grid)
-
-### 2.2 Enemy System ✅ **COMPLETE**
-
-**Base Enemy Class** (`world/enemy.py`):
-- Common attributes: HP, speed, damage, attack range, attack cooldown
-- Features:
-  - Building targeting (finds nearest building)
-  - Movement AI (moves toward target)
-  - Attack system (damages buildings on cooldown)
-  - HP bar display
-  - Death handling
-  - Screen boundary checking
-
-**Enemy Types Implemented:**
-1. **BasicZombie** - Basic zombie enemy
-   - HP: 50
-   - Speed: 30 pixels/second
-   - Damage: 5 per attack
-   - Attack Range: 32 pixels
-   - Attack Cooldown: 1.0 second
-
-**Enemy AI Behavior:**
-- ✅ Finds nearest building target
-- ✅ Moves toward target building
-- ✅ Stops at attack range (32 pixels)
-- ✅ Attacks building every 1.0 second
-- ✅ Re-targets when current target is destroyed
-- ✅ Falls back to moving down if no targets
-
-### 2.3 Combat System ✅ **COMPLETE**
-
-**Turret System** (`world/buildings/turret.py`):
-- Targeting: Finds nearest enemy within range (200 pixels)
-- Rotation: Smooth rotation toward target (180°/second)
-- Shooting: Fires projectiles when aimed and off cooldown
-- Animation: 8-frame firing animation (150ms per frame = 1200ms total)
-- Cooldown: 1700ms between shots (1200ms animation + 500ms delay)
-- Damage: 10 damage per projectile
-- Range: 200 pixels
-
-**Projectile System** (`world/projectile.py`):
-- Visual: Yellow/orange bullet (8x8 pixels)
-- Speed: 400 pixels/second
-- Damage: 10 per hit
-- Collision: Rectangle-based collision with enemies
-- Despawn: Out of bounds or max range (500 pixels)
-
-**Combat Flow:**
-1. Turret detects nearest enemy within range
-2. Turret rotates toward target
-3. Turret shoots when aimed (10° tolerance) and off cooldown
-4. Projectile spawns and moves toward target
-5. Projectile hits enemy (deals damage)
-6. Enemy takes damage (dies at 0 HP)
-7. Turret repeats cycle
-
-### 2.4 Resource System ✅ **COMPLETE**
-
-**Resource Management** (`world/resources.py`):
-- Resources: Wood, Iron, Food
-- Starting Resources: 500 Wood, 300 Iron, 200 Food
-- Production: Buildings produce resources per minute
-- Consumption: Buildings cost resources to build
-- Display: Resource counter in UI
-
-**Production Rates:**
-- Farm: 120 food/min (10 food per 5 seconds)
-- Sawmill: 120 wood/min (10 wood per 5 seconds)
-- Smelter: 120 iron/min (10 iron per 5 seconds)
-
-### 2.5 Grid System ✅ **COMPLETE**
-
-**Grid Management** (`world/map.py`):
-- Grid Size: 60x33.75 tiles (1920x1080 pixels / 32 pixels per tile)
-- Features:
-  - Footprint blocking (prevents overlapping buildings)
-  - Placement validation (bounds checking)
-  - Tile blocking/unblocking on construction/destruction
-  - Grid-to-pixel conversion
-
-### 2.6 Spawner System ✅ **COMPLETE**
-
-**Enemy Spawner** (`world/spawner.py`):
-- Spawn Interval: 1.0 second (configurable)
-- Spawn Location: Top of screen (random X position)
-- Features:
-  - Continuous spawning
-  - Horde spawning (multiple enemies at once)
-  - Spawn count limiting (optional)
-  - Active/inactive toggle
-
-### 2.7 Debug System ✅ **COMPLETE**
-
-**Debug Mode** (`world/debug.py`):
-- Toggle: F12 key
-- Features:
-  - FPS display
-  - Cursor position display
-  - Entity counts (buildings, enemies, turrets)
-  - Debug actions:
-    - F1: Add +100 Resources
-    - F2: Instant Build
-    - F3: Spawn Zombie @ Mouse
-    - F4: Clear All Enemies
-    - F5: Clear All Buildings
-    - F6: Toggle Spawner
-    - F7: Kill All Enemies
-    - F8: Complete All Buildings
+1. **Custom Font Integration**: Added sprite sheet-based font system (Yellow, Red, Blue)
+2. **Upgrade System Fix**: Changed tier progression from 3 steps to 2 steps (1→2→MAX)
+3. **UI Improvements**: 
+   - Building button positions adjusted
+   - HP text positioned at (45, 75)
+   - Building name at (45, 45) with "turret" removed
+   - Day announcement moved to Y: 120
+4. **Research Button**: Updated to use new image path
+5. **Upgrade Button**: Hidden when building is at max tier
 
 ---
 
-## 3. User Interface
+## ⚠️ Known Issues / Limitations
 
-### 3.1 Building Buttons ✅ **COMPLETE**
-- 8 building buttons on left side of screen
-- Button highlighting when selected
-- Click to select building type
-- Click again to deselect
-
-### 3.2 Building Preview ✅ **COMPLETE**
-- Green preview when placement is valid
-- Red preview when placement is invalid
-- Shows building footprint
-- Resource cost validation
-
-### 3.3 Resource Display ✅ **COMPLETE**
-- Wood, Iron, Food counters
-- Enemy count display
-- Position: Top-right of screen
-
-### 3.4 Building Selection ✅ **COMPLETE**
-- Click building to select
-- Selected building highlighted
-- ESC to deselect
-
-### 3.5 Debug Overlay ✅ **COMPLETE**
-- Debug panel (bottom-left)
-- FPS counter
-- Cursor position
-- Entity counts
-- Debug actions list
+1. **Merge Conflicts**: Resolved in `main.py` and `data/saves/last_run.json`
+2. **Python Version**: Uses Python 3.10+ type hints (Optional[] instead of |)
+3. **Asset Dependencies**: Some assets may be missing (fallbacks implemented)
 
 ---
 
-## 4. Gameplay Features
+## 🚀 Future Improvements (Potential)
 
-### 4.1 Building Placement ✅ **COMPLETE**
-- Grid-based placement (32x32 pixel tiles)
-- Footprint validation (prevents overlapping)
-- Resource cost checking
-- Placement preview (green/red)
-- Instant placement (debug mode)
-
-### 4.2 Building Construction ✅ **COMPLETE**
-- Construction progress bar
-- Build time system (seconds)
-- Resource payment on placement
-- 60% refund on cancellation (ESC)
-- State transitions (CONSTRUCTING → ACTIVE)
-
-### 4.3 Building Destruction ✅ **COMPLETE**
-- Zombies attack buildings (5 damage per attack, 1.0s cooldown)
-- Buildings take damage (HP decreases)
-- Buildings destroyed at 0 HP
-- Grid tiles unblocked on destruction
-- Buildings removed from game
-
-### 4.4 Combat ✅ **COMPLETE**
-- Turrets target nearest enemy (200 pixel range)
-- Turrets rotate toward target (180°/second)
-- Turrets shoot projectiles (10 damage, 400 px/s speed)
-- Projectiles hit enemies (rectangle collision)
-- Enemies take damage and die at 0 HP
-
-### 4.5 Resource Production ✅ **COMPLETE**
-- Buildings produce resources while ACTIVE
-- Production rates: 120 units/min per building
-- Resources accumulate over time
-- Visual feedback in resource display
+1. More enemy types
+2. More building types
+3. Advanced survivor AI
+4. More day events
+5. Achievement system
+6. Settings menu
+7. Tutorial system
+8. More difficulty modes
+9. Multiplayer support (unlikely)
+10. Performance optimizations
 
 ---
 
-## 5. Technical Specifications
+## 📊 Technical Specifications
 
-### 5.1 Performance
-- Target FPS: 60 FPS
-- Frame Time: ~16.67ms per frame
-- Delta Time: Frame-rate independent updates
-- Sprite Groups: Efficient collision detection
-
-### 5.2 Configuration
-- **JSON Configuration**: `data/config/buildings.json`
-  - Building stats (HP, costs, build time, production)
-  - Per-building-class configuration
-  - Runtime configuration loading
-  - Fallback to code defaults if JSON missing
-
-### 5.3 Animation System
-- **Turret Animation**: 8-frame sprite sheet
-- **Animation Timing**: 150ms per frame (1200ms total)
-- **Cooldown Sync**: 1700ms (1200ms animation + 500ms delay)
-- **Rotation**: Smooth rotation (180°/second)
-
-### 5.4 Collision Detection
-- **Rectangle Collision**: Buildings, enemies, projectiles
-- **Distance-Based**: Turret range, enemy attack range
-- **Grid-Based**: Building placement validation
+- **Language**: Python 3.10+
+- **Framework**: Pygame
+- **Resolution**: 1920x1080
+- **FPS**: 60
+- **Tile Size**: 32x32 pixels
+- **Grid System**: Tile-based placement
+- **Animation Steps**: 4 frames per turret rotation
+- **Save Format**: JSON
 
 ---
 
-## 6. Current Limitations & Known Issues
+## 📝 Notes
 
-### 6.1 Missing Features
-- ❌ Save/Load game system (code exists but not integrated)
-- ❌ Building upgrade UI (upgrade system exists but no UI)
-- ❌ Wave system (spawner is basic, no wave management)
-- ❌ Win/Lose conditions (no game over screen)
-- ❌ Pause menu
-- ❌ Settings menu
-- ❌ Sound effects / Music
-- ❌ Particle effects
-- ❌ Building repair system (repair function exists but no UI)
-
-### 6.2 Technical Limitations
-- **Pathfinding**: Zombies use simple direct movement (no obstacle avoidance)
-- **Building AI**: No building-specific behaviors (all buildings are passive)
-- **Enemy Variety**: Only one enemy type (BasicZombie)
-- **Turret Variety**: Only one turret type (BallisticTurret)
-- **Visual Polish**: Basic placeholder graphics (colored rectangles)
-
-### 6.3 Potential Issues
-- **Performance**: No optimization for large numbers of entities
-- **Memory**: No object pooling for projectiles/enemies
-- **Balancing**: Game balance not tuned (damage, costs, production rates)
-- **Error Handling**: Limited error handling for missing assets/config files
+- Game is fully playable from start to finish
+- All core systems are implemented and functional
+- Debug mode provides extensive testing capabilities
+- Custom font system provides consistent visual style
+- Research system unlocks gameplay progression
+- Upgrade system provides long-term progression
 
 ---
 
-## 7. Testing & Debugging
+**Report End**
 
-### 7.1 Debug Mode ✅ **COMPLETE**
-- Toggle: F12
-- Features: Resource manipulation, instant building, enemy spawning
-- Visual: Debug overlay with FPS, cursor position, entity counts
-
-### 7.2 Testing Scenarios
-- ✅ Building placement and construction
-- ✅ Resource production and consumption
-- ✅ Enemy spawning and movement
-- ✅ Turret targeting and shooting
-- ✅ Building destruction
-- ✅ Projectile collision
-- ✅ Grid system (placement validation)
-
----
-
-## 8. Future Development Recommendations
-
-### 8.1 High Priority
-1. **Wave System**: Implement wave-based spawning with increasing difficulty
-2. **Win/Lose Conditions**: Add game over screen and win conditions
-3. **Building Upgrade UI**: Add UI for upgrading buildings
-4. **Enemy Variety**: Add more enemy types (fast, tank, flying)
-5. **Turret Variety**: Add more turret types (splash damage, slow, freeze)
-
-### 8.2 Medium Priority
-1. **Pathfinding**: Implement A* pathfinding for zombies
-2. **Particle Effects**: Add visual effects for combat
-3. **Sound System**: Add sound effects and music
-4. **Save/Load**: Integrate save/load system
-5. **Building Repair**: Add repair UI and functionality
-
-### 8.3 Low Priority
-1. **Visual Polish**: Improve graphics (sprites, animations)
-2. **UI Polish**: Improve UI design and layout
-3. **Settings Menu**: Add settings (volume, graphics, controls)
-4. **Tutorial**: Add tutorial system
-5. **Achievements**: Add achievement system
-
----
-
-## 9. Code Quality & Maintainability
-
-### 9.1 Strengths
-- ✅ **Modular Architecture**: Clean separation of concerns
-- ✅ **OOP Design**: Proper inheritance and polymorphism
-- ✅ **Data-Driven**: JSON configuration for easy balancing
-- ✅ **Documentation**: Comments and docstrings in code
-- ✅ **Extensible**: Easy to add new buildings/enemies
-
-### 9.2 Areas for Improvement
-- **Error Handling**: Add more robust error handling
-- **Testing**: Add unit tests for core systems
-- **Code Organization**: Some files are large (main.py ~600 lines)
-- **Performance**: Optimize for large numbers of entities
-- **Documentation**: Add more comprehensive documentation
-
----
-
-## 10. Summary
-
-### 10.1 Completed Systems ✅
-- Building system (8 building types)
-- Enemy system (zombie AI with building targeting)
-- Combat system (turrets, projectiles, damage)
-- Resource system (production, consumption)
-- Grid system (placement, validation)
-- Spawner system (enemy spawning)
-- Debug system (testing tools)
-- UI system (buttons, previews, displays)
-
-### 10.2 Playable Features ✅
-- Build and defend base
-- Place buildings with resource costs
-- Construct buildings over time
-- Produce resources passively
-- Defend against zombie attacks
-- Turrets automatically target and shoot enemies
-- Buildings can be destroyed by zombies
-
-### 10.3 Game Status
-**Status:** ✅ **Core Gameplay Loop Complete**  
-**Playability:** ✅ **Fully Playable**  
-**Stability:** ✅ **Stable** (no known crashes)  
-**Performance:** ✅ **Good** (60 FPS on modern hardware)
-
----
-
-## 11. Consultant Discussion Points
-
-### 11.1 Technical Architecture
-- **OOP Design**: Clean inheritance hierarchy
-- **Data-Driven**: JSON configuration for balancing
-- **Modular**: Easy to extend and maintain
-- **Performance**: Efficient sprite groups and collision detection
-
-### 11.2 Game Design
-- **Core Loop**: Build → Defend → Survive
-- **Progression**: Resource production → Build more → Defend better
-- **Challenge**: Zombies attack buildings, turrets defend
-- **Balance**: Needs tuning (damage, costs, production rates)
-
-### 11.3 Next Steps
-1. **Wave System**: Add wave-based spawning
-2. **Win/Lose**: Add game over conditions
-3. **Variety**: Add more enemy/turret types
-4. **Polish**: Improve visuals and UI
-5. **Testing**: Playtest and balance game
-
-### 11.4 Questions for Consultant
-1. **Game Balance**: What are recommended damage/HP/cost ratios?
-2. **Wave Design**: How should waves scale in difficulty?
-3. **Progression**: What progression systems should be added?
-4. **Polish**: What visual/audio improvements are needed?
-5. **Scope**: What features are essential vs. nice-to-have?
-
----
-
-## 12. Conclusion
-
-The game has a **solid foundation** with all core systems implemented and working. The codebase is **well-structured** and **maintainable**, making it easy to add new features and content. The game is **fully playable** and provides a complete tower defense experience, though it needs **polish** and **content variety** for a finished product.
-
-**Recommendation**: Focus on **wave system**, **win/lose conditions**, and **enemy/turret variety** for the next development phase.
-
----
-
-**Report Generated:** Current Date  
-**Codebase Version:** Current Implementation  
-**Total Lines of Code:** ~2,500+ lines  
-**Files:** 20+ Python files  
-**Status:** ✅ **Production Ready (Core Systems)**
-
+*Generated from codebase analysis*

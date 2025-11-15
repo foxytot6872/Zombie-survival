@@ -36,6 +36,7 @@ class GatlingTurret(Building):
         self.damage = 5  # damage per shot - low damage
         self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 500.0  # pixels per second - fast projectiles
+        self.noise_value = 3  # Noise value for spawn attraction (Gatling = 3)
         self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.angle = 0
         self.target_angle = 0

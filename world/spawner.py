@@ -104,8 +104,8 @@ class Spawner:
                 if enemy_type in self.enemy_factory:
                     enemy_class = self.enemy_factory[enemy_type]
                     
-                    # Spawn enemy from random edge (top, bottom, left, right)
-                    spawn_pos = self._get_random_edge_spawn_position(batch_count)
+                    # Spawn enemy from weighted random edge (based on night bias + turret noise)
+                    spawn_pos = self._get_random_edge_spawn_position(batch_count, world)
                     
                     enemy = enemy_class(spawn_pos)
                     
@@ -126,15 +126,37 @@ class Spawner:
                     self.spawn_count += 1
                     batch_count += 1
     
-    def _get_random_edge_spawn_position(self, offset: int = 0):
+    def _get_random_edge_spawn_position(self, offset: int = 0, world=None):
         """
         Get a random spawn position on one of the four screen edges.
+        Uses night-based spawn bias and turret noise system.
+        
         Args:
             offset: Offset for staggering multiple spawns
+            world: World object (for noise calculation and night number)
         Returns:
             Tuple (x, y) spawn position
         """
-        edge = random.choice(["top", "bottom", "left", "right"])
+        # Get base spawn side from night bias
+        edge = "bottom"  # Default fallback
+        if world and hasattr(world, 'wave_manager') and world.wave_manager:
+            night = getattr(world.wave_manager, 'night', 1)
+            edge = world.wave_manager.get_spawn_side_for_night(night)
+        
+        # Apply turret noise influence if world is available
+        if world:
+            noise_weights = self._calculate_spawn_weights_with_noise(edge, world)
+            if noise_weights:
+                # Use weighted random with noise-influenced weights
+                total_weight = sum(noise_weights.values())
+                if total_weight > 0:
+                    rand = random.uniform(0, total_weight)
+                    cumulative = 0.0
+                    for side, weight in noise_weights.items():
+                        cumulative += weight
+                        if rand <= cumulative:
+                            edge = side
+                            break
         margin = 50  # Margin from screen edge
         
         if edge == "top":
@@ -156,6 +178,46 @@ class Spawner:
         
         return (spawn_x, spawn_y)
     
+    def _calculate_spawn_weights_with_noise(self, base_edge: str, world) -> Dict[str, float]:
+        """
+        Calculate spawn weights combining night bias and turret noise.
+        
+        Final weight = bias_weight + (quadrant_noise * 0.5)
+        Never let a weight hit 0.
+        
+        Args:
+            base_edge: Base spawn side from night bias
+            world: World object for noise calculation
+            
+        Returns:
+            Dictionary mapping sides to weights
+        """
+        # Get quadrant noise from world
+        quadrant_noise = {}
+        if hasattr(world, 'get_quadrant_noise'):
+            quadrant_noise = world.get_quadrant_noise()
+        
+        # Base weights from night bias (assume equal weight if not specified)
+        base_weights = {
+            "top": 0.0,
+            "bottom": 0.0,
+            "left": 0.0,
+            "right": 0.0
+        }
+        # Give base edge a weight of 1.0
+        base_weights[base_edge] = 1.0
+        
+        # Combine with noise (noise adds 0.5 * noise_value to weight)
+        noise_multiplier = 0.5
+        final_weights = {}
+        for side in ["top", "bottom", "left", "right"]:
+            noise_value = quadrant_noise.get(side, 0.0)
+            weight = base_weights.get(side, 0.0) + (noise_value * noise_multiplier)
+            # Never let weight hit 0
+            final_weights[side] = max(0.1, weight)
+        
+        return final_weights
+    
     def spawn_enemy(self, enemy_group: pygame.sprite.Group, enemy_class: Optional[Type[Enemy]] = None):
         """Spawn a single enemy (legacy method) - spawns from random edge"""
         if enemy_class is None:
@@ -165,8 +227,8 @@ class Spawner:
             else:
                 return
         
-        # Spawn from random edge
-        spawn_pos = self._get_random_edge_spawn_position()
+        # Spawn from weighted random edge (based on night bias + turret noise)
+        spawn_pos = self._get_random_edge_spawn_position(0, world=None)
         
         # Create enemy
         enemy = enemy_class(spawn_pos)
@@ -183,8 +245,8 @@ class Spawner:
                 return
         
         for i in range(count):
-            # Spawn from random edge
-            spawn_pos = self._get_random_edge_spawn_position(i)
+            # Spawn from weighted random edge (based on night bias + turret noise)
+            spawn_pos = self._get_random_edge_spawn_position(i, world=None)
             enemy = enemy_class(spawn_pos)
             enemy_group.add(enemy)
             self.spawn_count += 1

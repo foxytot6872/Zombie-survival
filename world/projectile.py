@@ -139,6 +139,12 @@ class Projectile(pygame.sprite.Sprite):
                             armor_pierce_mult = world.modifiers.get("enemy_armor_pierce_mult", 1.0)
                             # Apply armor pierce (increases damage against armored enemies)
                             effective_damage = int(self.damage * armor_pierce_mult)
+                        
+                        # SwarmlingZombie takes double damage (handled in enemy.take_damage, but apply here too for consistency)
+                        from world.enemies.swarmling import SwarmlingZombie
+                        if isinstance(enemy, SwarmlingZombie):
+                            effective_damage *= 2
+                        
                         enemy.take_damage(effective_damage)
                         self.hit = True
                         self.active = False

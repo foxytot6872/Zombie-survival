@@ -30,6 +30,7 @@ class BallisticTurret(Building):
         self.damage = 10  # damage per shot
         self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 400.0  # pixels per second
+        self.noise_value = 1  # Noise value for spawn attraction (Ballistic = 1)
         self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.angle = 0  # Current rotation angle in degrees
         self.target_angle = 0  # Target angle to rotate toward

@@ -22,6 +22,7 @@ class ResearchButton:
         
         # Try to load research_button.png
         image_paths = [
+            'asset/hud/Research_button.png',  # New path
             'asset/research_button.png',
             'asset/Research_button.png',
             'asset/Research_Button.png'

@@ -28,6 +28,7 @@ class PiercerTurret(Building):
         self.damage = 25  # damage per shot - high damage
         self.effective_damage = self.damage  # Will be modified by research/day events
         self.projectile_speed = 600.0  # pixels per second - very fast projectiles
+        self.noise_value = 5  # Noise value for spawn attraction (Railgun = 5)
         self.effective_projectile_speed = self.projectile_speed  # Will be modified by research/day events
         self.pierce = True  # Pierces through enemies
         self.pierce_count = 3  # Number of enemies to pierce

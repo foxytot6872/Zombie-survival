@@ -359,9 +359,13 @@ class Enemy(pygame.sprite.Sprite):
                     has_path = self.pathfinding_cache[cache_key]
                 else:
                     # Check if path exists
+                    # SwarmlingZombie ignores walls in pathfinding
+                    from world.enemies.swarmling import SwarmlingZombie
+                    ignore_walls = isinstance(self, SwarmlingZombie)
+                    
                     start_grid = (int(self.pos.x // 32), int(self.pos.y // 32))
                     goal_grid = (building.grid_x, building.grid_y)
-                    path = pathfinding.find_path(start_grid, goal_grid)
+                    path = pathfinding.find_path(start_grid, goal_grid, ignore_walls=ignore_walls)
                     has_path = path is not None
                     self.pathfinding_cache[cache_key] = has_path
                 
@@ -444,9 +448,14 @@ class Enemy(pygame.sprite.Sprite):
             self.on_attack_survivor(survivor)
     
     def take_damage(self, amount: int):
-        """Apply damage to enemy"""
+        """Apply damage to enemy. SwarmlingZombie takes double damage."""
         if not self.alive:
             return
+        
+        # SwarmlingZombie takes double damage
+        from world.enemies.swarmling import SwarmlingZombie
+        if isinstance(self, SwarmlingZombie):
+            amount *= 2
         
         self.hp -= amount
         if self.hp <= 0:

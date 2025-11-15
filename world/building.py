@@ -136,7 +136,7 @@ class Building(pygame.sprite.Sprite):
         self.tier = tier
         self.state = BuildState.CONSTRUCTING
         self.progress = 0.0
-        self.upgrade_progress = 0  # 0-3, where 3 upgrades = tier increase
+        self.upgrade_progress = 0  # 0-2, where 2 upgrades = tier increase
         # Store as instance attributes (may differ from class defaults due to config)
         self.BUILD_TIME = build_time if isinstance(build_time, (int, float)) else self.BUILD_TIME
         self.BASE_HP = base_hp if isinstance(base_hp, int) else self.BASE_HP
@@ -433,7 +433,7 @@ class Building(pygame.sprite.Sprite):
             if allow_max_progress:
                 if not hasattr(self, 'upgrade_progress'):
                     self.upgrade_progress = 0
-                if self.upgrade_progress >= 3:
+                if self.upgrade_progress >= 2:  # Changed from 3 to 2
                     return False
                 self.upgrade_progress += 1
                 self.on_upgrade()
@@ -447,8 +447,8 @@ class Building(pygame.sprite.Sprite):
         # Increment upgrade progress
         self.upgrade_progress += 1
         
-        # When progress reaches 3, actually upgrade the tier
-        if self.upgrade_progress >= 3:
+        # When progress reaches 2, actually upgrade the tier (changed from 3 to 2)
+        if self.upgrade_progress >= 2:
             self.tier += 1
             self.upgrade_progress = 0  # Reset progress for next tier
             # Recalculate max_hp with modifiers when upgrading

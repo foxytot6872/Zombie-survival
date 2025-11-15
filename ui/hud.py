@@ -273,7 +273,7 @@ class HUD:
             # Draw event banner
             event_surface = self.font_large.render(self.event_text, True, (255, 255, 255))
             event_surface.set_alpha(alpha)
-            event_rect = event_surface.get_rect(center=(self.screen_width // 2, 50))
+            event_rect = event_surface.get_rect(center=(self.screen_width // 2, 120))  # Moved lower from 50 to 120
             # Overlay rectangle for event banner (estimated ~600x60)
             if show_ui_rectangles:
                 overlay = pygame.Surface((600, 60), pygame.SRCALPHA)

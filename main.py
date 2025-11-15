@@ -1186,6 +1186,61 @@ class World:
         type_id = type_id.lower()
         for building in self.buildings_by_type.get(type_id, []):
             building.upgrade_level(new_level)
+    
+    def get_quadrant_noise(self) -> Dict[str, float]:
+        """
+        Calculate noise value for each quadrant based on turret positions.
+        Divides map into 4 quadrants and sums turret.noise_value inside each.
+        
+        Returns:
+            Dictionary mapping quadrants to noise values: {"top": N1, "bottom": N2, "left": N3, "right": N4}
+        """
+        import constants as c
+        
+        # Get screen dimensions for quadrant calculation
+        screen_width = c.SCREEN_WIDTH
+        screen_height = c.SCREEN_HEIGHT
+        mid_x = screen_width // 2
+        mid_y = screen_height // 2
+        
+        # Initialize noise values for each quadrant
+        noise_values = {
+            "top": 0.0,
+            "bottom": 0.0,
+            "left": 0.0,
+            "right": 0.0
+        }
+        
+        # Check all buildings for turrets
+        if not self.building_group:
+            return noise_values
+        
+        for building in self.building_group:
+            # Check if building has noise_value (turrets)
+            if hasattr(building, 'noise_value'):
+                noise = getattr(building, 'noise_value', 0.0)
+                if noise > 0:
+                    # Determine which quadrant(s) this turret is in
+                    pos_x = building.pos.x if hasattr(building, 'pos') else (building.grid_x * 32 + 16) if hasattr(building, 'grid_x') else screen_width // 2
+                    pos_y = building.pos.y if hasattr(building, 'pos') else (building.grid_y * 32 + 16) if hasattr(building, 'grid_y') else screen_height // 2
+                    
+                    # Determine quadrant (top/bottom/left/right based on position)
+                    # Top: y < mid_y
+                    # Bottom: y >= mid_y
+                    # Left: x < mid_x
+                    # Right: x >= mid_x
+                    
+                    if pos_y < mid_y:
+                        noise_values["top"] += noise
+                    else:
+                        noise_values["bottom"] += noise
+                    
+                    if pos_x < mid_x:
+                        noise_values["left"] += noise
+                    else:
+                        noise_values["right"] += noise
+        
+        return noise_values
 
 # Initialize core systems first
 game_state_manager = GameStateManager()
@@ -2945,7 +3000,15 @@ while running:
                 recipe = wave_manager.get_wave_recipe()
                 spawn_config = waves_config["spawn"]
                 zombie_spawner.begin(recipe, spawn_config)
-                hud.show_event(f"Night {wave_manager.night} Begins!", 3.0)
+                
+                # Display night modifier banner if present
+                if wave_manager.current_night_modifier:
+                    modifier_name = wave_manager.current_night_modifier.get("name", "Night Event")
+                    modifier_desc = wave_manager.current_night_modifier.get("description", "")
+                    hud.show_event(f"Night {wave_manager.night} – {modifier_name} ({modifier_desc})", 4.0)
+                else:
+                    hud.show_event(f"Night {wave_manager.night} Begins!", 3.0)
+                
                 sound_system.play("wave_start")
                 wave_manager.enemies_spawned = 0
             elif wave_manager.state == WaveManager.STATE_SUMMARY:

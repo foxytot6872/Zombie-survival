@@ -222,17 +222,18 @@ class BuildingPanel:
         y_offset = self.panel_rect.y + int(20 * self.scale)
         line_height = int(30 * self.scale)
         
-        # Building name (use larger font - default yellow)
+        # Building name - remove "turret" word, use smaller font, positioned at (45, 45)
         building_name = building.TYPE_ID.replace('_', ' ').title()
-        name_surface = self.font_large.render(building_name, True, (255, 255, 255))
-        surface.blit(name_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
-        y_offset += line_height + int(10 * self.scale)
+        building_name = building_name.replace(' Turret', '').replace('turret', '')  # Remove turret from name
+        name_surface = self.font_small.render(building_name, True, (255, 255, 255))
+        surface.blit(name_surface, (self.panel_rect.x + 45, self.panel_rect.y + 45))
+        # Don't update y_offset since we're using fixed position
         
-        # HP text (default yellow)
+        # HP text (default yellow) - positioned at (45, 85) relative to panel
         hp_text = f"HP: {building.hp} / {building.max_hp}"
         hp_surface = self.font_medium.render(hp_text, True, (255, 255, 255))
-        surface.blit(hp_surface, (self.panel_rect.x + int(10 * self.scale), y_offset))
-        y_offset += line_height
+        surface.blit(hp_surface, (self.panel_rect.x + 45, self.panel_rect.y + 75))
+        # Don't update y_offset since we're using fixed position
         
         # Draw HP bar using health bar frames at position (48, 115) relative to panel
         if self.health_bar_frames and len(self.health_bar_frames) > 0:
@@ -380,8 +381,8 @@ class BuildingPanel:
         else:
             self.upgrade_panel_rect = None
         
-        # Draw upgrade button at position (74, 330) relative to panel
-        if self.upgrade_button_frames and len(self.upgrade_button_frames) > 0:
+        # Draw upgrade button at position (74, 330) relative to panel - only if building can be upgraded
+        if self.upgrade_button_frames and len(self.upgrade_button_frames) > 0 and can_upgrade_any:
             button_x = self.panel_rect.x + 74
             button_y = self.panel_rect.y + 330
             
@@ -449,13 +450,10 @@ class BuildingPanel:
             
             # Draw the upgrade button
             surface.blit(button_frame, (button_x, button_y))
-
-            # Apply disabled overlay if needed
-            self.upgrade_button_disabled = not can_upgrade_any
-            if self.upgrade_button_disabled:
-                overlay = pygame.Surface((button_width, button_height), pygame.SRCALPHA)
-                overlay.fill((0, 0, 0, 160))
-                surface.blit(overlay, (button_x, button_y))
+        else:
+            # Button not drawn - clear upgrade_button_rect if at max level
+            if not can_upgrade_any:
+                self.upgrade_button_rect = None
         
         # Draw demolish button at position (301, 0) relative to panel
         if self.demolish_button_frames and len(self.demolish_button_frames) > 0:
