@@ -15,6 +15,7 @@ class PiercerTurret(Building):
     COST = Cost(wood=50, iron=40)
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
+    ALLOW_MAX_TIER_PROGRESS = True
     
     def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
         super().__init__(grid_pos, tier=tier, uid=uid)

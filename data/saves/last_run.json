@@ -18,10 +18,7 @@
     {
       "uid": "8fefbb14-95c8-49c5-a3a7-9f5afce0f047",
       "type": "hq",
-      "grid": [
-        29,
-        15
-      ],
+      "grid": [29, 15],
       "tier": 1,
       "hp": 2000,
       "state": "active",
@@ -625,3 +622,4 @@
   ],
   "game_state": "playing"
 }
+

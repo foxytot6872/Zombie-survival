@@ -19,7 +19,9 @@ class DifficultySettings:
     starting_resources: Dict[str, int]
     sawmill_yield_multiplier: float
     smelter_yield_multiplier: float
-    research_total_target: float
+    build_cost_multiplier: float
+    research_cost_multiplier: float
+    research_total_target: float | None = None
 
 
 DIFFICULTY_CONFIG: Dict[Difficulty, DifficultySettings] = {
@@ -29,6 +31,8 @@ DIFFICULTY_CONFIG: Dict[Difficulty, DifficultySettings] = {
         starting_resources={"wood": 500, "iron": 500, "food": 500},
         sawmill_yield_multiplier=1.0,
         smelter_yield_multiplier=1.0,
+        build_cost_multiplier=0.75,
+        research_cost_multiplier=1.0,
         research_total_target=600.0,
     ),
     Difficulty.MEDIUM: DifficultySettings(
@@ -37,23 +41,29 @@ DIFFICULTY_CONFIG: Dict[Difficulty, DifficultySettings] = {
         starting_resources={"wood": 375, "iron": 375, "food": 375},
         sawmill_yield_multiplier=0.75,
         smelter_yield_multiplier=0.75,
-        research_total_target=750.0,
+        build_cost_multiplier=1.0,
+        research_cost_multiplier=1.10,
+        research_total_target=None,
     ),
     Difficulty.HARD: DifficultySettings(
         name="Hard",
         description="Tight economy and expensive research.",
-        starting_resources={"wood": 250, "iron": 250, "food": 250},
-        sawmill_yield_multiplier=0.5,
-        smelter_yield_multiplier=0.5,
-        research_total_target=900.0,
+        starting_resources={"wood": 300, "iron": 300, "food": 300},
+        sawmill_yield_multiplier=0.6,
+        smelter_yield_multiplier=0.6,
+        build_cost_multiplier=1.2,
+        research_cost_multiplier=1.30,
+        research_total_target=None,
     ),
     Difficulty.EXTREME: DifficultySettings(
         name="Extreme",
         description="Brutal scarcity. Only for veterans.",
-        starting_resources={"wood": 100, "iron": 100, "food": 100},
-        sawmill_yield_multiplier=0.2,
-        smelter_yield_multiplier=0.2,
-        research_total_target=1000.0,
+        starting_resources={"wood": 200, "iron": 200, "food": 200},
+        sawmill_yield_multiplier=0.4,
+        smelter_yield_multiplier=0.4,
+        build_cost_multiplier=1.5,
+        research_cost_multiplier=1.60,
+        research_total_target=None,
     ),
 }
 

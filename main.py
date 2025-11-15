@@ -1,5 +1,6 @@
 ﻿import pygame
 import json
+import os
 from typing import Dict
 import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
@@ -26,6 +27,8 @@ from ui.hud import HUD
 from ui.research_button import ResearchButton
 from ui.start_screen import StartScreen
 from ui.difficulty_screen import SelectDifficultyScreen
+from ui.build_tooltip import BuildTooltipManager
+from upgrade_config import get_next_turret_upgrade, scale_upgrade_cost
 from research_tree import open_research_tree
 from world.research import ResearchManager
 from difficulty_config import Difficulty, DIFFICULTY_CONFIG
@@ -103,6 +106,22 @@ font_medium = load_pixel_font(PIXEL_FONT_PATH, 32)
 font_small = load_pixel_font(PIXEL_FONT_PATH, 24)
 font_tiny = load_pixel_font(PIXEL_FONT_PATH, 20)
 font_huge = load_pixel_font(PIXEL_FONT_PATH, 72)
+
+def load_build_item_config(path: str = os.path.join("data", "config", "build_items.json")) -> Dict:
+    """Load build item metadata for tooltips."""
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        print(f"Warning: build item config not found at {path}, using defaults")
+        return {}
+    except Exception as e:
+        print(f"Error loading build item config at {path}: {e}")
+        return {}
+
+
+build_item_config = load_build_item_config()
+
 
 ###################
 # Load images
@@ -1111,6 +1130,7 @@ class World:
 game_state_manager = GameStateManager()
 # Start in menu state
 game_state_manager.set_state(GameState.MENU)
+game_state_manager.difficulty = Difficulty.EASY
 save_system = SaveSystem()
 sound_system = SoundSystem()
 
@@ -1147,6 +1167,7 @@ pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
 building_panel = BuildingPanel(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upgrade_panel_frames, upgrade_panel_darken_frames, [], upgrade_button_frames, demolish_button_frames, health_bar_frames, current_level_frames, next_level_frames, font_large, font_medium, font_small)
+tooltip_manager = BuildTooltipManager(build_item_config, (c.SCREEN_WIDTH, c.SCREEN_HEIGHT))
 
 
 # Set UI callbacks
@@ -1825,9 +1846,15 @@ def apply_difficulty_settings(difficulty: Difficulty, *, reset_resources: bool =
     world.production_multipliers["sawmill"] = settings.sawmill_yield_multiplier
     world.production_multipliers["smelter"] = settings.smelter_yield_multiplier
     world.current_difficulty = difficulty
+    if hasattr(game_state_manager, "difficulty"):
+        game_state_manager.difficulty = difficulty
+    else:
+        game_state_manager.difficulty = difficulty
+    if 'tooltip_manager' in globals() and tooltip_manager:
+        tooltip_manager.set_difficulty(difficulty)
     if hasattr(wave_manager, "difficulty"):
         wave_manager.difficulty = difficulty.name.lower()
-    research_manager.apply_difficulty_scaling(settings.research_total_target)
+    research_manager.apply_difficulty_scaling(settings.research_total_target, settings.research_cost_multiplier)
 
 
 def restart_game():
@@ -1942,7 +1969,42 @@ difficulty_screen.on_cancel = handle_difficulty_cancel
 # Building panel callbacks (will be set up in game loop)
 def upgrade_building(building):
     """Upgrade building"""
-    if building and building.tier < building.TIER_MAX:
+    if not building or building.state != BuildState.ACTIVE:
+        return
+
+    current_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
+    type_id = getattr(building, "TYPE_ID", "").lower()
+    is_turret_building = type_id.startswith("turret")
+
+    def has_resources(cost_dict):
+        return (
+            resources.wood >= cost_dict.get("wood", 0) and
+            resources.iron >= cost_dict.get("iron", 0) and
+            resources.food >= cost_dict.get("food", 0) and
+            resources.coins >= cost_dict.get("coins", 0)
+        )
+
+    def pay_resources(cost_dict):
+        resources.wood -= cost_dict.get("wood", 0)
+        resources.iron -= cost_dict.get("iron", 0)
+        resources.food -= cost_dict.get("food", 0)
+        resources.coins -= cost_dict.get("coins", 0)
+
+    if is_turret_building:
+        upgrade_info = get_next_turret_upgrade(building)
+        if not upgrade_info or upgrade_info.get("is_max"):
+            print("Turret is at maximum level.")
+            return
+        scaled_cost = scale_upgrade_cost(upgrade_info["base_cost"], current_difficulty)
+        if not has_resources(scaled_cost):
+            print("Not enough resources for turret upgrade.")
+            return
+        pay_resources(scaled_cost)
+        building.upgrade(world)
+        sound_system.play("upgrade")
+        return
+
+    if building.tier < building.TIER_MAX:
         from world.building import Cost
         upgrade_mult = 1.25
         base_cost = building.COST
@@ -1951,16 +2013,12 @@ def upgrade_building(building):
             iron=int(base_cost.iron * upgrade_mult * building.tier),
             food=int(base_cost.food * upgrade_mult * building.tier)
         )
-        if (resources.wood >= upgrade_cost.wood and
-            resources.iron >= upgrade_cost.iron and
-            resources.food >= upgrade_cost.food):
+        if has_resources({"wood": upgrade_cost.wood, "iron": upgrade_cost.iron, "food": upgrade_cost.food, "coins": 0}):
             resources.wood -= upgrade_cost.wood
             resources.iron -= upgrade_cost.iron
             resources.food -= upgrade_cost.food
             building.upgrade(world)
-            # If it's a wall, refresh neighbors after upgrade
             if hasattr(building, 'on_upgrade') and callable(building.on_upgrade):
-                # on_upgrade will call autotile_wall_and_neighbors if world is set
                 if hasattr(building, 'world') and building.world:
                     building.on_upgrade()
                 elif isinstance(building, (WallWood, WallIron)) and world:
@@ -2582,10 +2640,13 @@ while running:
         screen.blit(building_menu_bg, (menu_x, menu_y))
     
     ###################
-    # Handle button clicks
+    # Handle button clicks and hover tooltips
     ###################
+    tooltip_shown = False
+    active_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
     for building_class, button_data in buttons.items():
-        if button_data['button'].draw(screen):
+        button_obj = button_data['button']
+        if button_obj.draw(screen):
             if selected_building_type == building_class:
                 # Deselect if clicking the same button
                 selected_building_type = None
@@ -2596,6 +2657,34 @@ while running:
                 build_mode = True
                 # Deselect any selected building when entering build mode
                 deselect_building()
+        if button_obj.rect.collidepoint(mouse_pos):
+            tooltip_manager.show_build_tooltip(
+                building_class,
+                button_obj.rect,
+                resources,
+                research_manager,
+                world=world,
+                difficulty=active_difficulty,
+            )
+            tooltip_shown = True
+
+    if (
+        building_panel.is_visible
+        and building_panel.selected_building
+        and getattr(building_panel.selected_building, "TYPE_ID", "").startswith("turret")
+        and building_panel.upgrade_button_rect
+        and building_panel.upgrade_button_rect.collidepoint(mouse_pos)
+    ):
+        tooltip_manager.show_upgrade_tooltip(
+            building_panel.selected_building,
+            building_panel.upgrade_button_rect,
+            resources,
+            active_difficulty,
+        )
+        tooltip_shown = True
+
+    if not tooltip_shown:
+        tooltip_manager.hide_tooltip()
     
     # DEBUG: Draw overlay rectangles for build menu buttons (bottom-left)
     if debug_system.is_active() and debug_system.show_ui_rectangles and buttons:
@@ -2613,6 +2702,8 @@ while running:
             button = buttons[selected_building_type]['button']
             # Draw highlight
             pygame.draw.rect(screen, (255, 255, 0), button.rect, 3)
+
+    tooltip_manager.draw(screen)
     
     ###################
     # Update buildings
@@ -3067,20 +3158,16 @@ while running:
         grid_pos = pixel_to_grid(mouse_pos)
         can_place = can_place_building(selected_building_type, grid_pos, grid)
         
-        # Check if we have enough resources (with day event modifiers)
-        cost = selected_building_type.get_cost()
-        # Apply build cost modifier from day events
-        if hasattr(world, 'modifiers'):
-            cost_mult = world.modifiers.get("build_cost_mult", 1.0)
-            effective_wood = int(cost.wood * cost_mult)
-            effective_iron = int(cost.iron * cost_mult)
-            effective_food = int(cost.food * cost_mult)
-        else:
-            effective_wood = cost.wood
-            effective_iron = cost.iron
-            effective_food = cost.food
+        # Check if we have enough resources (difficulty + modifiers)
+        preview_difficulty = getattr(game_state_manager, "difficulty", world.current_difficulty)
+        effective_cost = selected_building_type.get_scaled_cost(world=world, difficulty=preview_difficulty)
         
-        if resources.wood < effective_wood or resources.iron < effective_iron or resources.food < effective_food:
+        if (
+            resources.wood < effective_cost.wood
+            or resources.iron < effective_cost.iron
+            or resources.food < effective_cost.food
+            or resources.coins < effective_cost.coins
+        ):
             can_place = False
         
         draw_preview(screen, grid_pos, can_place, selected_building_type.FOOTPRINT)

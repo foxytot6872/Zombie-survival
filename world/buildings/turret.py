@@ -13,6 +13,7 @@ class BallisticTurret(Building):
     COST = Cost(wood=40, iron=30)
     FOOTPRINT = (1, 1)
     TIER_MAX = 3
+    ALLOW_MAX_TIER_PROGRESS = True
     
     def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
         # Initialize building first
