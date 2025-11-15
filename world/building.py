@@ -197,6 +197,45 @@ class Building(pygame.sprite.Sprite):
         self.image = new_image
         # Keep rect as footprint area - don't change it based on sprite size
 
+    # ------------------------------------------------------------------
+    # Dynamic sprite / level support
+    # ------------------------------------------------------------------
+    def upgrade_level(self, new_level: int):
+        """Upgrade building appearance level."""
+        if new_level <= 0:
+            new_level = 1
+        if new_level == self.level:
+            return
+        self.level = new_level
+        self.update_sprite()
+
+    def update_sprite(self):
+        """Update sprite based on current level (supports static or sheet)."""
+        if not self.level_sprites:
+            return
+
+        sprite_data = self.level_sprites.get(self.level)
+        if sprite_data is None:
+            # Fall back to highest available level
+            max_level = max(self.level_sprites.keys())
+            sprite_data = self.level_sprites.get(max_level)
+            if sprite_data is None:
+                return
+
+        center = self.rect.center if hasattr(self, "rect") else (self.pos.x, self.pos.y)
+
+        if isinstance(sprite_data, list):
+            if not sprite_data:
+                return
+            self.animation_frames = [frame.copy() for frame in sprite_data]
+            new_image = self.animation_frames[0]
+        else:
+            self.animation_frames = []
+            new_image = sprite_data.copy()
+
+        self.image = new_image
+        self.rect = self.image.get_rect(center=center)
+
     # ----- Placement & Economy -----
     @classmethod
     def can_place(cls, grid, grid_pos: Tuple[int,int], building_group=None) -> bool:

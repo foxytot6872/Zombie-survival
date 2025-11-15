@@ -25,7 +25,10 @@ from ui.building_panel import BuildingPanel
 from ui.hud import HUD
 from ui.research_button import ResearchButton
 from ui.start_screen import StartScreen
+<<<<<<< Updated upstream
 from ui.difficulty_screen import SelectDifficultyScreen
+=======
+>>>>>>> Stashed changes
 from research_tree import open_research_tree
 from world.research import ResearchManager
 from difficulty_config import Difficulty, DIFFICULTY_CONFIG
@@ -635,9 +638,12 @@ class World:
         self.hud = None
         self.nodes = node_group if node_group else pygame.sprite.Group()
         self.survivor_group = survivor_group if survivor_group else pygame.sprite.Group()
+<<<<<<< Updated upstream
         self.production_multipliers = {"sawmill": 1.0, "smelter": 1.0}
         self.current_difficulty = Difficulty.EASY
         self.sawmill_level = 0
+=======
+>>>>>>> Stashed changes
         self.buildings_by_type: Dict[str, list] = {}
     
     def enemy_count(self):

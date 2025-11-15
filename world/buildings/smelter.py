@@ -16,6 +16,7 @@ def load_smelter_sprite(path: str) -> pygame.Surface:
 
     if os.path.exists(path):
         try:
+<<<<<<< Updated upstream
             loaded = pygame.image.load(path).convert_alpha()
             SPRITE_CACHE[path] = loaded
             print(f"Loaded smelter sprite: {path} ({loaded.get_width()}x{loaded.get_height()})")
@@ -25,6 +26,14 @@ def load_smelter_sprite(path: str) -> pygame.Surface:
 
     # Placeholder if missing
     print(f"Warning: Smelter sprite not found at {path}, using placeholder")
+=======
+            SPRITE_CACHE[path] = pygame.image.load(path).convert_alpha()
+            return SPRITE_CACHE[path]
+        except Exception:
+            pass
+
+    # Placeholder if missing
+>>>>>>> Stashed changes
     surface = pygame.Surface((64, 64), pygame.SRCALPHA)
     surface.fill((90, 70, 70))
     pygame.draw.rect(surface, (30, 20, 20), surface.get_rect(), 2)
@@ -32,14 +41,22 @@ def load_smelter_sprite(path: str) -> pygame.Surface:
     return surface
 
 
+<<<<<<< Updated upstream
 def prepare_frames(surface: pygame.Surface, frame_width: int = 96) -> list[pygame.Surface] | pygame.Surface:
     """
     Split horizontal sprite sheet into frames.
     For smelter: 96x96 per frame, 4 frames = 384x96 sprite sheet.
+=======
+def prepare_frames(surface: pygame.Surface) -> list[pygame.Surface] | pygame.Surface:
+    """
+    Split horizontal sprite sheet into frames if width indicates multiple frames.
+    Otherwise return the surface itself.
+>>>>>>> Stashed changes
     """
     height = surface.get_height()
     width = surface.get_width()
 
+<<<<<<< Updated upstream
     if height == 0 or width == 0:
         return surface
 
@@ -54,6 +71,19 @@ def prepare_frames(surface: pygame.Surface, frame_width: int = 96) -> list[pygam
         return frames
 
     # Single frame
+=======
+    if height == 0:
+        return surface
+
+    if width > height and width % height == 0:
+        frames = []
+        frame_width = height  # assume square frames laid horizontally
+        for x in range(0, width, frame_width):
+            frame = surface.subsurface((x, 0, frame_width, height)).copy()
+            frames.append(frame)
+        return frames
+
+>>>>>>> Stashed changes
     return surface
 
 
@@ -69,13 +99,20 @@ class Smelter(Building):
     PASSIVE = Production(iron_per_min=120.0)  # 10 iron per 5 seconds = 120 per minute
 
     LEVEL_SPRITES = {
+<<<<<<< Updated upstream
         1: ("asset/smelter/Bricks_01-Sheet.png",),
         2: ("asset/smelter/Bricks_02-Sheet.png",),
         3: ("asset/smelter/Bricks_03-Sheet.png",),
+=======
+        1: ("asset/smelter/Bricks_01.png", "asset/smelter/Bricks_01-Sheet.png"),
+        2: ("asset/smelter/Bricks_02.png", "asset/smelter/Bricks_02-Sheet.png"),
+        3: ("asset/smelter/Bricks_03.png", "asset/smelter/Bricks_03-Sheet.png"),
+>>>>>>> Stashed changes
     }
 
     def __init__(self, grid_pos, tier=1, uid=None):
         super().__init__(grid_pos, tier=tier, uid=uid)
+<<<<<<< Updated upstream
         # Sync level with tier for sprite selection
         self.level = self.tier
         self.level_sprites = self._load_level_sprites()
@@ -95,10 +132,14 @@ class Smelter(Building):
         super().on_upgrade()
         # Sync level with tier when upgraded
         self.level = self.tier
+=======
+        self.level_sprites = self._load_level_sprites()
+>>>>>>> Stashed changes
         self.update_sprite()
 
     def _load_level_sprites(self):
         sprites = {}
+<<<<<<< Updated upstream
         # Frame sizes per tier: tier 1 = 64x64, tier 2-3 = 96x96
         frame_sizes = {
             1: 64,  # 64x64 per frame, 4 frames = 256x64
@@ -106,12 +147,15 @@ class Smelter(Building):
             3: 96,  # 96x96 per frame, 4 frames = 384x96
         }
         
+=======
+>>>>>>> Stashed changes
         for level, paths in self.LEVEL_SPRITES.items():
             surface = None
             for path in paths:
                 surface = load_smelter_sprite(path)
                 if surface is not None:
                     break
+<<<<<<< Updated upstream
             if surface is None:
                 # Create placeholder if all paths failed
                 frame_width = frame_sizes.get(level, 96)
@@ -202,3 +246,7 @@ class Smelter(Building):
             hp_bar_width = int(bar_width * hp_pct)
             if hp_bar_width > 0:
                 pygame.draw.rect(surface, hp_color, (bar_x, bar_y, hp_bar_width, bar_height))
+=======
+            sprites[level] = prepare_frames(surface)
+        return sprites
+>>>>>>> Stashed changes
