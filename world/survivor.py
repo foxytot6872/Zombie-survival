@@ -77,6 +77,7 @@ class Survivor(pygame.sprite.Sprite):
         # State
         self.alive = True
         self.state = SurvivorState.IDLE
+        self.can_gather_today = True  # Can gather today (injured survivors cannot)
         
         # Stuck detection
         self.last_progress_check_pos = pygame.Vector2(self.pos)
@@ -777,6 +778,14 @@ class Worker(Survivor):
                     self.state = SurvivorState.IDLE
                 return
             
+            # Check if survivor can gather today (injured survivors cannot gather)
+            if not getattr(self, 'can_gather_today', True):
+                # Injured survivor cannot gather - go idle
+                self.target_node = None
+                self.assigned_node = None
+                self.state = SurvivorState.IDLE
+                return
+            
             # Gather resources in ticks
             # Apply gather speed modifier
             gather_speed_mult = 1.0
@@ -793,11 +802,19 @@ class Worker(Survivor):
                 # Tick complete - gather resources
                 if self.can_carry_more():
                     gathered = self.target_node.gather_tick()
+                    
+                    # Apply gather bonus per node (from Clear Skies event)
+                    gather_bonus = 0
+                    if world and hasattr(world, 'modifiers'):
+                        gather_bonus = world.modifiers.get("gather_bonus_per_node", 0)
+                    
                     if gathered > 0:
+                        # Add bonus to gathered amount
+                        total_gathered = gathered + gather_bonus
                         # Add to carried resources
                         resource = self.target_node.resource
                         space_available = self.carry_capacity - self.get_total_carried()
-                        amount_to_add = min(gathered, space_available)
+                        amount_to_add = min(total_gathered, space_available)
                         self.carried[resource] += amount_to_add
                     self.current_gather_tick_time = 0.0
                 else:

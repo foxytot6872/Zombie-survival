@@ -1,6 +1,7 @@
 ﻿import pygame
 import json
 import os
+import random
 from typing import Dict, Optional
 import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
@@ -1932,6 +1933,62 @@ def spawn_initial_workers():
     
     print(f"Spawned {3} workers near HQ")
 
+def apply_special_event_effects(world, building_group, survivor_group, node_group, grid):
+    """Apply special event effects that require direct access to game objects."""
+    if not hasattr(world, 'modifiers'):
+        return
+    
+    modifiers = world.modifiers
+    
+    # Handle wall HP bonus
+    if "wall_hp_bonus" in modifiers and modifiers["wall_hp_bonus"] > 0:
+        from world.buildings.wall_wood import WallWood
+        from world.buildings.wall_iron import WallIron
+        bonus = modifiers["wall_hp_bonus"]
+        for building in building_group:
+            if isinstance(building, (WallWood, WallIron, Wall)):
+                building.hp = min(building.max_hp, building.hp + bonus)
+    
+    # Handle survivor grant
+    if "grant_survivor" in modifiers and modifiers["grant_survivor"] > 0:
+        count = modifiers["grant_survivor"]
+        # Find HQ position for spawning
+        hq_pos = None
+        for building in building_group:
+            if isinstance(building, HQ):
+                hq_pos = (building.grid_x * 32 + 16, building.grid_y * 32 + 16)
+                break
+        if hq_pos:
+            for _ in range(count):
+                # Spawn a new worker near HQ
+                spawn_x = hq_pos[0] + random.randint(-50, 50)
+                spawn_y = hq_pos[1] + random.randint(-50, 50)
+                worker = Worker((spawn_x, spawn_y), world=world)
+                survivor_group.add(worker)
+                if hasattr(world, 'register_survivor'):
+                    world.register_survivor(worker)
+    
+    # Handle injured survivor
+    if "injured_survivor" in modifiers and modifiers["injured_survivor"] > 0:
+        # Mark a random survivor as injured (cannot gather)
+        alive_workers = [s for s in survivor_group if s.alive and s.role == "worker"]
+        if alive_workers:
+            injured = random.choice(alive_workers)
+            # Store injured status in survivor (can't gather today)
+            injured.can_gather_today = False
+    
+    # Handle random building damage
+    if "random_building_damage" in modifiers and modifiers["random_building_damage"] > 0:
+        damage = modifiers["random_building_damage"]
+        # Get all non-HQ buildings
+        target_buildings = [b for b in building_group if not isinstance(b, HQ) and b.state == BuildState.ACTIVE]
+        if target_buildings:
+            target = random.choice(target_buildings)
+            target.hp = max(1, target.hp - damage)
+    
+    # Handle extra wood nodes (applied when spawning daily nodes)
+    # This is handled in spawn_daily_resource_nodes()
+
 def spawn_daily_resource_nodes():
     """Spawn daily resource nodes in clusters around the starting structure"""
     global node_group, world, grid, building_group
@@ -2006,9 +2063,14 @@ def spawn_daily_resource_nodes():
     num_scrap = daily_spawn.get("scrap", 3)
     
     # Apply node spawn bonus from day events
-    if hasattr(world, 'modifiers') and world.modifiers.get("node_spawn_bonus", False):
-        num_trees += 2  # Bonus trees
-        num_scrap += 2  # Bonus scrap
+    if hasattr(world, 'modifiers'):
+        if world.modifiers.get("node_spawn_bonus", False):
+            num_trees += 2  # Bonus trees
+            num_scrap += 2  # Bonus scrap
+        # Apply extra wood nodes from events
+        extra_wood = world.modifiers.get("extra_wood_nodes", 0)
+        if extra_wood > 0:
+            num_trees += extra_wood
     
     # Load node configs
     tree_config = None
@@ -2440,12 +2502,20 @@ def upgrade_building(building):
 
     if building.tier < building.TIER_MAX:
         from world.building import Cost
+        # Base upgrade multiplier (1.25× per tier level)
         upgrade_mult = 1.25
         base_cost = building.COST
+        base_upgrade_cost = {
+            "wood": int(base_cost.wood * upgrade_mult * building.tier),
+            "iron": int(base_cost.iron * upgrade_mult * building.tier),
+            "food": int(base_cost.food * upgrade_mult * building.tier)
+        }
+        # Apply difficulty-based upgrade cost multiplier
+        upgrade_cost_dict = scale_upgrade_cost(base_upgrade_cost, current_difficulty)
         upgrade_cost = Cost(
-            wood=int(base_cost.wood * upgrade_mult * building.tier),
-            iron=int(base_cost.iron * upgrade_mult * building.tier),
-            food=int(base_cost.food * upgrade_mult * building.tier)
+            wood=upgrade_cost_dict.get("wood", 0),
+            iron=upgrade_cost_dict.get("iron", 0),
+            food=upgrade_cost_dict.get("food", 0)
         )
         if has_resources({"wood": upgrade_cost.wood, "iron": upgrade_cost.iron, "food": upgrade_cost.food, "coins": 0}):
             resources.wood -= upgrade_cost.wood
@@ -2882,14 +2952,13 @@ def select_building(mouse_pos, building_group):
     return False
 
 def draw_resources(screen, resources, font):
-    """Draw resource display (including coins) at bottom, spanning horizontally."""
-    padding = 10
-    item_spacing = 30  # Space between items horizontally (increased from 20)
-    # Use smaller font for resources
-    resource_font = font_small  # Use pixel font for resource display
+    """
+    Draw resource display as a clean vertical panel on the left center.
+    Uses a semi-transparent background box with proper spacing.
+    """
+    import math
     
     # Handle NaN values by converting to 0
-    import math
     wood_val = resources.wood if not math.isnan(resources.wood) else 0
     iron_val = resources.iron if not math.isnan(resources.iron) else 0
     food_val = resources.food if not math.isnan(resources.food) else 0
@@ -2905,52 +2974,60 @@ def draw_resources(screen, resources, font):
     if math.isnan(resources.coins):
         resources.coins = 0
     
-    texts = [
-        f"Wood: {int(wood_val)}",
-        f"Iron: {int(iron_val)}",
-        f"Food: {int(food_val)}",
-        f"Coins: {int(coins_val)}",
-        f"Zombies: {len(enemy_group)}"
+    # Use consistent font for resources
+    resource_font = font_small
+    line_height = resource_font.get_linesize() + 4  # Extra spacing between lines
+    padding = 12  # Internal padding inside the panel
+    panel_x = 25  # Position from left edge (slightly inset)
+    
+    # Prepare resource data with labels and colors
+    resource_data = [
+        ("Wood", int(wood_val), (255, 255, 255)),
+        ("Iron", int(iron_val), (255, 255, 255)),
+        ("Food", int(food_val), (255, 255, 255)),
+        ("Coins", int(coins_val), (255, 215, 0)),  # Gold color for coins
+        ("Zombies", len(enemy_group), (255, 120, 120)),  # Light red for zombies
     ]
     
-    # Calculate total width needed
+    # Render all text surfaces and calculate panel dimensions
     text_surfaces = []
-    total_width = 0
-    for text in texts:
-        # Use gold color for coins, red custom font for zombies, white for others
-        if "Coins" in text:
-            color = (255, 215, 0)
-            text_surface = resource_font.render(text, True, color)
-            text_surfaces.append((text_surface, color))
-        elif "Zombies" in text:
-            # Use red custom font for zombie counter
+    max_width = 0
+    for label, value, color in resource_data:
+        text = f"{label}: {value}"
+        if label == "Zombies" and custom_font_red:
+            # Use red custom font for zombie counter if available
             zombie_font = create_scaled_custom_font(custom_font_red, 1.09, 24) if custom_font_red else resource_font
-            text_surface = zombie_font.render(text, True, (255, 255, 255))  # White color, red font
-            text_surfaces.append((text_surface, (255, 0, 0)))  # Store red color for reference
+            text_surface = zombie_font.render(text, True, color)
         else:
-            color = (255, 255, 255)
             text_surface = resource_font.render(text, True, color)
-            text_surfaces.append((text_surface, color))
-        total_width += text_surface.get_width() + item_spacing
+        text_surfaces.append((text_surface, label, value, color))
+        max_width = max(max_width, text_surface.get_width())
     
-    # Remove last spacing
-    total_width -= item_spacing
+    # Calculate panel dimensions
+    panel_width = max_width + padding * 2
+    panel_height = len(resource_data) * line_height + padding * 2
+
+    # Center panel vertically on the left side (กลางซ้าย)
+    panel_y = c.SCREEN_HEIGHT // 2 - panel_height // 2
     
-    # Position at bottom-right, spanning horizontally
-    start_x = c.SCREEN_WIDTH - total_width - padding  # Right-aligned with padding
-    start_y = c.SCREEN_HEIGHT - 45  # 45px from bottom (increased from 30)
+    # Draw semi-transparent background panel
+    panel_bg = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+    panel_bg.fill((30, 30, 40, 200))  # Dark semi-transparent background
+    # Draw border
+    pygame.draw.rect(panel_bg, (80, 100, 120, 255), panel_bg.get_rect(), width=2)
+    screen.blit(panel_bg, (panel_x, panel_y))
     
-    # DEBUG: Draw overlay rectangle for resource display area (horizontal span)
+    # Draw resource text lines vertically with proper spacing
+    current_y = panel_y + padding
+    for text_surface, label, value, color in text_surfaces:
+        screen.blit(text_surface, (panel_x + padding, current_y))
+        current_y += line_height
+    
+    # DEBUG: Draw overlay rectangle for resource display area
     if debug_system.is_active() and debug_system.show_ui_rectangles:
-        resource_overlay = pygame.Surface((total_width + 20, 45), pygame.SRCALPHA)
-        resource_overlay.fill((0, 255, 255, 80))  # Cyan overlay
-        screen.blit(resource_overlay, (start_x - 10, start_y - 5))
-    
-    # Draw all resources horizontally
-    current_x = start_x
-    for text_surface, color in text_surfaces:
-        screen.blit(text_surface, (current_x, start_y))
-        current_x += text_surface.get_width() + item_spacing
+        debug_overlay = pygame.Surface((panel_width, panel_height), pygame.SRCALPHA)
+        debug_overlay.fill((0, 255, 255, 80))  # Cyan overlay
+        screen.blit(debug_overlay, (panel_x, panel_y))
 
 def create_building(building_class, grid_pos, *args):
     """Create a building instance based on the building class."""
@@ -3417,31 +3494,135 @@ while running:
         if wave_manager._prev_state != wave_manager.state:
             # State changed
             if wave_manager.state == WaveManager.STATE_DAY:
-                # Just started day - roll random day event
+                # PERFECT FLOW FOR DAY PHASE START:
+                # 1. System Popup: "Day X Begins"
+                # 2. Daily Upkeep (survivor food consumption - NOT an event)
+                # 3. Luck Roll → Event Type
+                # 4. Pick Random Event Matching Type + Phase = Day
+                # 5. Show Event Popup
+                # 6. Apply Event Effects
+                # 7. Spawn daily nodes
+                
+                # STEP 1: SYSTEM POPUP - "Day X Begins" (separate from events)
+                if hud:
+                    hud.show_event(
+                        text=f"Day {wave_manager.day} Begins",
+                        duration=2.0,
+                        title=f"Day {wave_manager.day} Begins",
+                        description="",
+                        effects=[],
+                        event_type="neutral"
+                    )
+                
+                # STEP 2: DAILY UPKEEP - Survivor food consumption (automatic, not an event)
+                # Reset all survivors to can gather (injured status cleared)
+                for survivor in survivor_group:
+                    if survivor.alive:
+                        survivor.can_gather_today = True
+                
+                alive_survivors = sum(1 for s in survivor_group if s.alive)
+                food_needed = alive_survivors
+                
+                if food_needed > 0:
+                    if resources.food >= food_needed:
+                        # Deduct food (automatic upkeep)
+                        resources.food -= food_needed
+                        # Don't show popup for normal consumption - it's expected
+                    else:
+                        # Insufficient food - reduce HQ HP (starvation effect)
+                        food_shortage = food_needed - resources.food
+                        starving_survivors = food_shortage
+                        resources.food = 0  # Use all remaining food
+                        
+                        # Find HQ and reduce HP
+                        hq_building = None
+                        for building in building_group:
+                            if isinstance(building, HQ):
+                                hq_building = building
+                                break
+                        
+                        if hq_building:
+                            # Reduce HP by shortage amount (each missing food = 1 HP damage)
+                            damage = starving_survivors
+                            hq_building.hp = max(0, hq_building.hp - damage)
+                            if hud:
+                                hud.show_event(
+                                    text=f"Food Shortage! {starving_survivors} survivors starving.",
+                                    duration=3.0,
+                                    title="Starvation Warning",
+                                    description=f"HQ took {damage} damage from food shortage.",
+                                    effects=[],
+                                    event_type="negative"
+                                )
+                                sound_system.play("building_damaged")
+                            
+                            # Check if HQ died from food shortage
+                            if hq_building.hp <= 0:
+                                if not game_over_screen.is_visible:
+                                    game_state_manager.game_over()
+                                    game_over_screen.show(GameState.GAME_OVER, {
+                                        "nights": wave_manager.night - 1,
+                                        "enemies_killed": wave_manager.enemies_killed,
+                                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
+                                    })
+                                    sound_system.play("game_over")
+                                    hq_building.state = BuildState.DESTROYED
+                                    # Game over - continue to next iteration (game over screen will be shown)
+                
+                # STEP 3-6: LUCK-BASED RANDOM EVENT SYSTEM
+                # Always roll an event (luck determines type: positive/mixed/negative)
                 if world.day_events:
-                    world.day_events.roll_new_day_event(wave_manager.day)
-                # Spawn daily nodes
+                    world.day_events.roll_new_day_event(wave_manager.day, phase="day")
+                    # Apply special event effects (wall HP, survivors, etc.)
+                    apply_special_event_effects(world, building_group, survivor_group, node_group, grid)
+                
+                # STEP 7: Spawn daily resource nodes
                 spawn_daily_resource_nodes()
             elif wave_manager.state == WaveManager.STATE_NIGHT:
-                # Just started night
+                # PERFECT FLOW FOR NIGHT PHASE START:
+                # 1. Luck Roll → Event Type
+                # 2. Pick Random Event Matching Type + Phase = Night
+                # 3. Show Event Popup
+                # 4. Apply Event Effects
+                # 5. Spawn waves (with wave size modifier if present)
+                
+                # STEP 1-4: LUCK-BASED RANDOM EVENT SYSTEM
+                # Always roll a night event (luck determines type: positive/mixed/negative)
+                if world.day_events:
+                    world.day_events.roll_new_day_event(wave_manager.night, phase="night")
+                    # Apply special event effects
+                    apply_special_event_effects(world, building_group, survivor_group, node_group, grid)
+                
+                # STEP 5: Spawn zombie waves (apply wave size modifier if present)
                 recipe = wave_manager.get_wave_recipe()
+                # Apply wave size modifier from event if present
+                if hasattr(world, 'modifiers') and "zombie_wave_size_mult" in world.modifiers:
+                    size_mult = world.modifiers["zombie_wave_size_mult"]
+                    if size_mult != 1.0:
+                        # Scale all enemy counts in recipe
+                        scaled_recipe = {}
+                        for enemy_type, count in recipe.items():
+                            scaled_recipe[enemy_type] = max(1, int(count * size_mult))
+                        recipe = scaled_recipe
+                
                 spawn_config = waves_config["spawn"]
                 zombie_spawner.begin(recipe, spawn_config)
-                
-                # Display night modifier banner if present
-                if wave_manager.current_night_modifier:
-                    modifier_name = wave_manager.current_night_modifier.get("name", "Night Event")
-                    modifier_desc = wave_manager.current_night_modifier.get("description", "")
-                    hud.show_event(f"Night {wave_manager.night} – {modifier_name} ({modifier_desc})", 4.0)
-                else:
-                    hud.show_event(f"Night {wave_manager.night} Begins!", 3.0)
                 
                 sound_system.play("wave_start")
                 wave_manager.enemies_spawned = 0
             elif wave_manager.state == WaveManager.STATE_SUMMARY:
                 # Just started summary - autosave
                 save_system.save_world(world, wave_manager, game_state_manager, resources)
-                hud.show_event(f"Night {wave_manager.night - 1} Cleared!", 3.0)
+                # SYSTEM POPUP - "Night X Clear" (separate from events)
+                if hud:
+                    hud.show_event(
+                        text=f"Night {wave_manager.night - 1} Cleared",
+                        duration=2.0,
+                        title=f"Night {wave_manager.night - 1} Cleared",
+                        description="",
+                        effects=[],
+                        event_type="neutral"
+                    )
                 sound_system.play("wave_clear")
         
         wave_manager._prev_state = wave_manager.state
@@ -4068,10 +4249,15 @@ while running:
                 if button_clicked == "close":
                     # Clicked outside panel - deselect building and hide panel
                     deselect_building()
-                elif button_clicked in ("upgrade", "upgrade_to_iron"):
-                    building = building_panel.selected_building
-                    if building:
-                        upgrade_building(building)
+                elif button_clicked == "upgrade":
+                    # CONSTRUCTION RULES: Can only build/upgrade during Day Phase
+                    if wave_manager.state != WaveManager.STATE_DAY:
+                        hud.show_event("Can only upgrade during Day Phase!", 2.0)
+                        sound_system.play("button_click")
+                    else:
+                        building = building_panel.selected_building
+                        if building:
+                            upgrade_building(building)
                 elif button_clicked == "repair":
                     building = building_panel.selected_building
                     if building:
@@ -4139,6 +4325,12 @@ while running:
                 continue
             
             if build_mode and selected_building_type:
+                # CONSTRUCTION RULES: Can only build/upgrade during Day Phase
+                if wave_manager.state != WaveManager.STATE_DAY:
+                    hud.show_event("Can only build during Day Phase!", 2.0)
+                    sound_system.play("button_click")
+                    continue
+                
                 grid_pos = pixel_to_grid(mouse_pos)
                 can_place = can_place_building(selected_building_type, grid_pos, grid, building_group)
                 
@@ -4283,6 +4475,12 @@ while running:
             
             # Upgrade selected building (U key) - only when not paused/over
             if event.key == pygame.K_u and not game_over_screen.is_visible and not game_state_manager.is_paused():
+                # CONSTRUCTION RULES: Can only build/upgrade during Day Phase
+                if wave_manager.state != WaveManager.STATE_DAY:
+                    hud.show_event("Can only upgrade during Day Phase!", 2.0)
+                    sound_system.play("button_click")
+                    continue
+                
                 # Check building panel first (if visible), then global selected_building
                 building_to_upgrade = None
                 if building_panel.is_visible and building_panel.selected_building:

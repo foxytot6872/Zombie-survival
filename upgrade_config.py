@@ -19,10 +19,10 @@ TURRET_UPGRADE_CONFIG: Dict[str, list] = {
 }
 
 DIFFICULTY_UPGRADE_MULTIPLIER: Dict[Difficulty, float] = {
-    Difficulty.EASY: 0.75,
-    Difficulty.MEDIUM: 1.0,
-    Difficulty.HARD: 1.25,
-    Difficulty.EXTREME: 1.5,
+    Difficulty.EASY: 0.5,    # Easy: 0.5× upgrade cost (as per requirements)
+    Difficulty.MEDIUM: 1.0,   # Normal: 1.0× upgrade cost
+    Difficulty.HARD: 2.0,     # Hard: 2.0× upgrade cost (as per requirements)
+    Difficulty.EXTREME: 2.5,  # Extreme: 2.5× upgrade cost (more punishing than hard)
 }
 
 

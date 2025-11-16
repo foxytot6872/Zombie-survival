@@ -405,7 +405,11 @@ class Building(pygame.sprite.Sprite):
                         if p.iron_per_min > 0:
                             world.resources.iron += batch_amount
                         if p.food_per_min > 0:
-                            world.resources.food += batch_amount
+                            # Apply farm food bonus from day events
+                            farm_bonus = 0
+                            if hasattr(world, 'modifiers'):
+                                farm_bonus = world.modifiers.get("farm_food_bonus", 0)
+                            world.resources.food += batch_amount + farm_bonus
                     
                     # Reset timer (keep remainder for smooth timing)
                     self.production_timer -= self.production_interval

@@ -52,11 +52,16 @@ class HUD:
         self.hq_hp = 0
         self.hq_max_hp = 2000
         
-        # Event banner
+        # Event popup
         self.event_text = ""
+        self.event_title = ""  # Separate title for event popup
+        self.event_description = ""  # Event description
+        self.event_effects = []  # List of effect strings
+        self.event_type = "neutral"  # "positive", "mixed", "negative", or "neutral"
         self.event_timer = 0.0
-        self.event_duration = 3.0
+        self.event_duration = 4.0  # Default duration ~4 seconds
         self.event_visible = False
+        self.event_fade_alpha = 0  # For fade-in/fade-out animation
         
         # Day/night counter pulse animation
         self.day_night_pulse_anim = None  # PulseAnimation for day/night transitions
@@ -142,18 +147,70 @@ class HUD:
             if self.daycounter_current_frame >= len(self.daycounter_frames):
                 self.daycounter_current_frame = len(self.daycounter_frames) - 1
         
-        # Update event banner
+        # Update event popup (with fade-in/fade-out animation)
         if self.event_visible:
             self.event_timer -= dt
+            
+            # Fade-in: first 0.3 seconds
+            fade_in_duration = 0.3
+            # Fade-out: last 0.5 seconds
+            fade_out_duration = 0.5
+            
+            if self.event_timer > self.event_duration - fade_in_duration:
+                # Fading in
+                fade_progress = (self.event_duration - self.event_timer) / fade_in_duration
+                self.event_fade_alpha = int(255 * fade_progress)
+            elif self.event_timer < fade_out_duration:
+                # Fading out
+                fade_progress = self.event_timer / fade_out_duration
+                self.event_fade_alpha = int(255 * fade_progress)
+            else:
+                # Fully visible
+                self.event_fade_alpha = 255
+            
             if self.event_timer <= 0:
                 self.event_visible = False
+                self.event_fade_alpha = 0
     
-    def show_event(self, text: str, duration: float = 3.0):
-        """Show event banner"""
+    def show_event(
+        self,
+        text: str,
+        duration: float = 4.0,
+        title: str = "",
+        description: str = "",
+        effects: list = None,
+        event_type: str = "neutral",
+    ):
+        """
+        Show event popup with improved formatting.
+        
+        Args:
+            text: Full event text (for backward compatibility)
+            duration: How long to display (default 4 seconds)
+            title: Event title (e.g., "Lucky Day")
+            description: Event description (e.g., "Gathering yields +50% resources today.")
+            effects: List of effect strings (e.g., ["+50% Resource Production", "+2 Bonus Trees"])
+        """
         self.event_text = text
+        
+        # Parse text if title/description/effects not provided (backward compatibility)
+        if not title and ":" in text:
+            parts = text.split(":", 1)
+            title = parts[0].strip()
+            description = parts[1].strip() if len(parts) > 1 else text
+        elif not title:
+            title = "Event"
+            description = text
+        
+        self.event_title = title
+        self.event_description = description
+        self.event_effects = effects if effects else []
+        self.event_type = event_type or "neutral"
+        
         self.event_timer = duration
         self.event_duration = duration
         self.event_visible = True
+        self.event_fade_alpha = 0  # Start faded in (will fade in from 0)
     
     def show_starting_defenses_hint(self):
         """Show 'Starting Defenses' hint on Day 1"""
@@ -326,26 +383,96 @@ class HUD:
                 surface.blit(overlay, (self.screen_width - 260, wave_y))
             surface.blit(wave_surface, wave_rect)
         
-        # Draw event banner (top-center, fades in/out)
-        if self.event_visible:
-            # Calculate alpha based on timer
-            if self.event_timer > self.event_duration * 0.8:
-                # Fade in
-                alpha = int(255 * (1 - (self.event_timer - self.event_duration * 0.8) / (self.event_duration * 0.2)))
-            elif self.event_timer < self.event_duration * 0.2:
-                # Fade out
-                alpha = int(255 * (self.event_timer / (self.event_duration * 0.2)))
-            else:
-                alpha = 255
+        # Draw event popup panel (top-center, with overlay and fade animation)
+        if self.event_visible and self.event_fade_alpha > 0:
+            # Draw semi-transparent dark overlay behind popup
+            overlay_alpha = int(self.event_fade_alpha * 0.6)  # 60% opacity overlay
+            dark_overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
+            dark_overlay.fill((0, 0, 0, overlay_alpha))
+            surface.blit(dark_overlay, (0, 0))
             
-            # Draw event banner
-            event_surface = self.font_large.render(self.event_text, True, (255, 255, 255))
-            event_surface.set_alpha(alpha)
-            event_rect = event_surface.get_rect(center=(self.screen_width // 2, 120))  # Moved lower from 50 to 120
-            # Overlay rectangle for event banner (estimated ~600x60)
+            # Calculate popup panel dimensions
+            panel_padding = 20
+            popup_width = 600
+            popup_x = (self.screen_width - popup_width) // 2
+            popup_y = 150  # Top-center position
+            
+            # Prepare text content
+            title_text = self.event_title
+            desc_text = self.event_description
+            
+            # Choose colors based on event type
+            if self.event_type == "positive":
+                title_color = (210, 255, 210)
+                border_base = (80, 200, 120)
+            elif self.event_type == "negative":
+                title_color = (255, 210, 210)
+                border_base = (230, 100, 100)
+            elif self.event_type == "mixed":
+                title_color = (255, 245, 200)
+                border_base = (230, 210, 120)
+            else:
+                title_color = (255, 255, 200)
+                border_base = (107, 199, 255)
+
+            # Render title (large font)
+            title_surface = self.font_large.render(title_text, True, title_color)
+            title_surface.set_alpha(self.event_fade_alpha)
+            
+            # Render description (medium font, wrap if needed)
+            desc_surface = self.font_medium.render(desc_text, True, (255, 255, 255))
+            desc_surface.set_alpha(self.event_fade_alpha)
+            
+            # Render effects if any (small font)
+            effect_surfaces = []
+            if self.event_effects:
+                for effect in self.event_effects:
+                    effect_surface = self.font_small.render(f"• {effect}", True, (200, 255, 200))  # Light green
+                    effect_surface.set_alpha(self.event_fade_alpha)
+                    effect_surfaces.append(effect_surface)
+            
+            # Calculate panel height based on content
+            line_spacing = 8
+            title_height = title_surface.get_height()
+            desc_height = desc_surface.get_height()
+            effects_height = sum(s.get_height() + line_spacing for s in effect_surfaces) if effect_surfaces else 0
+            
+            popup_height = (panel_padding * 2 + 
+                           title_height + line_spacing * 2 +
+                           desc_height + line_spacing * 2 +
+                           effects_height)
+            
+            # Draw popup panel background
+            popup_bg = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
+            popup_bg.fill((40, 45, 55, int(self.event_fade_alpha * 0.95)))  # Dark semi-transparent background
+            # Draw border (color-coded by event type)
+            border_color = (*border_base, self.event_fade_alpha)
+            pygame.draw.rect(popup_bg, border_color, popup_bg.get_rect(), width=3, border_radius=8)
+            
+            # Apply border radius effect (simple approach)
+            popup_bg_rect = pygame.Rect(0, 0, popup_width, popup_height)
+            popup_bg.set_alpha(int(self.event_fade_alpha * 0.95))
+            surface.blit(popup_bg, (popup_x, popup_y))
+            
+            # Draw title
+            title_rect = title_surface.get_rect(centerx=popup_x + popup_width // 2, y=popup_y + panel_padding)
+            surface.blit(title_surface, title_rect)
+            
+            # Draw description (wrap if too long)
+            desc_y = title_rect.bottom + line_spacing * 2
+            desc_rect = desc_surface.get_rect(centerx=popup_x + popup_width // 2, y=desc_y)
+            surface.blit(desc_surface, desc_rect)
+            
+            # Draw effects
+            effect_y = desc_rect.bottom + line_spacing * 2
+            for effect_surface in effect_surfaces:
+                effect_rect = effect_surface.get_rect(x=popup_x + panel_padding + 20, y=effect_y)
+                surface.blit(effect_surface, effect_rect)
+                effect_y += effect_surface.get_height() + line_spacing
+            
+            # DEBUG: Draw overlay rectangle for event popup
             if show_ui_rectangles:
-                overlay = pygame.Surface((600, 60), pygame.SRCALPHA)
-                overlay.fill((255, 0, 255, 80))  # Magenta overlay
-                surface.blit(overlay, (self.screen_width // 2 - 300, 20))
-            surface.blit(event_surface, event_rect)
+                debug_overlay = pygame.Surface((popup_width, popup_height), pygame.SRCALPHA)
+                debug_overlay.fill((255, 0, 255, 80))  # Magenta overlay
+                surface.blit(debug_overlay, (popup_x, popup_y))
 
