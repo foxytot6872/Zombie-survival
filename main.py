@@ -1526,6 +1526,8 @@ game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, fo
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+# Play gamestart sound when start screen is first shown
+sound_system.play("gamestart")
 # Create scaled versions for building panel fonts
 custom_font_blue_large = create_scaled_custom_font(custom_font_blue, 2.18, 48) if custom_font_blue else None  # ~48px
 custom_font_blue_medium_panel = create_scaled_custom_font(custom_font_blue, 1.45, 32) if custom_font_blue else None  # ~32px
@@ -2397,6 +2399,7 @@ def open_difficulty_selection():
     """Transition from start screen to difficulty selection."""
     start_screen.hide()
     difficulty_screen.show()
+    sound_system.play("gamestart")
     game_state_manager.set_state(GameState.SELECT_DIFFICULTY)
 
 
@@ -2413,6 +2416,7 @@ def handle_difficulty_cancel():
     """Return to start screen from difficulty selection."""
     difficulty_screen.hide()
     start_screen.show()
+    sound_system.play("gamestart")
     game_state_manager.set_state(GameState.MENU)
 
 
@@ -3748,6 +3752,8 @@ while running:
             if coin_frames:
                 coin_drop = CoinDrop(enemy.pos.copy(), coin_reward, coin_frames)
                 coin_drops.append(coin_drop)
+                # Play coin drop sound
+                sound_system.play("coin")
             else:
                 # Fallback: directly add coins if no sprite frames available
                 resources.add_coins(coin_reward)

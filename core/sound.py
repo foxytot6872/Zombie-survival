@@ -53,7 +53,26 @@ class SoundSystem:
         ]
         
         for event_name in sound_events:
+            # Try .wav first, then .mp3
             sound_file = self.audio_dir / f"{event_name}.wav"
+            if not sound_file.exists():
+                sound_file = self.audio_dir / f"{event_name}.mp3"
+            
+            if sound_file.exists():
+                try:
+                    self.sounds[event_name] = pygame.mixer.Sound(str(sound_file))
+                    self.sounds[event_name].set_volume(self.volume)
+                except Exception as e:
+                    print(f"Warning: Could not load sound {event_name}: {e}")
+        
+        # Load additional sounds (coin, gamestart)
+        additional_sounds = ["coin", "gamestart"]
+        for event_name in additional_sounds:
+            # Try .mp3 first, then .wav
+            sound_file = self.audio_dir / f"{event_name}.mp3"
+            if not sound_file.exists():
+                sound_file = self.audio_dir / f"{event_name}.wav"
+            
             if sound_file.exists():
                 try:
                     self.sounds[event_name] = pygame.mixer.Sound(str(sound_file))
