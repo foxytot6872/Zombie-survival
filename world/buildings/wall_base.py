@@ -2,6 +2,14 @@
 from world.building import Building, Cost, BuildState, TILE
 import pygame
 
+# Module-level variable to store wall tiles (set from main.py)
+wall_tiles_dict = {}
+
+def set_wall_tiles(tiles_dict):
+    """Set the wall tiles dictionary from main.py"""
+    global wall_tiles_dict
+    wall_tiles_dict = tiles_dict
+
 class WallBase(Building):
     """Base class for walls - shared functionality."""
     FOOTPRINT = (1, 1)
@@ -20,24 +28,151 @@ class WallBase(Building):
             return (120, 120, 140), (180, 180, 200)
         return (100, 80, 60), (150, 130, 100)
 
-    def refresh_wall_variant(self, world=None):
-        """Reset the wall sprite to the default solid piece."""
-        if world is not None:
-            self.world = world
+    def has_wall(self, dx, dy):
+        """Check if there's a wall at offset (dx, dy) from this wall's position."""
+        if not self.world:
+            return False
+        gx = self.grid_x + dx
+        gy = self.grid_y + dy
+        return self.world.is_wall_at(gx, gy)
 
+    def get_wall_neighbor(self, dx, dy):
+        """Get the wall building object at offset (dx, dy), or None if not a wall."""
+        if not self.world:
+            return None
+        gx = self.grid_x + dx
+        gy = self.grid_y + dy
+        building = self.world.building_at(gx, gy)
+        if building and hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith("wall"):
+            return building
+        return None
+
+    def is_tile_type(self, tile_key):
+        """Check if this wall's current sprite matches a specific tile type."""
+        if not self.sprite or not wall_tiles_dict:
+            return False
+        target_tile = wall_tiles_dict.get(tile_key)
+        if not target_tile:
+            return False
+        # Compare sprite surfaces by checking if they're the same object or have same size/contents
+        # For simplicity, we compare by checking if sprite is the same surface object
+        return self.sprite is target_tile
+
+    def update_sprite(self):
+        """Update wall sprite based on neighboring walls (auto-tiling)."""
+        if not self.world:
+            return
+        
+        # Check neighbors (N, S, E, W)
+        N = self.has_wall(0, -1)
+        S = self.has_wall(0, 1)
+        E = self.has_wall(1, 0)
+        W = self.has_wall(-1, 0)
+        
+        # Get wall tiles dictionary
+        wall_tiles = wall_tiles_dict if wall_tiles_dict else {}
+        
+        # Determine sprite based on neighbors
+        if not wall_tiles:
+            # Fallback to old method if tiles not loaded
+            self.refresh_wall_variant_fallback()
+            return
+        
+        sprite = None
+        
+        # 1 — 4-way
+        if N and S and W and E:
+            sprite = wall_tiles.get("4way")
+        
+        # 2 — T-junctions
+        if sprite is None:
+            # T-up: has up, left, right, but no down
+            if N and W and E and not S:
+                sprite = wall_tiles.get("t_down")
+            # T-down: has down, left, right, but no up
+            elif S and W and E and not N:
+                sprite = wall_tiles.get("t_up")
+            # T-right: has up, down, right, but no left
+            elif N and S and E and not W:
+                sprite = wall_tiles.get("t_left")
+            # T-left: has up, down, left, but no right
+            elif N and S and W and not E:
+                sprite = wall_tiles.get("t_right")
+        
+        # 3 — Corners (MUST COME BEFORE VERTICAL RULE)
+        if sprite is None:
+            # Corner bottom-left
+            if S and W and not N and not E:
+                sprite = wall_tiles.get("corner_tr")
+            # Corner bottom-right
+            elif S and E and not N and not W:
+                sprite = wall_tiles.get("corner_tl")
+            # Corner top-left
+            elif N and W and not S and not E:
+                sprite = wall_tiles.get("corner_br")
+            # Corner top-right
+            elif N and E and not S and not W:
+                sprite = wall_tiles.get("corner_bl")
+        
+        # 4 — NEW VERTICAL RULE (after corners)
+        if sprite is None and (N or S):
+            if E:
+                sprite = wall_tiles.get("vertical_r")
+            elif W:
+                sprite = wall_tiles.get("vertical_l")
+            else:
+                sprite = wall_tiles.get("vertical_l")
+        
+        # 5 — HORIZONTAL
+        if sprite is None and (W or E):
+            sprite = wall_tiles.get("horizontal")
+        
+        # Fallback if nothing matched
+        if sprite is None:
+            sprite = wall_tiles.get("horizontal")
+        
+        # Set sprite (fallback to old method if sprite not found)
+        if sprite:
+            self.sprite = sprite
+            self.rect = self.sprite.get_rect(center=self.pos) if self.sprite else None
+        else:
+            self.refresh_wall_variant_fallback()
+
+    def refresh_wall_variant_fallback(self):
+        """Fallback method using old colored rectangle approach."""
         fill, border = self._get_fill_color()
         surface = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
         surface.fill(fill)
         pygame.draw.rect(surface, border, (0, 0, TILE, TILE), 2)
         self.sprite = surface
-        self.rect = self.sprite.get_rect(center=self.pos)
+        self.rect = self.sprite.get_rect(center=self.pos) if self.sprite else None
+
+    def refresh_wall_variant(self, world=None):
+        """Refresh wall variant - calls update_sprite for auto-tiling."""
+        if world is not None:
+            self.world = world
+        self.update_sprite()
 
     def on_place(self, world):
         self.refresh_wall_variant(world)
+        # Update all neighbors (this wall already updated by refresh_wall_variant)
+        if world:
+            gx, gy = self.grid_x, self.grid_y
+            for nx, ny in ((gx+1, gy), (gx-1, gy), (gx, gy+1), (gx, gy-1)):
+                neighbor = world.building_at(nx, ny)
+                if neighbor and hasattr(neighbor, "update_sprite"):
+                    neighbor.update_sprite()
 
     def on_complete(self, world=None):
         super().on_complete(world)
         self.refresh_wall_variant(world)
+        # Update all neighbors (this wall already updated by refresh_wall_variant)
+        if world:
+            gx, gy = self.grid_x, self.grid_y
+            for nx, ny in ((gx+1, gy), (gx-1, gy), (gx, gy+1), (gx, gy-1)):
+                neighbor = world.building_at(nx, ny)
+                if neighbor and hasattr(neighbor, "update_sprite"):
+                    neighbor.update_sprite()
 
     def on_destroy(self):
         gx, gy = self.grid_x, self.grid_y

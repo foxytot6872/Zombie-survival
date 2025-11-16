@@ -1095,6 +1095,36 @@ grass_tiles_day = load_grass_variants('asset/Grass_tile.png', (50, 100, 50))
 # Load night grass tiles
 grass_tiles_night = load_grass_variants('asset/Grassnight_tile.png', (30, 50, 30))
 
+# Load wall auto-tiling sprites
+wall_tiles = {}
+wall_sprite_paths = {
+    "4way": "asset/Wall/Wall-4way_lv1.png",
+    "corner_tl": "asset/Wall/Wall-corner-tl_lv1.png",
+    "corner_tr": "asset/Wall/Wall-corner-tr_lv1.png",
+    "corner_bl": "asset/Wall/Wall-corner-bl_lv1.png",
+    "corner_br": "asset/Wall/Wall-corner-br_lv1.png",
+    "horizontal": "asset/Wall/Wall-horizontal_lv1.png",
+    "vertical_l": "asset/Wall/Wall-vertical-l_lv1.png",
+    "vertical_r": "asset/Wall/Wall-vertical-r_lv1.png",
+    "t_up": "asset/Wall/Wall-t-up_lv1.png",
+    "t_down": "asset/Wall/Wall-t-down_lv1.png",
+    "t_left": "asset/Wall/Wall-t-left_lv1.png",
+    "t_right": "asset/Wall/Wall-t-right_lv1.png",
+}
+
+for tile_name, path in wall_sprite_paths.items():
+    wall_tiles[tile_name] = load_image_or_placeholder(
+        path,
+        (TILE, TILE),  # 32x32 pixels
+        (100, 100, 100, 255),
+        f"Wall tile: {tile_name}"
+    )
+print(f"Loaded {len(wall_tiles)} wall tile sprites")
+
+# Set wall tiles in WallBase module for auto-tiling
+from world.buildings.wall_base import set_wall_tiles
+set_wall_tiles(wall_tiles)
+
 ###################
 # Game state
 ###################
@@ -1335,8 +1365,9 @@ class World:
         """Refresh wall tile variants for the tile at (gx, gy) and its 4 neighbors."""
         for nx, ny in ((gx, gy), (gx+1, gy), (gx-1, gy), (gx, gy+1), (gx, gy-1)):
             b = self.building_at(nx, ny)
-            if b and hasattr(b, "refresh_wall_variant"):
-                b.refresh_wall_variant(self)
+            if b and hasattr(b, "update_sprite"):
+                b.world = self  # Ensure world is set
+                b.update_sprite()
     
     def autotile_wall_and_neighbors(self, gx, gy):
         """Alias for refresh_wall_and_neighbors (backwards compatibility)."""
@@ -2228,6 +2259,13 @@ def load_game():
         #     # Recreate buildings from data
         #     pass
         
+        # Auto-tile all walls after loading (ensures walls have correct sprites)
+        for building in building_group:
+            if hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith("wall"):
+                if hasattr(building, 'update_sprite'):
+                    building.world = world
+                    building.update_sprite()
+        
         # Restore game state
         game_state_manager.set_state(GameState(save_data["game_state"]))
         
@@ -2364,12 +2402,22 @@ def sell_building(building):
         if isinstance(building, HQ):
             print("Cannot sell HQ - it's the main base!")
             return
+        
+        # Check if this is a wall before removal
+        is_wall = hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith("wall")
+        gx, gy = building.grid_x, building.grid_y
+        
         building.refund_cost(resources, ratio=0.6, world=world)
-        grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
+        grid.set_footprint_blocked((gx, gy), building.FOOTPRINT, False)
         world.unregister_building(building)
         building_group.remove(building)
         if building in turret_group:
             turret_group.remove(building)
+        
+        # Update wall neighbors if this was a wall
+        if is_wall:
+            world.autotile_wall_and_neighbors(gx, gy)
+        
         building_panel.hide()
         sound_system.play("button_click")
         print(f"Sold {building.TYPE_ID}")
@@ -2381,12 +2429,22 @@ def demolish_building(building):
         if isinstance(building, HQ):
             print("Cannot demolish HQ - it's the main base!")
             return
+        
+        # Check if this is a wall before removal
+        is_wall = hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith("wall")
+        gx, gy = building.grid_x, building.grid_y
+        
         # Demolish without refund
-        grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, False)
+        grid.set_footprint_blocked((gx, gy), building.FOOTPRINT, False)
         world.unregister_building(building)
         building_group.remove(building)
         if building in turret_group:
             turret_group.remove(building)
+        
+        # Update wall neighbors if this was a wall
+        if is_wall:
+            world.autotile_wall_and_neighbors(gx, gy)
+        
         building_panel.hide()
         sound_system.play("button_click")
         print(f"Demolished {building.TYPE_ID}")
