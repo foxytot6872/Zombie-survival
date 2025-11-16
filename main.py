@@ -29,6 +29,7 @@ from ui.pause_menu import PauseMenu
 from ui.building_panel import BuildingPanel
 from ui.hud import HUD
 from ui.research_button import ResearchButton
+from ui.research_panel import ResearchPanel
 from ui.start_screen import StartScreen
 from ui.difficulty_screen import SelectDifficultyScreen
 from ui.build_tooltip import BuildTooltipManager
@@ -2846,11 +2847,16 @@ def rebuild_building_buttons():
 rebuild_building_buttons()
 
 def launch_research_tree():
-    """Open the research tree UI and rebuild buttons afterwards."""
-    open_research_tree(screen, world, research_manager, game_state_manager)
-    rebuild_building_buttons()
+    """Toggle the research panel and rebuild buttons afterwards when closing."""
+    # Toggle panel visibility
+    research_panel_ui.toggle()
+    # Rebuild building buttons next frame after closing via event loop
 
 research_button = ResearchButton(10, 10, 120, 40, launch_research_tree)
+
+# Research panel UI
+research_panel_ui = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT,
+                                  font_large=font_large, font_medium=font_medium, font_small=font_small)
 
 ###################
 # Helper functions
@@ -4036,6 +4042,10 @@ while running:
     if building_panel.is_visible:
         building_panel.draw(screen, resources, mouse_pos, show_ui_rects, dt)
     
+    # Draw research panel (overlay UI)
+    if research_panel_ui.visible:
+        research_panel_ui.draw(screen, show_ui_rects)
+    
     ###################
     # Draw research button
     ###################
@@ -4242,6 +4252,14 @@ while running:
             if research_button.handle_click(mouse_pos):
                 sound_system.play("button_click")
                 continue
+            
+            # Research panel click handling
+            if research_panel_ui.visible:
+                if research_panel_ui.handle_click(mouse_pos):
+                    # If panel was closed or research clicked, refresh building buttons after changes
+                    if not research_panel_ui.visible:
+                        rebuild_building_buttons()
+                    continue
             
             # Handle building panel clicks (upgrade/repair/sell)
             if building_panel.is_visible:

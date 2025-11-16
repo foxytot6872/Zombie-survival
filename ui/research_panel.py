@@ -25,9 +25,29 @@ class ResearchPanel:
         self.screen_height = screen_height
         self.visible = False
         
-        # Panel dimensions
-        panel_width = 600
-        panel_height = 500
+        # Load panel background image if available
+        self.panel_image = None
+        try:
+            import os
+            img_path = 'asset/hud/ResearchPanel.png'
+            if os.path.exists(img_path):
+                self.panel_image = pygame.image.load(img_path).convert_alpha()
+        except Exception as e:
+            print(f"Warning: Could not load ResearchPanel.png: {e}")
+            self.panel_image = None
+        
+        # Panel dimensions (use image size if present, otherwise default)
+        if self.panel_image:
+            img_w, img_h = self.panel_image.get_size()
+            # Fit within 90% of screen if too large, preserving aspect
+            max_w = int(screen_width * 0.9)
+            max_h = int(screen_height * 0.9)
+            scale = min(max_w / img_w, max_h / img_h, 1.0)
+            panel_width = int(img_w * scale)
+            panel_height = int(img_h * scale)
+        else:
+            panel_width = 900
+            panel_height = 700
         panel_x = (screen_width - panel_width) // 2
         panel_y = (screen_height - panel_height) // 2
         self.rect = pygame.Rect(panel_x, panel_y, panel_width, panel_height)
@@ -64,18 +84,26 @@ class ResearchPanel:
             panel_overlay.fill((128, 255, 128, 100))  # Light green overlay
             screen.blit(panel_overlay, self.rect)
         
-        # Draw panel background
-        panel_bg = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
-        panel_bg.fill((40, 40, 40, 240))
-        screen.blit(panel_bg, self.rect)
+        # Draw panel background (image if available, else fallback box)
+        if self.panel_image:
+            # Scale to rect size if needed
+            if self.panel_image.get_size() != (self.rect.width, self.rect.height):
+                scaled = pygame.transform.smoothscale(self.panel_image, (self.rect.width, self.rect.height))
+                screen.blit(scaled, self.rect)
+            else:
+                screen.blit(self.panel_image, self.rect)
+        else:
+            panel_bg = pygame.Surface((self.rect.width, self.rect.height), pygame.SRCALPHA)
+            panel_bg.fill((40, 40, 40, 240))
+            screen.blit(panel_bg, self.rect)
+            # Draw panel border
+            pygame.draw.rect(screen, (200, 200, 200), self.rect, 3)
         
-        # Draw panel border
-        pygame.draw.rect(screen, (200, 200, 200), self.rect, 3)
-        
-        # Draw title
-        title = self.font_large.render("Research", True, (255, 255, 255))
-        title_rect = title.get_rect(centerx=self.rect.centerx, y=self.rect.y + 20)
-        screen.blit(title, title_rect)
+        # Draw title only if no themed panel image is provided
+        if not self.panel_image:
+            title = self.font_large.render("Research", True, (255, 255, 255))
+            title_rect = title.get_rect(centerx=self.rect.centerx, y=self.rect.y + 20)
+            screen.blit(title, title_rect)
         
         # Draw coins display
         coins_text = f"Coins: {self.world.resources.coins}"
