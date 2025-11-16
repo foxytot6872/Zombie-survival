@@ -129,12 +129,14 @@ class BuildingPanel:
             # Check if clicking outside panel - close it
             if not self.panel_rect.collidepoint(mouse_pos):
                 self.hide()
+                print("BuildingPanel: close (clicked outside panel)")
                 return "close"
             
             # Check upgrade button click (if upgrade button is drawn)
             if self.upgrade_button_rect and self.upgrade_button_rect.collidepoint(mouse_pos):
                 # Check if button is disabled - if so, don't process click
                 if self.upgrade_button_disabled:
+                    print("BuildingPanel: upgrade button disabled")
                     return None
                 
                 self.upgrade_button_pressed = True
@@ -146,18 +148,22 @@ class BuildingPanel:
                 turret_info = get_next_turret_upgrade(self.selected_building) if is_turret else None
                 can_upgrade_turret = bool(turret_info and not turret_info.get("is_max"))
                 if can_upgrade_to_iron:
+                    print("BuildingPanel: upgrade_to_iron (upgrade button)")
                     return "upgrade_to_iron"
                 elif can_upgrade_tier or can_upgrade_turret:
+                    print("BuildingPanel: upgrade (upgrade button)")
                     return "upgrade"
             
             # Check demolish button click
             if self.demolish_button_rect and self.demolish_button_rect.collidepoint(mouse_pos):
+                print("BuildingPanel: demolish button")
                 return "demolish"
             
             # Check other button clicks
             if hasattr(self, 'button_rects'):
                 for button_name, button_rect in self.button_rects.items():
                     if button_rect.collidepoint(mouse_pos):
+                        print(f"BuildingPanel: button '{button_name}'")
                         return button_name
         
         if event.type == pygame.MOUSEBUTTONUP and event.button == 1:

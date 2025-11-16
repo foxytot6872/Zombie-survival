@@ -4249,7 +4249,8 @@ while running:
                 if button_clicked == "close":
                     # Clicked outside panel - deselect building and hide panel
                     deselect_building()
-                elif button_clicked == "upgrade":
+                elif button_clicked in ("upgrade", "upgrade_to_iron"):
+                    print(f"DEBUG: building panel click -> {button_clicked}")
                     # CONSTRUCTION RULES: Can only build/upgrade during Day Phase
                     if wave_manager.state != WaveManager.STATE_DAY:
                         hud.show_event("Can only upgrade during Day Phase!", 2.0)
@@ -4257,6 +4258,7 @@ while running:
                     else:
                         building = building_panel.selected_building
                         if building:
+                            print(f"DEBUG: upgrading building TYPE_ID={getattr(building,'TYPE_ID',None)} tier={getattr(building,'tier',None)} state={getattr(building,'state',None)}")
                             upgrade_building(building)
                 elif button_clicked == "repair":
                     building = building_panel.selected_building
