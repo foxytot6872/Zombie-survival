@@ -31,6 +31,13 @@ class PauseMenu:
         self.on_restart: Optional[Callable] = None
         self.on_quit: Optional[Callable] = None
         self.on_resume: Optional[Callable] = None  # For ESC key to resume
+        
+        # Optional 9-slice panel renderer (uses 32x32 tiles in asset/hud)
+        try:
+            from ui.panel import NineSlicePanel
+            self.panel_renderer = NineSlicePanel()
+        except Exception:
+            self.panel_renderer = None
     
     def show(self):
         """Show pause menu"""
@@ -79,7 +86,6 @@ class PauseMenu:
         """Draw pause menu"""
         if not self.is_visible:
             return
-        
         # Dark overlay
         overlay = pygame.Surface((self.screen_width, self.screen_height), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 180))
@@ -104,13 +110,25 @@ class PauseMenu:
                 surface.blit(button_overlay, (self.screen_width // 2 - 150, y_offset - 5))
                 y_offset += option_height
         
-        # Draw title
+        # Draw panel using 9-slice tiles if available (snapped to 32px grid)
+        menu_width, menu_height = 544, 384  # multiples of 32 for crisp tiling
+        menu_x = (self.screen_width - menu_width) // 2
+        menu_y = (self.screen_height - menu_height) // 2
+        menu_rect = pygame.Rect(menu_x, menu_y, menu_width, menu_height)
+        if self.panel_renderer and self.panel_renderer.is_ready():
+            self.panel_renderer.draw(surface, menu_rect)
+        else:
+            # Basic rectangle fallback
+            pygame.draw.rect(surface, (30, 30, 30), menu_rect)
+            pygame.draw.rect(surface, (200, 200, 200), menu_rect, 3)
+        
+        # Draw title centered on the panel
         title_surface = self.font_large.render("PAUSED", True, (255, 255, 255))
-        title_rect = title_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 - 200))
+        title_rect = title_surface.get_rect(center=(menu_rect.centerx, menu_rect.y + 60))
         surface.blit(title_surface, title_rect)
         
         # Draw options
-        y_offset = self.screen_height // 2 - 50
+        y_offset = menu_rect.centery - 50
         option_height = 60
         
         for i, option in enumerate(self.options):
