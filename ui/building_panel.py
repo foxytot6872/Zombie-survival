@@ -265,8 +265,18 @@ class BuildingPanel:
         
         # Tier - draw current level number
         if self.current_level_frames and len(self.current_level_frames) > 0:
+            # Determine display tier for UI (walls: wood=1, iron=2)
+            from world.buildings.wall_wood import WallWood
+            from world.buildings.wall_iron import WallIron
+            if isinstance(building, WallIron):
+                display_tier = 2
+            elif isinstance(building, WallWood):
+                display_tier = 1
+            else:
+                display_tier = building.tier
+
             # Get tier (1, 2, or 3) - convert to frame index (0, 1, or 2)
-            tier = building.tier
+            tier = display_tier
             level_frame_index = tier - 1  # tier 1 = frame 0, tier 2 = frame 1, tier 3 = frame 2
             level_frame_index = max(0, min(len(self.current_level_frames) - 1, level_frame_index))
             
