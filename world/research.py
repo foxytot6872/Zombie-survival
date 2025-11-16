@@ -119,14 +119,20 @@ class ResearchManager:
         for item in unlocks:
             self.unlocked.add(item)
         
-        # Apply modifiers immediately (stack multiplicatively)
+        # Apply modifiers immediately
         modifiers = self.research_defs[research_key].get("modifiers", {})
         for mod_key, mod_value in modifiers.items():
             if isinstance(mod_value, (int, float)):
-                # Multiplicative stacking: multiply current value by new value
-                # If this is the first research for this modifier, start from 1.0
-                current = self.research_modifiers.get(mod_key, 1.0)
-                self.research_modifiers[mod_key] = current * mod_value
+                # Special handling for additive modifiers (max_survivors)
+                if mod_key == "max_survivors":
+                    # Additive stacking for max_survivors
+                    current = self.research_modifiers.get(mod_key, 0)
+                    self.research_modifiers[mod_key] = current + mod_value
+                else:
+                    # Multiplicative stacking for other modifiers
+                    # If this is the first research for this modifier, start from 1.0
+                    current = self.research_modifiers.get(mod_key, 1.0)
+                    self.research_modifiers[mod_key] = current * mod_value
             else:
                 # For non-numeric modifiers, just set it
                 self.research_modifiers[mod_key] = mod_value
@@ -195,11 +201,18 @@ class ResearchManager:
         else:
             effective = self._get_default_modifiers()
         
-        # Apply research modifiers multiplicatively on top of day event modifiers
+        # Apply research modifiers on top of day event modifiers
         for mod_key, mod_value in self.research_modifiers.items():
             if isinstance(mod_value, (int, float)):
-                base_value = effective.get(mod_key, 1.0)
-                effective[mod_key] = base_value * mod_value
+                # Special handling for additive modifiers (max_survivors)
+                if mod_key == "max_survivors":
+                    # Additive stacking for max_survivors
+                    base_value = effective.get(mod_key, 0)
+                    effective[mod_key] = base_value + mod_value
+                else:
+                    # Multiplicative stacking for other modifiers
+                    base_value = effective.get(mod_key, 1.0)
+                    effective[mod_key] = base_value * mod_value
             else:
                 effective[mod_key] = mod_value
         

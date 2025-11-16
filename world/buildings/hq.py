@@ -14,8 +14,8 @@ class HQ(Building):
     # Class-level image (set from main.py after loading)
     building_image = None
     
-    def __init__(self, grid_pos, tier=1, uid=None, building_image=None):
-        super().__init__(grid_pos, tier, uid)
+    def __init__(self, grid_pos, tier=1, uid=None, building_image=None, world=None):
+        super().__init__(grid_pos, tier, uid, world)
         # Use provided image or class-level image
         self.building_image = building_image if building_image is not None else HQ.building_image
         # HQ spawns immediately active

@@ -83,7 +83,7 @@ class Survivor(pygame.sprite.Sprite):
         self.last_progress_check_pos = pygame.Vector2(self.pos)
         self.time_since_progress = 0.0
         self.path_recalc_timer = 0.0
-        self.path_recalc_interval = 0.5  # Recalculate path every 0.5 seconds
+        self.path_recalc_interval = 1.0  # Recalculate path every 1.0 seconds (optimized from 0.5)
         
         # Pathfinding
         self.current_path = []  # List of (grid_x, grid_y) positions
@@ -374,6 +374,7 @@ class Survivor(pygame.sprite.Sprite):
                 self.pos += push
                 self.rect.center = self.pos
     
+    
     def check_threat(self, world) -> bool:
         """Check if there are enemies within safe distance"""
         if not world or not hasattr(world, 'enemy_group'):
@@ -408,7 +409,8 @@ class Survivor(pygame.sprite.Sprite):
         if world and hasattr(world, 'pathfinding') and world.pathfinding:
             # Check if we need to recalculate path
             need_recalc = False
-            if self.path_target is None or (target_pos - self.path_target).length() > 32:
+            # OPTIMIZED: Increased threshold from 32 to 64 pixels to reduce pathfinding calls
+            if self.path_target is None or (target_pos - self.path_target).length() > 64:
                 need_recalc = True
             elif self.path_recalc_timer >= self.path_recalc_interval:
                 need_recalc = True
@@ -943,8 +945,59 @@ class Worker(Survivor):
         # Update animation
         self.update_animation(dt)
         
-        # Move worker
-        self.pos += self.velocity * dt
+        # Handle wall collisions using tile-based collision map (BEFORE movement)
+        # Survivors ignore gates (can pass through them)
+        if world and hasattr(world, 'collision_map') and world.collision_map and hasattr(world, 'tile_size'):
+            # Convert position to tile index
+            tile_x = int(self.pos.x // world.tile_size)
+            tile_y = int(self.pos.y // world.tile_size)
+            
+            # Check if current tile is solid
+            if world.collision_map.is_solid(tile_x, tile_y):
+                # Check if it's a gate (survivors can pass through gates)
+                is_gate = False
+                if world and hasattr(world, 'building_group'):
+                    for building in world.building_group:
+                        if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                            building.grid_x == tile_x and building.grid_y == tile_y):
+                            building_type = getattr(building, 'TYPE_ID', '').lower()
+                            if building_type == 'gate':
+                                is_gate = True
+                                break
+                
+                # Only collide with walls/HQ (not gates)
+                if not is_gate:
+                    # Push survivor back out of the wall
+                    self.pos -= self.velocity * dt * 1.2
+            
+            # Check the tile we're moving into
+            next_pos = self.pos + self.velocity * dt
+            next_tile_x = int(next_pos.x // world.tile_size)
+            next_tile_y = int(next_pos.y // world.tile_size)
+            
+            if world.collision_map.is_solid(next_tile_x, next_tile_y):
+                # Check if it's a gate
+                is_gate = False
+                if world and hasattr(world, 'building_group'):
+                    for building in world.building_group:
+                        if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                            building.grid_x == next_tile_x and building.grid_y == next_tile_y):
+                            building_type = getattr(building, 'TYPE_ID', '').lower()
+                            if building_type == 'gate':
+                                is_gate = True
+                                break
+                
+                # Only collide with walls/HQ (not gates)
+                if not is_gate:
+                    # Prevent moving into wall
+                    self.pos -= self.velocity * dt * 1.2
+            
+            # Normal movement (if no collision)
+            self.pos += self.velocity * dt
+        else:
+            # Fallback: normal movement if no collision map
+            self.pos += self.velocity * dt
+        
         self.rect.center = self.pos
     
     def draw(self, surface: pygame.Surface):

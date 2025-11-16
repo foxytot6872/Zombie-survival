@@ -112,7 +112,7 @@ class Building(pygame.sprite.Sprite):
             return config_data[key]
         return default
 
-    def __init__(self, grid_pos: Tuple[int,int], tier: int = 1, uid: Optional[str] = None):
+    def __init__(self, grid_pos: Tuple[int,int], tier: int = 1, uid: Optional[str] = None, world=None):
         # Production batch system
         self.production_timer: float = 0.0  # Timer for batch production
         self.production_interval: float = 5.0  # Seconds between batches
@@ -125,6 +125,9 @@ class Building(pygame.sprite.Sprite):
         self.level = 1
         self.level_sprites: Dict[int, Union[pygame.Surface, List[pygame.Surface]]] = {}
         self.animation_frames: List[pygame.Surface] = []
+        
+        # Store world reference for collision map access
+        self.world = world
         
         # Load config overrides
         self._load_config()
@@ -476,8 +479,27 @@ class Building(pygame.sprite.Sprite):
         return True
 
     # ----- Hooks -----
-    def on_complete(self, world=None): 
-        pass
+    def on_complete(self, world=None):
+        """Called when building finishes construction. Mark tiles as solid if needed."""
+        if not world or not hasattr(world, 'collision_map') or not world.collision_map:
+            return
+        
+        # Only mark walls, gates, and HQ as solid (not turrets, farms, sawmills, etc.)
+        building_type = getattr(self, 'TYPE_ID', '').lower()
+        is_wall = building_type.startswith('wall')
+        is_gate = building_type == 'gate'
+        is_hq = building_type == 'hq'
+        
+        if is_wall or is_gate or is_hq:
+            # Get building footprint
+            footprint = getattr(self, 'FOOTPRINT', (1, 1))
+            if isinstance(footprint, (list, tuple)) and len(footprint) >= 2:
+                footprint_w, footprint_h = footprint[0], footprint[1]
+            else:
+                footprint_w, footprint_h = 1, 1
+            
+            # Mark all tiles in footprint as solid
+            world.collision_map.set_footprint_solid(self.grid_x, self.grid_y, footprint_w, footprint_h)
 
     def get_attacker_capacity(self) -> int:
         """Get the maximum number of attackers this building can handle."""
@@ -499,9 +521,31 @@ class Building(pygame.sprite.Sprite):
             self.attacker_count -= 1
     
     def on_destroy(self):
+        """Called when building is destroyed. Unmark tiles from collision map if needed."""
         # Release all attacker slots when destroyed
         self.attacker_count = 0
-        pass
+        
+        # Get world from building instance (should be set during construction)
+        world = getattr(self, 'world', None)
+        if not world or not hasattr(world, 'collision_map') or not world.collision_map:
+            return
+        
+        # Only unmark walls, gates, and HQ (same as on_complete)
+        building_type = getattr(self, 'TYPE_ID', '').lower()
+        is_wall = building_type.startswith('wall')
+        is_gate = building_type == 'gate'
+        is_hq = building_type == 'hq'
+        
+        if is_wall or is_gate or is_hq:
+            # Get building footprint
+            footprint = getattr(self, 'FOOTPRINT', (1, 1))
+            if isinstance(footprint, (list, tuple)) and len(footprint) >= 2:
+                footprint_w, footprint_h = footprint[0], footprint[1]
+            else:
+                footprint_w, footprint_h = 1, 1
+            
+            # Unmark all tiles in footprint
+            world.collision_map.set_footprint_empty(self.grid_x, self.grid_y, footprint_w, footprint_h)
 
     def on_upgrade(self): 
         pass

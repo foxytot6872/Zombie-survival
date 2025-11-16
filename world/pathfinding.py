@@ -18,13 +18,14 @@ class Pathfinding:
         self.grid = grid
         self.building_group = building_group
     
-    def find_path(self, start: Tuple[int, int], goal: Tuple[int, int], ignore_walls: bool = False) -> Optional[List[Tuple[int, int]]]:
+    def find_path(self, start: Tuple[int, int], goal: Tuple[int, int], ignore_walls: bool = False, allow_gates: bool = True) -> Optional[List[Tuple[int, int]]]:
         """
         Find path from start to goal using A*.
         Args:
             start: Start position (grid_x, grid_y)
             goal: Goal position (grid_x, grid_y)
             ignore_walls: If True, ignore wall collisions (for SwarmlingZombie)
+            allow_gates: If True, gates are passable (for survivors). If False, gates are solid (for enemies).
         Returns:
             List of positions from start to goal, or None if no path found
         """
@@ -34,13 +35,13 @@ class Pathfinding:
         if not isinstance(goal[0], int):
             goal = (int(goal[0]), int(goal[1]))
         
-        # Check if start or goal is blocked (gates are passable, walls ignored if ignore_walls=True)
+        # Check if start or goal is blocked (gates are passable only if allow_gates=True, walls ignored if ignore_walls=True)
         if not ignore_walls:
-            if self.grid.is_blocked(start[0], start[1], check_passable=True, building_group=self.building_group):
+            if self.grid.is_blocked(start[0], start[1], check_passable=allow_gates, building_group=self.building_group):
                 return None
-            if self.grid.is_blocked(goal[0], goal[1], check_passable=True, building_group=self.building_group):
+            if self.grid.is_blocked(goal[0], goal[1], check_passable=allow_gates, building_group=self.building_group):
                 # Try to find nearby unblocked tile
-                goal = self._find_nearby_unblocked(goal, ignore_walls=ignore_walls)
+                goal = self._find_nearby_unblocked(goal, ignore_walls=ignore_walls, allow_gates=allow_gates)
                 if goal is None:
                     return None
         
@@ -82,12 +83,12 @@ class Pathfinding:
                     neighbor[1] < 0 or neighbor[1] >= self.grid.height):
                     continue
                 
-                # Check if blocked (gates are passable, walls ignored if ignore_walls=True)
+                # Check if blocked (gates are passable only if allow_gates=True, walls ignored if ignore_walls=True)
                 if not ignore_walls:
-                    if self.grid.is_blocked(neighbor[0], neighbor[1], check_passable=True, building_group=self.building_group):
+                    if self.grid.is_blocked(neighbor[0], neighbor[1], check_passable=allow_gates, building_group=self.building_group):
                         continue
                 else:
-                    # If ignoring walls, only block on non-wall buildings (e.g., HQ, turrets)
+                    # If ignoring walls, only block on non-wall buildings (e.g., HQ, turrets, gates if allow_gates=False)
                     # Check if there's a non-wall building at this position
                     if self.building_group:
                         blocked_by_non_wall = False
@@ -96,7 +97,24 @@ class Pathfinding:
                                 building.grid_x == neighbor[0] and building.grid_y == neighbor[1]):
                                 # Check if it's a wall (swarmlings can pass through walls)
                                 type_id = getattr(building, 'TYPE_ID', '').lower()
-                                if not type_id.startswith('wall') and not getattr(building, 'PASSABLE', False):
+                                is_gate = type_id == 'gate'
+                                is_wall = type_id.startswith('wall')
+                                
+                                # Walls are ignored (swarmlings can pass through)
+                                if is_wall:
+                                    continue
+                                
+                                # Gates block if allow_gates=False (for enemies)
+                                if is_gate and not allow_gates:
+                                    blocked_by_non_wall = True
+                                    break
+                                
+                                # Gates pass through if allow_gates=True (for survivors)
+                                if is_gate and allow_gates:
+                                    continue
+                                
+                                # Other non-wall, non-gate buildings block
+                                if not getattr(building, 'PASSABLE', False):
                                     blocked_by_non_wall = True
                                     break
                         if blocked_by_non_wall:
@@ -128,7 +146,7 @@ class Pathfinding:
         """Calculate heuristic distance between two points (Manhattan distance)"""
         return abs(a[0] - b[0]) + abs(a[1] - b[1])
     
-    def _find_nearby_unblocked(self, pos: Tuple[int, int], radius: int = 3, ignore_walls: bool = False) -> Optional[Tuple[int, int]]:
+    def _find_nearby_unblocked(self, pos: Tuple[int, int], radius: int = 3, ignore_walls: bool = False, allow_gates: bool = True) -> Optional[Tuple[int, int]]:
         """Find nearby unblocked tile"""
         for r in range(1, radius + 1):
             for dx in range(-r, r + 1):
@@ -138,19 +156,36 @@ class Pathfinding:
                     check_pos = (pos[0] + dx, pos[1] + dy)
                     if (0 <= check_pos[0] < self.grid.width and
                         0 <= check_pos[1] < self.grid.height):
-                        # Check if blocked (walls ignored if ignore_walls=True)
+                        # Check if blocked (gates are passable only if allow_gates=True, walls ignored if ignore_walls=True)
                         if not ignore_walls:
-                            if not self.grid.is_blocked(check_pos[0], check_pos[1], check_passable=True, building_group=self.building_group):
+                            if not self.grid.is_blocked(check_pos[0], check_pos[1], check_passable=allow_gates, building_group=self.building_group):
                                 return check_pos
                         else:
-                            # If ignoring walls, only block on non-wall buildings
+                            # If ignoring walls, only block on non-wall buildings (gates block if allow_gates=False)
                             if self.building_group:
                                 blocked = False
                                 for building in self.building_group:
                                     if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
                                         building.grid_x == check_pos[0] and building.grid_y == check_pos[1]):
                                         type_id = getattr(building, 'TYPE_ID', '').lower()
-                                        if not type_id.startswith('wall') and not getattr(building, 'PASSABLE', False):
+                                        is_gate = type_id == 'gate'
+                                        is_wall = type_id.startswith('wall')
+                                        
+                                        # Walls are ignored (swarmlings can pass through)
+                                        if is_wall:
+                                            continue
+                                        
+                                        # Gates block if allow_gates=False (for enemies)
+                                        if is_gate and not allow_gates:
+                                            blocked = True
+                                            break
+                                        
+                                        # Gates pass through if allow_gates=True (for survivors)
+                                        if is_gate and allow_gates:
+                                            continue
+                                        
+                                        # Other non-wall, non-gate buildings block
+                                        if not getattr(building, 'PASSABLE', False):
                                             blocked = True
                                             break
                                 if not blocked:

@@ -24,9 +24,11 @@ class WallBase(Building):
     FOOTPRINT = (1, 1)
     PASSABLE = False  # Walls block pathfinding
 
-    def __init__(self, grid_pos, tier=1, uid=None):
-        super().__init__(grid_pos, tier=tier, uid=uid)
-        self.world = None
+    def __init__(self, grid_pos, tier=1, uid=None, world=None):
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
+        # world is already set by parent, but keep for compatibility
+        if world is not None:
+            self.world = world
         self.sprite = None
         w, h = self.FOOTPRINT
         self.image = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)

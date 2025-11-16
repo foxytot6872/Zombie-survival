@@ -13,8 +13,8 @@ class Gate(Building):
     TIER_MAX = 3
     PASSABLE = True  # Gates are passable for pathfinding
     
-    def __init__(self, grid_pos, tier=1, uid=None):
-        super().__init__(grid_pos, tier, uid)
+    def __init__(self, grid_pos, tier=1, uid=None, world=None):
+        super().__init__(grid_pos, tier, uid, world)
         # Gates can be passable but still block placement
         self.passable = True
         # Lazy-load sprite assets once per class

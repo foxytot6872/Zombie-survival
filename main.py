@@ -14,6 +14,7 @@ from button import Button
 from world.map import Grid
 from world.resources import Resources
 from world.building import BuildState, Building
+from world.collision_map import CollisionMap
 # Core systems
 from core.wave_manager import WaveManager
 from core.game_state import GameState, GameStateManager
@@ -1169,6 +1170,9 @@ except:
 
 # Create grid and resources
 grid = Grid(GRID_WIDTH, GRID_HEIGHT, c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upper_fraction)
+
+# Collision map for fast tile-based collision detection
+collision_map = CollisionMap(GRID_WIDTH, GRID_HEIGHT, TILE)
 resources = Resources(wood=0, iron=0, food=0, coins=0)
 current_difficulty = Difficulty.EASY
 current_game_mode = GameMode.TEN_DAY
@@ -1319,7 +1323,7 @@ except FileNotFoundError:
 
 # World object for building updates
 class World:
-    def __init__(self, resources, grid, screen_height=c.SCREEN_HEIGHT, enemy_group=None, projectile_group=None, building_group=None, sound_system=None, wave_manager=None, pathfinding=None, node_group=None, survivor_group=None):
+    def __init__(self, resources, grid, screen_height=c.SCREEN_HEIGHT, enemy_group=None, projectile_group=None, building_group=None, sound_system=None, wave_manager=None, pathfinding=None, node_group=None, survivor_group=None, collision_map=None):
         self.resources = resources
         self.grid = grid
         self.screen_height = screen_height
@@ -1329,6 +1333,8 @@ class World:
         self.sound_system = sound_system
         self.wave_manager = wave_manager
         self.pathfinding = pathfinding
+        self.collision_map = collision_map
+        self.tile_size = TILE  # For easy access
         
         # Day event modifiers (initialized to neutral values)
         self.modifiers = {
@@ -1343,6 +1349,7 @@ class World:
             "turret_range_mult": 1.0,
             "node_spawn_bonus": False,
             "lightning_storm": False,
+            "max_survivors": 0,  # Base max survivors (can be increased by research)
         }
         
         # Day event manager (will be set after initialization)
@@ -1350,6 +1357,9 @@ class World:
         self.hud = None
         self.nodes = node_group if node_group else pygame.sprite.Group()
         self.survivor_group = survivor_group if survivor_group else pygame.sprite.Group()
+        
+        # Cache HQ reference for performance (avoid searching building_group every frame)
+        self.hq = None
 
         self.production_multipliers = {"sawmill": 1.0, "smelter": 1.0}
         self.current_difficulty = Difficulty.EASY
@@ -1362,6 +1372,20 @@ class World:
     def enemy_count(self):
         """Get current enemy count"""
         return len(self.enemy_group) if self.enemy_group else 0
+    
+    def get_max_survivors(self) -> int:
+        """Get maximum survivors allowed (base + research modifiers)"""
+        base_max = 3  # Starting 3 survivors
+        research_bonus = self.modifiers.get("max_survivors", 0)
+        return base_max + int(research_bonus)
+    
+    def get_current_survivor_count(self) -> int:
+        """Get current alive survivor count"""
+        return sum(1 for s in self.survivor_group if s.alive)
+    
+    def can_hire_survivor(self) -> bool:
+        """Check if player can hire another survivor"""
+        return self.get_current_survivor_count() < self.get_max_survivors()
     
     def deposit(self, resource: str, amount: int):
         """Deposit resources at HQ (stockpile)"""
@@ -1411,6 +1435,11 @@ class World:
         type_id = getattr(building, "TYPE_ID", building.__class__.__name__.lower())
         type_id = type_id.lower()
         self.buildings_by_type.setdefault(type_id, []).append(building)
+        
+        # Cache HQ reference when registering
+        from world.buildings.hq import HQ
+        if isinstance(building, HQ):
+            self.hq = building
 
     def unregister_building(self, building):
         type_id = getattr(building, "TYPE_ID", building.__class__.__name__.lower()).lower()
@@ -1421,6 +1450,11 @@ class World:
                     del self.buildings_by_type[type_id]
             except ValueError:
                 pass
+        
+        # Clear HQ cache if this building was HQ
+        from world.buildings.hq import HQ
+        if isinstance(building, HQ) and self.hq == building:
+            self.hq = None
 
     def upgrade_buildings(self, type_id: str, new_level: int):
         type_id = type_id.lower()
@@ -1499,7 +1533,7 @@ node_group = pygame.sprite.Group()
 survivor_group = pygame.sprite.Group()
 
 # Initialize world (wave_manager will be added after initialization)
-world = World(resources, grid, enemy_group=enemy_group, projectile_group=projectile_group, building_group=building_group, sound_system=sound_system, pathfinding=pathfinding, node_group=node_group, survivor_group=survivor_group)
+world = World(resources, grid, enemy_group=enemy_group, projectile_group=projectile_group, building_group=building_group, sound_system=sound_system, pathfinding=pathfinding, node_group=node_group, survivor_group=survivor_group, collision_map=collision_map)
 
 # Initialize research system (needed before building buttons)
 research_manager = ResearchManager(world)
@@ -1748,10 +1782,15 @@ def spawn_starting_layout():
     hq_gx = compound_left + (compound_width - hq_w) // 2
     hq_gy = compound_top + (compound_height - hq_h) // 2
     
-    hq = HQ((hq_gx, hq_gy), tier=1)
+    hq = HQ((hq_gx, hq_gy), tier=1, world=world)
+    hq.state = BuildState.ACTIVE
+    hq.hp = hq.max_hp
+    hq.progress = hq.BUILD_TIME
     building_group.add(hq)
     world.register_building(hq)
     grid.set_footprint_blocked((hq_gx, hq_gy), HQ.FOOTPRINT, True)
+    # Mark tiles as solid in collision map
+    hq.on_complete(world)
     
     # Store HQ reference in world
     if 'world' in globals():
@@ -1766,53 +1805,57 @@ def spawn_starting_layout():
     # Top wall
     for gx in range(compound_left, compound_right + 1):
         if 0 <= gx < W_TILES and 0 <= compound_top < H_TILES:
-            w = WallWood((gx, compound_top), tier=1)
+            w = WallWood((gx, compound_top), tier=1, world=world)
             w.state = BuildState.ACTIVE
             w.hp = w.max_hp
             w.progress = w.BUILD_TIME
-            w.world = world
             building_group.add(w)
             world.register_building(w)
             grid.set_footprint_blocked((gx, compound_top), WallWood.FOOTPRINT, True)
+            # Mark tiles as solid in collision map
+            w.on_complete(world)
             walls_placed.append((gx, compound_top))
     
     # Bottom wall
     for gx in range(compound_left, compound_right + 1):
         if 0 <= gx < W_TILES and 0 <= compound_bottom < H_TILES:
-            w = WallWood((gx, compound_bottom), tier=1)
+            w = WallWood((gx, compound_bottom), tier=1, world=world)
             w.state = BuildState.ACTIVE
             w.hp = w.max_hp
             w.progress = w.BUILD_TIME
-            w.world = world
             building_group.add(w)
             world.register_building(w)
             grid.set_footprint_blocked((gx, compound_bottom), WallWood.FOOTPRINT, True)
+            # Mark tiles as solid in collision map
+            w.on_complete(world)
             walls_placed.append((gx, compound_bottom))
     
     # Left wall (excluding corners already placed)
     for gy in range(compound_top + 1, compound_bottom):
         if 0 <= compound_left < W_TILES and 0 <= gy < H_TILES:
-            w = WallWood((compound_left, gy), tier=1)
+            w = WallWood((compound_left, gy), tier=1, world=world)
             w.state = BuildState.ACTIVE
             w.hp = w.max_hp
             w.progress = w.BUILD_TIME
-            w.world = world
             building_group.add(w)
             world.register_building(w)
             grid.set_footprint_blocked((compound_left, gy), WallWood.FOOTPRINT, True)
+            # Mark tiles as solid in collision map
+            w.on_complete(world)
             walls_placed.append((compound_left, gy))
     
     # Right wall (excluding corners already placed)
     for gy in range(compound_top + 1, compound_bottom):
         if 0 <= compound_right < W_TILES and 0 <= gy < H_TILES:
-            w = WallWood((compound_right, gy), tier=1)
+            w = WallWood((compound_right, gy), tier=1, world=world)
             w.state = BuildState.ACTIVE
             w.hp = w.max_hp
             w.progress = w.BUILD_TIME
-            w.world = world
             building_group.add(w)
             world.register_building(w)
             grid.set_footprint_blocked((compound_right, gy), WallWood.FOOTPRINT, True)
+            # Mark tiles as solid in collision map
+            w.on_complete(world)
             walls_placed.append((compound_right, gy))
     
     # After all walls are placed, refresh all wall variants so they see their neighbors
@@ -1839,13 +1882,15 @@ def spawn_starting_layout():
                         walls_placed.remove((gate_gx, gate_gy))
                         break
         
-        g = Gate((gate_gx, gate_gy), tier=1)
+        g = Gate((gate_gx, gate_gy), tier=1, world=world)
         g.state = BuildState.ACTIVE
         g.hp = g.max_hp
         g.progress = g.BUILD_TIME
         building_group.add(g)
         world.register_building(g)
         grid.set_footprint_blocked((gate_gx, gate_gy), Gate.FOOTPRINT, True)
+        # Mark tiles as solid in collision map (gates are solid for enemies)
+        g.on_complete(world)
         print(f"Gate placed at ({gate_gx}, {gate_gy})")
     
     # --- Place turrets outside walls ---
@@ -1944,6 +1989,42 @@ def spawn_initial_workers():
         survivor_group.add(worker)
     
     print(f"Spawned {3} workers near HQ")
+
+def hire_survivor():
+    """Hire a new survivor at HQ (cost: 50 coins)"""
+    global survivor_group, building_group, resources, world
+    
+    # Check if player can hire more survivors
+    if not world or not world.can_hire_survivor():
+        return False
+    
+    # Check if player has enough coins
+    if resources.coins < HIRE_SURVIVOR_COST:
+        return False
+    
+    # Find HQ position
+    hq_pos = None
+    for building in building_group:
+        if isinstance(building, HQ):
+            hq_pos = building.pos
+            break
+    
+    if not hq_pos:
+        return False
+    
+    # Deduct coins
+    resources.coins -= HIRE_SURVIVOR_COST
+    
+    # Spawn worker near HQ with slight random offset
+    import random
+    offset_x = random.randint(-50, 50)
+    offset_y = random.randint(30, 60)
+    worker_pos = (hq_pos.x + offset_x, hq_pos.y + offset_y)
+    worker = Worker(worker_pos, world=world)
+    survivor_group.add(worker)
+    
+    print(f"Hired new survivor at ({worker_pos[0]:.1f}, {worker_pos[1]:.1f}), cost: {HIRE_SURVIVOR_COST} coins")
+    return True
 
 def apply_special_event_effects(world, building_group, survivor_group, node_group, grid):
     """Apply special event effects that require direct access to game objects."""
@@ -2906,6 +2987,51 @@ def launch_research_tree():
 
 research_button = ResearchButton(10, 10, 120, 40, launch_research_tree)
 
+# Hire survivor button (cost: 50 coins)
+HIRE_SURVIVOR_COST = 50
+def hire_survivor_callback():
+    """Callback for hire survivor button"""
+    if hire_survivor():
+        sound_system.play("button_click")
+        return True
+    return False
+
+# Create hire survivor button similar to research button
+class HireSurvivorButton:
+    """Button to hire a new survivor."""
+    def __init__(self, x: int, y: int, width: int, height: int, callback):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.callback = callback
+        self.text = "Hire Survivor"
+        self.enabled = True
+        self.rect = pygame.Rect(x, y, width, height)
+    
+    def draw(self, screen: pygame.Surface):
+        """Draw the hire survivor button."""
+        # Draw button background
+        bg_color = (60, 80, 100) if self.enabled else (40, 40, 40)
+        pygame.draw.rect(screen, bg_color, self.rect)
+        pygame.draw.rect(screen, (200, 200, 200) if self.enabled else (100, 100, 100), self.rect, 2)
+        
+        # Draw text
+        font = pygame.font.Font(None, 24)
+        text_color = (255, 255, 255) if self.enabled else (150, 150, 150)
+        label = font.render(self.text, True, text_color)
+        label_rect = label.get_rect(center=(self.rect.centerx, self.rect.centery))
+        screen.blit(label, label_rect)
+    
+    def handle_click(self, mouse_pos: tuple) -> bool:
+        """Handle mouse click on button."""
+        if self.enabled and self.rect.collidepoint(mouse_pos):
+            self.callback()
+            return True
+        return False
+
+hire_survivor_button = HireSurvivorButton(25, 200, 150, 40, hire_survivor_callback)
+
 # Research panel UI
 research_panel_ui = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT,
                                   font_large=font_large, font_medium=font_medium, font_small=font_small)
@@ -3093,31 +3219,27 @@ def create_building(building_class, grid_pos, *args):
     if building_class is BallisticTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
-            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
-            building.world = world
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1, world=world)
             world.register_building(building)
             turret_group.add(building)
             return building
     elif building_class is PiercerTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
-            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
-            building.world = world
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1, world=world)
             world.register_building(building)
             turret_group.add(building)
             return building
     elif building_class is GatlingTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
-            building = building_class(grid_pos, sprite_sheets, base_images, tier=1)
-            building.world = world
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1, world=world)
             world.register_building(building)
             turret_group.add(building)
             return building
     else:
         # Other buildings just need grid position
-        building = building_class(grid_pos, tier=1)
-        building.world = world
+        building = building_class(grid_pos, tier=1, world=world)
         world.register_building(building)
         return building
     
@@ -3151,7 +3273,7 @@ while running:
     if hasattr(world, 'research') and world.research:
         # Get effective modifiers (cached, only recalculates when research changes or day events change)
         effective_modifiers = research_manager.apply_research_modifiers()
-        # Update world.modifiers with effective modifiers
+        # Update world.modifiers with effective modifiers (including max_survivors)
         # Day events will reset world.modifiers to only day event modifiers when they change,
         # and mark research modifiers as dirty, so this is safe
         world.modifiers.update(effective_modifiers)
@@ -3488,20 +3610,24 @@ while running:
             sound_system.play("building_destroyed")
         
         # Check if HQ HP <= 0 (lose condition) - check HP directly, not just state
-        if isinstance(building, HQ) and building.hp <= 0:
-            if not game_over_screen.is_visible:  # Only trigger once
-                game_state_manager.game_over()
-                game_over_screen.show(GameState.GAME_OVER, {
-                    "nights": wave_manager.night - 1,
-                    "enemies_killed": wave_manager.enemies_killed,
-                    "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
-                })
-                sound_system.play("game_over")
-                # Mark HQ as destroyed
-                building.state = BuildState.DESTROYED
-                building.hp = 0
-                if building not in buildings_to_remove:
-                    buildings_to_remove.append(building)
+        # OPTIMIZED: Also cache HQ reference when we see it
+        if isinstance(building, HQ):
+            if world and not world.hq:
+                world.hq = building  # Cache HQ reference
+            if building.hp <= 0:
+                if not game_over_screen.is_visible:  # Only trigger once
+                    game_state_manager.game_over()
+                    game_over_screen.show(GameState.GAME_OVER, {
+                        "nights": wave_manager.night - 1,
+                        "enemies_killed": wave_manager.enemies_killed,
+                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
+                    })
+                    sound_system.play("game_over")
+                    # Mark HQ as destroyed
+                    building.state = BuildState.DESTROYED
+                    building.hp = 0
+                    if building not in buildings_to_remove:
+                        buildings_to_remove.append(building)
     
     # Mark tiles as blocked for newly active buildings
     for building in newly_active:
@@ -3510,12 +3636,15 @@ while running:
         if pending_construction == building:
             pending_construction = None
     
-    # Remove destroyed buildings
+        # Remove destroyed buildings
     for building in buildings_to_remove:
         # Store position before removing (for wall autotiling)
         gx, gy = building.grid_x, building.grid_y
         # Check if it's a wall (for autotiling neighbors)
         is_wall = hasattr(building, 'TYPE_ID') and building.TYPE_ID.startswith('wall')
+        
+        # Check if this is HQ before unregistering (to clear cache)
+        is_hq = isinstance(building, HQ)
         
         world.unregister_building(building)
         # Unblock grid tiles
@@ -3603,12 +3732,8 @@ while running:
                         starving_survivors = food_shortage
                         resources.food = 0  # Use all remaining food
                         
-                        # Find HQ and reduce HP
-                        hq_building = None
-                        for building in building_group:
-                            if isinstance(building, HQ):
-                                hq_building = building
-                                break
+                        # Find HQ and reduce HP - OPTIMIZED: Use cached HQ reference
+                        hq_building = world.hq if world and hasattr(world, 'hq') and world.hq else None
                         
                         if hq_building:
                             # Reduce HP by shortage amount (each missing food = 1 HP damage)
@@ -3721,7 +3846,11 @@ while running:
     world.projectile_group = projectile_group
     
     # Build spatial grid for turret targeting (before turrets update)
-    spatial_grid = SpatialGrid(cell_size=128)
+    # OPTIMIZED: Reuse spatial grid instead of creating new one every frame
+    if not hasattr(world, '_spatial_grid') or world._spatial_grid is None:
+        world._spatial_grid = SpatialGrid(cell_size=128)
+    spatial_grid = world._spatial_grid
+    spatial_grid.clear()  # Clear instead of creating new object
     for enemy in enemy_group:
         if enemy.alive:
             spatial_grid.insert(enemy)
@@ -3897,6 +4026,26 @@ while running:
             # Apply separation
             if neighbors:
                 survivor.apply_separation(dt, neighbors)
+            
+            # Handle collision with enemies (prevent overlap) - OPTIMIZED: Use spatial grid
+            if world and hasattr(world, 'spatial_grid') and world.spatial_grid:
+                # Use spatial grid for efficient nearby enemy lookup instead of checking all enemies
+                nearby_enemies = world.spatial_grid.get_nearby(survivor.pos, radius_cells=1)
+                for enemy in nearby_enemies:
+                    if not enemy.alive:
+                        continue
+                    enemy_dist = (survivor.pos - enemy.pos).length()
+                    min_dist = survivor.SURVIVOR_RADIUS + enemy.ZOMBIE_RADIUS
+                    if enemy_dist < min_dist and enemy_dist > 0.1:
+                        # Push apart
+                        push_dir = (survivor.pos - enemy.pos).normalize()
+                        overlap = min_dist - enemy_dist
+                        # Apply push to both entities
+                        push = push_dir * overlap * 0.5
+                        survivor.pos += push
+                        enemy.pos -= push
+                        survivor.rect.center = survivor.pos
+                        enemy.rect.center = enemy.pos
     
     # Remove dead survivors
     for survivor in survivors_to_remove:
@@ -4083,12 +4232,14 @@ while running:
     hq = None
     hq_hp = 0
     hq_max_hp = 2000
-    for building in building_group:
-        if isinstance(building, HQ):
-            hq = building
-            hq_hp = building.hp
-            hq_max_hp = building.max_hp
-            break
+    # OPTIMIZED: Use cached HQ reference instead of searching building_group
+    hq = world.hq if world and hasattr(world, 'hq') and world.hq else None
+    if hq:
+        hq_hp = hq.hp
+        hq_max_hp = hq.max_hp
+    else:
+        hq_hp = 0
+        hq_max_hp = 1
     
     hud.update(dt, wave_manager.day, wave_manager.night, wave_manager.state, {
         "enemies_spawned": zombie_spawner.spawn_count,
@@ -4203,6 +4354,21 @@ while running:
     ###################
     if not research_panel_ui.visible:
         draw_resources(screen, resources, font)
+        
+        # Draw hire survivor button (below resource display)
+        # Update button state based on affordability and max survivors
+        if hire_survivor_button and world:
+            can_afford = resources.coins >= HIRE_SURVIVOR_COST
+            can_hire = world.can_hire_survivor()
+            hire_survivor_button.enabled = can_afford and can_hire
+            # Show tooltip if disabled
+            if not can_hire:
+                hire_survivor_button.text = f"Hire ({world.get_current_survivor_count()}/{world.get_max_survivors()})"
+            elif not can_afford:
+                hire_survivor_button.text = f"Hire ({HIRE_SURVIVOR_COST} coins)"
+            else:
+                hire_survivor_button.text = f"Hire Survivor ({HIRE_SURVIVOR_COST} coins)"
+            hire_survivor_button.draw(screen)
     
     ################### 
     # Update debug info
@@ -4341,6 +4507,10 @@ while running:
             if research_button.handle_click(mouse_pos):
                 sound_system.play("button_click")
                 continue
+            
+            # Handle hire survivor button click
+            if hire_survivor_button and hire_survivor_button.handle_click(mouse_pos):
+                continue  # Sound already played in callback
             
             # Research panel click handling
             if research_panel_ui.visible:

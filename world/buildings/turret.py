@@ -15,9 +15,9 @@ class BallisticTurret(Building):
     TIER_MAX = 3
     ALLOW_MAX_TIER_PROGRESS = True
     
-    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
+    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None, world=None):
         # Initialize building first
-        super().__init__(grid_pos, tier=tier, uid=uid)
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
         
         # Turret-specific attributes
         # ===== COOLDOWN ADJUSTMENT =====

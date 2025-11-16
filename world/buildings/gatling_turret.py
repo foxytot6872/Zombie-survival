@@ -17,7 +17,7 @@ class GatlingTurret(Building):
     TIER_MAX = 3
     ALLOW_MAX_TIER_PROGRESS = True
     
-    def __init__(self, grid_pos, sprite_sheets=None, base_images=None, tier=1, uid=None, turret_sheet=None, turret_image=None, base_image=None):
+    def __init__(self, grid_pos, sprite_sheets=None, base_images=None, tier=1, uid=None, turret_sheet=None, turret_image=None, base_image=None, world=None):
         """
         Initialize Gatling turret.
         
@@ -26,7 +26,7 @@ class GatlingTurret(Building):
         - turret_sheet and base_image for single tier (old way, for backward compatibility)
         - turret_image and base_image for old static turret (deprecated)
         """
-        super().__init__(grid_pos, tier=tier, uid=uid)
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
         
         # Gatling-specific attributes
         self.base_cooldown = 300  # milliseconds - very fast firing

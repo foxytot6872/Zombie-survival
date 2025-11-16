@@ -17,8 +17,8 @@ class PiercerTurret(Building):
     TIER_MAX = 3
     ALLOW_MAX_TIER_PROGRESS = True
     
-    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None):
-        super().__init__(grid_pos, tier=tier, uid=uid)
+    def __init__(self, grid_pos, sprite_sheets, base_images, tier=1, uid=None, world=None):
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
         
         # Piercer-specific attributes
         self.base_cooldown = 2000  # milliseconds - slow firing

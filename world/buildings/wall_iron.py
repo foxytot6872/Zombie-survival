@@ -10,7 +10,7 @@ class WallIron(WallBase):
     COST = Cost(wood=10, iron=40)  # Upgrade cost
     TIER_MAX = 1  # No further upgrades
     
-    def __init__(self, grid_pos, tier=1, uid=None):
-        super().__init__(grid_pos, tier=tier, uid=uid)
+    def __init__(self, grid_pos, tier=1, uid=None, world=None):
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
         self._is_iron = True
 

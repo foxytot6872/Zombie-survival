@@ -71,8 +71,8 @@ class Sawmill(Building):
         3: ("asset/sawmil/Level_3-Sheet.png",),
     }
 
-    def __init__(self, grid_pos, tier=1, uid=None):
-        super().__init__(grid_pos, tier=tier, uid=uid)
+    def __init__(self, grid_pos, tier=1, uid=None, world=None):
+        super().__init__(grid_pos, tier=tier, uid=uid, world=world)
         # Sync level with tier for sprite selection
         self.level = self.tier
         self.level_sprites = self._load_level_sprites()

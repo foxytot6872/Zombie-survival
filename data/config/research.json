@@ -75,7 +75,9 @@
 		"tier": 3,
 		"prerequisites": ["agriculture"],
 		"unlocks": ["max_survivor_plus_2"],
-		"modifiers": {}
+		"modifiers": {
+			"max_survivors": 2
+		}
 	},
 	"structural_reinforcement": {
 		"id": "structural_reinforcement",

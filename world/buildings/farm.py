@@ -50,11 +50,11 @@ class Farm(Building):
                 placeholder.fill((100, 150, 100, 255))
                 cls.farm_variants.append(placeholder)
     
-    def __init__(self, grid_pos, tier=1, uid=None):
+    def __init__(self, grid_pos, tier=1, uid=None, world=None):
         # Load farm variants if not already loaded
         Farm._load_farm_variants()
         
-        super().__init__(grid_pos, tier, uid)
+        super().__init__(grid_pos, tier, uid, world)
         
         # Randomly select a farm variant
         if Farm.farm_variants and len(Farm.farm_variants) > 0:
