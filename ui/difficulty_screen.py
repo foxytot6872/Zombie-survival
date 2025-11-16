@@ -25,9 +25,12 @@ class SelectDifficultyScreen:
         self.screen_height = screen_height
         self.is_visible = False
 
-        # Load sprite sheet
+        # Optional legacy background sprite sheet (not used when static bg present)
         self.sprite_sheet = self._load_sprite_sheet()
         self.frames: List[pygame.Surface] = self._split_frames()
+
+        # Static background image (preferred)
+        self.bg_image: Optional[pygame.Surface] = self._load_static_background()
 
         # Load text sprite sheet and frames
         self.text_sprite_sheet = self._load_text_sprite_sheet()
@@ -44,6 +47,10 @@ class SelectDifficultyScreen:
             Difficulty.HARD: pygame.Rect(1007, 385, 356, 336),
             Difficulty.EXTREME: pygame.Rect(1453, 385, 356, 336),
         }
+
+        # Load custom button images
+        self.button_images: Dict[Difficulty, Optional[pygame.Surface]] = self._load_button_images()
+        self.hover_scale = 1.05
 
         self.options = list(Difficulty)
         self.selected_index = 0
@@ -72,6 +79,42 @@ class SelectDifficultyScreen:
             frame = self.sprite_sheet.subsurface((x, 0, self.FRAME_WIDTH, self.FRAME_HEIGHT)).copy()
             frames.append(frame)
         return frames
+
+    def _load_static_background(self) -> Optional[pygame.Surface]:
+        """Load a static background image for the difficulty screen."""
+        import os
+        paths = ['asset/gamestar.jpg', 'asset/Gamestart.jpg']
+        for p in paths:
+            if os.path.exists(p):
+                try:
+                    return pygame.image_load(p).convert()  # type: ignore[attr-defined]
+                except Exception:
+                    try:
+                        return pygame.image.load(p).convert()
+                    except Exception as e:
+                        print(f"Warning: Failed to load {p}: {e}")
+        return None
+
+    def _load_button_images(self) -> Dict[Difficulty, Optional[pygame.Surface]]:
+        """Load per-difficulty button images from asset/hud/*button.png"""
+        import os
+        mapping = {
+            Difficulty.EASY: "asset/hud/Easybutton.png",
+            Difficulty.MEDIUM: "asset/hud/Mediumbutton.png",
+            Difficulty.HARD: "asset/hud/Hardbutton.png",
+            Difficulty.EXTREME: "asset/hud/Extremebutton.png",
+        }
+        images: Dict[Difficulty, Optional[pygame.Surface]] = {}
+        for diff, path in mapping.items():
+            if os.path.exists(path):
+                try:
+                    images[diff] = pygame.image.load(path).convert_alpha()
+                except Exception as e:
+                    print(f"Warning: Failed to load {path}: {e}")
+                    images[diff] = None
+            else:
+                images[diff] = None
+        return images
 
     def _load_text_sprite_sheet(self) -> pygame.Surface:
         """Load the difficulty text sprite sheet."""
@@ -191,16 +234,50 @@ class SelectDifficultyScreen:
         if not self.is_visible:
             return
 
-        # Get the appropriate frame based on hover state
-        frame_index = self._get_current_frame_index()
-        current_frame = self.frames[frame_index]
-
-        # Scale frame to screen size if needed
-        if current_frame.get_size() != (self.screen_width, self.screen_height):
-            scaled_frame = pygame.transform.scale(current_frame, (self.screen_width, self.screen_height))
-            surface.blit(scaled_frame, (0, 0))
+        # Draw static background if available, otherwise fallback to legacy frame or flat color
+        if self.bg_image:
+            if self.bg_image.get_size() != (self.screen_width, self.screen_height):
+                scaled_bg = pygame.transform.scale(self.bg_image, (self.screen_width, self.screen_height))
+                surface.blit(scaled_bg, (0, 0))
+            else:
+                surface.blit(self.bg_image, (0, 0))
+        elif self.frames:
+            bg = self.frames[0]
+            if bg.get_size() != (self.screen_width, self.screen_height):
+                surface.blit(pygame.transform.scale(bg, (self.screen_width, self.screen_height)), (0, 0))
+            else:
+                surface.blit(bg, (0, 0))
         else:
-            surface.blit(current_frame, (0, 0))
+            # Fallback background
+            surface.fill((20, 20, 28))
+
+        # Draw custom button images (scale to rect, slight scale up on hover)
+        for idx, diff in enumerate(self.options):
+            rect = self.button_rects[diff]
+            img = self.button_images.get(diff)
+            if img is None:
+                # Fallback: simple colored rect with text
+                color = (60, 60, 60)
+                pygame.draw.rect(surface, color, rect, border_radius=8)
+                label = str(diff.name).title()
+                font = pygame.font.Font(None, 48)
+                text = font.render(label, True, (255, 255, 255))
+                trect = text.get_rect(center=rect.center)
+                surface.blit(text, trect)
+                continue
+
+            # Determine scale on hover
+            if self.hover_index == idx:
+                w = int(rect.width * self.hover_scale)
+                h = int(rect.height * self.hover_scale)
+                scaled = pygame.transform.smoothscale(img, (w, h))
+                # center the scaled image over the rect
+                draw_x = rect.centerx - w // 2
+                draw_y = rect.centery - h // 2
+                surface.blit(scaled, (draw_x, draw_y))
+            else:
+                scaled = pygame.transform.smoothscale(img, (rect.width, rect.height))
+                surface.blit(scaled, rect.topleft)
 
         # Draw animated text at top middle
         if self.text_frames:
