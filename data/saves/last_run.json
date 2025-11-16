@@ -6,17 +6,17 @@
     "state": "SUMMARY",
     "difficulty": "easy",
     "enemies_killed": 0,
-    "enemies_spawned": 46,
+    "enemies_spawned": 58,
     "timer": 0.0
   },
   "resources": {
     "wood": 500,
     "iron": 500,
-    "food": 498
+    "food": 500
   },
   "buildings": [
     {
-      "uid": "6328356b-4e2b-4cde-b756-710e8e965e5a",
+      "uid": "2b1abe78-42ac-4f6e-9a00-24e958edfe3f",
       "type": "hq",
       "grid": [
         29,
@@ -28,19 +28,19 @@
       "progress": 0.0
     },
     {
-      "uid": "f14d5319-c1fa-4c71-a240-77f93b4e623d",
+      "uid": "b15234e9-f238-4667-99fd-f0c32b644dea",
       "type": "wall_wood",
       "grid": [
         23,
         12
       ],
       "tier": 1,
-      "hp": 235,
+      "hp": 250,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "3a9bfee8-5651-4cd4-b2e7-f8447bd15f51",
+      "uid": "21065c9a-ad7f-46e2-bbae-a3dcaead807f",
       "type": "wall_wood",
       "grid": [
         24,
@@ -52,7 +52,7 @@
       "progress": 1.0
     },
     {
-      "uid": "795e0454-aaf9-40bc-acfe-0c28c89eface",
+      "uid": "ae9916e3-7659-428f-ae45-9c35c850f0e8",
       "type": "wall_wood",
       "grid": [
         25,
@@ -64,7 +64,7 @@
       "progress": 1.0
     },
     {
-      "uid": "7e137f12-fa47-4c38-8cf5-434ca64059de",
+      "uid": "41a184c6-2dc6-42ef-b299-4c32c516b6a8",
       "type": "wall_wood",
       "grid": [
         26,
@@ -76,7 +76,7 @@
       "progress": 1.0
     },
     {
-      "uid": "4f18a7dd-38a7-411d-9538-45da53c5f432",
+      "uid": "dc3d82f4-569e-4184-87d7-ec7cf94cf2dc",
       "type": "wall_wood",
       "grid": [
         27,
@@ -88,7 +88,7 @@
       "progress": 1.0
     },
     {
-      "uid": "febcf2e9-e516-4c49-9f38-f4e56f1077bb",
+      "uid": "a220b1c7-adc9-491b-abb3-a0bced149eed",
       "type": "wall_wood",
       "grid": [
         28,
@@ -100,7 +100,7 @@
       "progress": 1.0
     },
     {
-      "uid": "e9dcf5ef-a220-4ea5-b59e-c5872ff23e85",
+      "uid": "4aaa4aeb-d16e-4efa-986b-85d6f3e95c27",
       "type": "wall_wood",
       "grid": [
         29,
@@ -112,7 +112,7 @@
       "progress": 1.0
     },
     {
-      "uid": "ad764972-ebf8-4484-8dd6-3c05401cb2a8",
+      "uid": "61193b7d-d0b2-42ef-872a-a46c721ca519",
       "type": "wall_wood",
       "grid": [
         30,
@@ -124,7 +124,7 @@
       "progress": 1.0
     },
     {
-      "uid": "62e62626-80ac-4fd5-8d75-9ec37d88f673",
+      "uid": "8ed23c41-8a6d-4059-aa8b-680480e77e6b",
       "type": "wall_wood",
       "grid": [
         31,
@@ -136,7 +136,7 @@
       "progress": 1.0
     },
     {
-      "uid": "bd816252-3272-42ca-aeda-f26a0357b0a0",
+      "uid": "da6dc72d-8ca6-40b0-ab66-96432d636325",
       "type": "wall_wood",
       "grid": [
         32,
@@ -148,7 +148,7 @@
       "progress": 1.0
     },
     {
-      "uid": "0db5e9e8-7b66-489b-ad31-fa5d7fd5af5d",
+      "uid": "566a4ef0-f825-44b4-8640-c989e4d6f331",
       "type": "wall_wood",
       "grid": [
         33,
@@ -160,7 +160,7 @@
       "progress": 1.0
     },
     {
-      "uid": "1c63eef4-5dbf-498b-b784-ab3b481b6872",
+      "uid": "f5e8d392-2aee-45da-8a0e-31fc7a86b3a5",
       "type": "wall_wood",
       "grid": [
         34,
@@ -172,7 +172,7 @@
       "progress": 1.0
     },
     {
-      "uid": "23cb4356-004c-4d75-b6da-8a6f32508db6",
+      "uid": "d0ce4438-b241-4088-9097-784ff7d91a12",
       "type": "wall_wood",
       "grid": [
         35,
@@ -184,7 +184,7 @@
       "progress": 1.0
     },
     {
-      "uid": "bc709219-d832-4142-8385-adf0ebbf4cba",
+      "uid": "f13cbcb6-98f0-4b00-94a5-ef1f5c9ff520",
       "type": "wall_wood",
       "grid": [
         36,
@@ -196,19 +196,19 @@
       "progress": 1.0
     },
     {
-      "uid": "dc35da59-af9c-4728-bfa2-a184795edba4",
+      "uid": "78baea45-346c-45ea-8056-e86435f5aaef",
       "type": "wall_wood",
       "grid": [
         37,
         12
       ],
       "tier": 1,
-      "hp": 238,
+      "hp": 250,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "52440abc-50de-4a89-b800-09aedb94ecfc",
+      "uid": "cc5d39e5-3d4c-4717-82a5-03a9b3831687",
       "type": "wall_wood",
       "grid": [
         23,
@@ -220,7 +220,7 @@
       "progress": 1.0
     },
     {
-      "uid": "1f264fca-2a3f-4396-a198-f68225ae3a6c",
+      "uid": "00286922-888f-4e00-a7e7-bb08dd876bd0",
       "type": "wall_wood",
       "grid": [
         24,
@@ -232,7 +232,7 @@
       "progress": 1.0
     },
     {
-      "uid": "e03e1004-152c-4149-984c-2c68445762e1",
+      "uid": "7581611f-e917-49c5-847f-9868c8ff3162",
       "type": "wall_wood",
       "grid": [
         25,
@@ -244,7 +244,7 @@
       "progress": 1.0
     },
     {
-      "uid": "dde395e7-0eb1-4b08-994d-b7a974e51e07",
+      "uid": "e21bbabd-dae9-4e96-871f-f4d99e58caa5",
       "type": "wall_wood",
       "grid": [
         26,
@@ -256,7 +256,7 @@
       "progress": 1.0
     },
     {
-      "uid": "cdaeb645-57d4-413d-957f-81edb3875828",
+      "uid": "bfc9129f-e56b-4777-824c-2ec90bbd2cb8",
       "type": "wall_wood",
       "grid": [
         27,
@@ -268,7 +268,7 @@
       "progress": 1.0
     },
     {
-      "uid": "6bbaaf48-6a14-4462-98c0-16dc5656a62f",
+      "uid": "6927332d-56ef-4750-aac2-82e57202a6e4",
       "type": "wall_wood",
       "grid": [
         28,
@@ -280,7 +280,7 @@
       "progress": 1.0
     },
     {
-      "uid": "67382f2e-449b-49a4-9dea-e3588770176c",
+      "uid": "380f490a-701d-403e-b2ed-a020bdbc03d3",
       "type": "wall_wood",
       "grid": [
         29,
@@ -292,7 +292,7 @@
       "progress": 1.0
     },
     {
-      "uid": "86df1c2f-d326-4120-8311-d60285acf79f",
+      "uid": "39ae7c32-2c9c-460c-a915-e11d47f1a406",
       "type": "wall_wood",
       "grid": [
         31,
@@ -304,7 +304,7 @@
       "progress": 1.0
     },
     {
-      "uid": "17ad5639-36a0-4a7c-b1f0-ec225f7c161b",
+      "uid": "6f71c6ea-b63e-40cd-90ca-6fdb61ce7f73",
       "type": "wall_wood",
       "grid": [
         32,
@@ -316,7 +316,7 @@
       "progress": 1.0
     },
     {
-      "uid": "ac4a8514-ed36-4a4e-8d50-c9f77227086a",
+      "uid": "0de9c6b5-d206-4545-819a-8de1aa92141b",
       "type": "wall_wood",
       "grid": [
         33,
@@ -328,7 +328,7 @@
       "progress": 1.0
     },
     {
-      "uid": "87eb61d8-e802-404a-8b05-b7307d1684a0",
+      "uid": "de1cd4c7-5a4f-4b40-b11f-0f969acd1bed",
       "type": "wall_wood",
       "grid": [
         34,
@@ -340,7 +340,7 @@
       "progress": 1.0
     },
     {
-      "uid": "76dc2e48-3b80-4859-80ae-c4c0abad794e",
+      "uid": "62bd080b-88db-494b-80aa-fcca19931a8f",
       "type": "wall_wood",
       "grid": [
         35,
@@ -352,7 +352,7 @@
       "progress": 1.0
     },
     {
-      "uid": "f670494e-7cc1-4128-a3d0-42e215350411",
+      "uid": "43c89cfd-5fac-45c6-bbe2-b21a699a32b6",
       "type": "wall_wood",
       "grid": [
         36,
@@ -364,19 +364,19 @@
       "progress": 1.0
     },
     {
-      "uid": "af3d01d6-b186-44ff-a7cc-2562c1f8bcba",
+      "uid": "616d0290-f06f-4190-b317-171251c78f7e",
       "type": "wall_wood",
       "grid": [
         37,
         19
       ],
       "tier": 1,
-      "hp": 237,
+      "hp": 250,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "f870cf5e-cdb6-4163-ba1f-f429cd1b4ac5",
+      "uid": "3e274e80-3f38-4ff2-a8bc-6f28cc405d85",
       "type": "wall_wood",
       "grid": [
         23,
@@ -388,7 +388,7 @@
       "progress": 1.0
     },
     {
-      "uid": "cedbedbe-2c46-4dc8-904a-8fbb810225be",
+      "uid": "8ae08a54-93e2-42b8-91da-50424a2b7ff4",
       "type": "wall_wood",
       "grid": [
         23,
@@ -400,7 +400,7 @@
       "progress": 1.0
     },
     {
-      "uid": "0ca09dbd-2805-474c-b771-1909c5843f1f",
+      "uid": "a96a8055-606f-474f-bd3f-2d57ee92f350",
       "type": "wall_wood",
       "grid": [
         23,
@@ -412,7 +412,7 @@
       "progress": 1.0
     },
     {
-      "uid": "8482da8e-5e41-41ed-9665-ed550f8ebc52",
+      "uid": "d867ac07-a9cc-4918-bb52-e6e3c8e79aa7",
       "type": "wall_wood",
       "grid": [
         23,
@@ -424,7 +424,7 @@
       "progress": 1.0
     },
     {
-      "uid": "5eb0fb4b-216e-4da6-874c-a6a31dcbeba0",
+      "uid": "cb0e35fa-a2e1-4773-a0cf-de90e3bc1f1e",
       "type": "wall_wood",
       "grid": [
         23,
@@ -436,7 +436,7 @@
       "progress": 1.0
     },
     {
-      "uid": "631ae5d7-05e7-4145-93b8-ffd82ec0dd05",
+      "uid": "4d883b50-2fd0-4eb9-9238-9e87aefe2b48",
       "type": "wall_wood",
       "grid": [
         23,
@@ -448,7 +448,7 @@
       "progress": 1.0
     },
     {
-      "uid": "847b0420-ef3c-4758-ba39-ee7ba5899eb0",
+      "uid": "f250bae8-327f-4340-b8ec-47a2cdedd0ee",
       "type": "wall_wood",
       "grid": [
         37,
@@ -460,7 +460,7 @@
       "progress": 1.0
     },
     {
-      "uid": "6a583059-5ebd-4394-bdfe-a1b11e967120",
+      "uid": "6408dcb6-306f-4845-9538-47b44c9e7573",
       "type": "wall_wood",
       "grid": [
         37,
@@ -472,7 +472,7 @@
       "progress": 1.0
     },
     {
-      "uid": "ef0db62d-1c59-41fc-825a-b48162845280",
+      "uid": "cd939d02-c096-4ca7-afd3-96c4af7ebe95",
       "type": "wall_wood",
       "grid": [
         37,
@@ -484,7 +484,7 @@
       "progress": 1.0
     },
     {
-      "uid": "63a2bebd-cf63-4438-b8ca-99bbba549999",
+      "uid": "344dc0cc-bd3f-4387-97da-a13fa25d28ef",
       "type": "wall_wood",
       "grid": [
         37,
@@ -496,7 +496,7 @@
       "progress": 1.0
     },
     {
-      "uid": "c43a22ac-9ec5-43e8-8526-49f57bb4f336",
+      "uid": "1be22f4e-9861-47bf-a627-1a5c4edc99a3",
       "type": "wall_wood",
       "grid": [
         37,
@@ -508,19 +508,19 @@
       "progress": 1.0
     },
     {
-      "uid": "dcd6d07f-44f4-4590-908f-98c8e41cc3c9",
+      "uid": "d9e77c31-b715-4619-aaac-218adda22489",
       "type": "wall_wood",
       "grid": [
         37,
         18
       ],
       "tier": 1,
-      "hp": 245,
+      "hp": 250,
       "state": "active",
       "progress": 1.0
     },
     {
-      "uid": "f332da99-9ee5-487f-8ccd-1fa951997374",
+      "uid": "19550462-2fb5-49de-8e13-3847cc552268",
       "type": "gate",
       "grid": [
         30,
@@ -532,7 +532,7 @@
       "progress": 2.0
     },
     {
-      "uid": "25c33775-d222-4a9e-be8b-5cdd63b849f0",
+      "uid": "a3728ebf-c160-4698-a6b2-3468e3a795ba",
       "type": "turret_ballistic",
       "grid": [
         27,
@@ -545,7 +545,7 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "d28577cd-581d-442a-9617-cbe42f0b70cc",
+      "uid": "0afaf416-63ac-4ae2-a175-de3f974ca03e",
       "type": "turret_ballistic",
       "grid": [
         30,
@@ -558,7 +558,7 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "d20947c1-b486-4de9-a885-7dd92f874c2a",
+      "uid": "0696b164-e27d-444a-8b77-1284becf7948",
       "type": "turret_ballistic",
       "grid": [
         33,
@@ -571,7 +571,7 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "658652d4-36d5-42e3-bb78-a5f58699b72c",
+      "uid": "1416560c-9ca5-45f2-8fd2-ad06b51cedd4",
       "type": "turret_ballistic",
       "grid": [
         26,
@@ -584,7 +584,7 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "9a21c276-0722-4d28-b87c-58da1c252d5c",
+      "uid": "613f8fb1-9e24-4bc5-81b0-4bda03d635f3",
       "type": "turret_ballistic",
       "grid": [
         34,
@@ -597,27 +597,27 @@
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "2211fb3d-0649-46a3-88ee-770d398ca836",
+      "uid": "9ec8d7e9-ae55-4c44-974c-d5e15bf85f67",
       "type": "turret_ballistic",
       "grid": [
         21,
         16
       ],
       "tier": 1,
-      "hp": 217,
+      "hp": 220,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
     },
     {
-      "uid": "8c8b8f30-3425-4153-bd68-dc037a18c744",
+      "uid": "7f4f5775-5bff-4134-87d6-a6d89478b0f6",
       "type": "turret_ballistic",
       "grid": [
         39,
         16
       ],
       "tier": 1,
-      "hp": 160,
+      "hp": 220,
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"

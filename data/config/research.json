@@ -27,7 +27,7 @@
 		"description": "Expand housing for more survivors.",
 		"cost": 120,
 		"tier": 2,
-		"prerequisites": ["agriculture"],
+		"prerequisites": ["recruitment"],
 		"unlocks": ["max_survivor_plus_2"],
 		"modifiers": {}
 	},
@@ -49,7 +49,7 @@
 		"description": "Establish a basic perimeter and reinforce defenses.",
 		"cost": 120,
 		"tier": 2,
-		"prerequisites": ["agriculture"],
+		"prerequisites": ["basic_woodworking"],
 		"unlocks": [],
 		"modifiers": {
 			"building_damage_taken_mult": 0.95
@@ -73,7 +73,7 @@
 		"description": "Organize efforts to bring in new survivors.",
 		"cost": 180,
 		"tier": 3,
-		"prerequisites": ["sleeping_quarters"],
+		"prerequisites": ["agriculture"],
 		"unlocks": ["max_survivor_plus_2"],
 		"modifiers": {}
 	},
@@ -83,7 +83,7 @@
 		"description": "Harden structures and walls.",
 		"cost": 200,
 		"tier": 3,
-		"prerequisites": ["perimeter_fortification"],
+		"prerequisites": ["perimeter_fortification","metalworking_fundamentals"],
 		"unlocks": [],
 		"modifiers": {
 			"building_hp_mult": 1.15,
@@ -108,7 +108,7 @@
 		"description": "Streamline logistics and hauling.",
 		"cost": 200,
 		"tier": 3,
-		"prerequisites": ["sleeping_quarters"],
+		"prerequisites": ["computer_engineering"],
 		"unlocks": [],
 		"modifiers": {
 			"haul_speed_mult": 1.15
@@ -132,7 +132,7 @@
 		"description": "Slow passive wall repairs via smart compounds.",
 		"cost": 250,
 		"tier": 4,
-		"prerequisites": ["structural_reinforcement"],
+		"prerequisites": ["advanced_wood_processing"],
 		"unlocks": [],
 		"modifiers": {
 			"wall_repair_rate_mult": 1.25
@@ -144,7 +144,7 @@
 		"description": "Advanced control systems for defenses.",
 		"cost": 260,
 		"tier": 4,
-		"prerequisites": ["automation", "perimeter_fortification"],
+		"prerequisites": ["high_heat_forgecraft", "refined_alloy_techniques"],
 		"unlocks": [],
 		"modifiers": {
 			"turret_range_mult": 1.10,
@@ -157,7 +157,7 @@
 		"description": "Deploy robotic combat support.",
 		"cost": 260,
 		"tier": 4,
-		"prerequisites": ["recruitment", "computer_engineering"],
+		"prerequisites": ["automation"],
 		"unlocks": ["combat_npc"],
 		"modifiers": {}
 	},
@@ -167,7 +167,7 @@
 		"description": "Global network optimizations for all systems.",
 		"cost": 400,
 		"tier": 5,
-		"prerequisites": ["high_heat_forgecraft", "combat_droids"],
+		"prerequisites": ["battle_computer_overclock", "combat_droids"],
 		"unlocks": [],
 		"modifiers": {
 			"resource_prod_mult": 1.10,
@@ -203,7 +203,7 @@
 		"description": "Stabilized targeting and control loops.",
 		"cost": 120,
 		"tier": 2,
-		"prerequisites": ["ballistic_engineering"],
+		"prerequisites": ["multibarrel_mechanism"],
 		"unlocks": [],
 		"modifiers": {
 			"turret_range_mult": 1.10
@@ -215,7 +215,7 @@
 		"description": "Longer tracking and prediction algorithms.",
 		"cost": 180,
 		"tier": 3,
-		"prerequisites": ["advanced_fire_control_system"],
+		"prerequisites": ["ballistic_engineering"],
 		"unlocks": [],
 		"modifiers": {
 			"turret_range_mult": 1.15
@@ -227,7 +227,7 @@
 		"description": "Heavier munitions for increased damage.",
 		"cost": 200,
 		"tier": 3,
-		"prerequisites": ["multibarrel_mechanism"],
+		"prerequisites": ["ballistic_engineering","refined_alloy_techniques"],
 		"unlocks": [],
 		"modifiers": {
 			"turret_damage_mult": 1.20
@@ -239,7 +239,7 @@
 		"description": "Unlock railgun infrastructure.",
 		"cost": 220,
 		"tier": 3,
-		"prerequisites": ["multibarrel_mechanism", "advanced_fire_control_system"],
+		"prerequisites": ["advanced_fire_control_system", "high_caliber_round","battle_computer_overclock"],
 		"unlocks": ["railgun"],
 		"modifiers": {}
 	},
@@ -249,7 +249,7 @@
 		"description": "Unlock flamethrower tower systems.",
 		"cost": 220,
 		"tier": 3,
-		"prerequisites": ["advanced_fire_control_system"],
+		"prerequisites": ["electromagnetic_rail_system"],
 		"unlocks": ["flamethrower"],
 		"modifiers": {}
 	},
@@ -259,7 +259,7 @@
 		"description": "Overdrive control computers for maximum output.",
 		"cost": 280,
 		"tier": 4,
-		"prerequisites": ["improved_target_acquisition", "high_caliber_round"],
+		"prerequisites": ["improved_target_acquisition", "computer_engineering"],
 		"unlocks": [],
 		"modifiers": {
 			"turret_fire_rate_mult": 0.85,

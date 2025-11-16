@@ -3986,12 +3986,6 @@ while running:
         if not hasattr(enemy, 'rect'):
             print(f"WARNING: Enemy missing rect attribute: {type(enemy).__name__}")
             continue
-        # Debug: Print first enemy position for testing
-        if enemy == list(enemy_group)[0] if enemy_group else None:
-            pos_key = (int(enemy.pos.x), int(enemy.pos.y))
-            if '_last_enemy_pos_log' not in globals() or globals()['_last_enemy_pos_log'] != pos_key:
-                globals()['_last_enemy_pos_log'] = pos_key
-                print(f"DEBUG: First enemy at ({int(enemy.pos.x)}, {int(enemy.pos.y)}), alive={enemy.alive}, has_image={hasattr(enemy, 'image')}")
         enemy.draw(screen)
     
     # Draw placement glow effects (after all world objects)

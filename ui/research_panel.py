@@ -7,6 +7,13 @@ import pygame
 
 from research_tree import ResearchNode
 
+# Connection line colors (pixel-art style, thick lines)
+# Hex colors converted to RGB: Red #e12c27, Yellow #efcb59, Blue #4ed3ff
+LINE_LOCKED = (225, 44, 39)  # Red #e12c27 for not unlocked
+LINE_UNLOCKABLE = (239, 203, 89)  # Yellow #efcb59 for unlockable path
+LINE_UNLOCKED = (78, 211, 255)  # Blue #4ed3ff for unlocked
+LINE_WIDTH = 10  # Thick pixel-art lines
+
 
 class ResearchPanel:
     """Popup research panel overlay that renders the node-based tech tree over the game."""
@@ -76,11 +83,16 @@ class ResearchPanel:
     # ------------------------------------------------------------------
     def _build_tree_layout(self):
         """Create nodes at fixed coordinates that match the reference layout (no auto layout)."""
-        if self.nodes:
-            return
-
         research_defs = self.research.research_defs
         if not research_defs:
+            return
+        
+        # If nodes already exist, update their prerequisites from JSON (so lines reflect JSON changes)
+        if self.nodes:
+            for key, node in self.nodes.items():
+                if key in research_defs:
+                    # Update prerequisites from JSON so connection lines reflect current JSON state
+                    node.parents = research_defs[key].get("prerequisites", [])
             return
 
         # Absolute positions taken from the reference layout (panel artwork coordinates)
@@ -90,26 +102,26 @@ class ResearchPanel:
             "basic_woodworking": (547, 274),
             "recruitment": (276, 276),
             "sleeping_quarters": (276, 397),
-            "perimeter_fortification": (639, 405),
+            "perimeter_fortification": (635, 385),
             "advanced_wood_processing": (404, 532),
-            "structural_reinforcement": (749, 533),
+            "structural_reinforcement": (740, 502),
             "self_sealing_technology": (416, 661),
-            "automation": (431, 840),
-            "computer_engineering": (736, 778),
+            "automation": (594, 814),
+            "computer_engineering": (976, 782),
             "combat_droids": (674, 951),
             "high_bandwidth": (977, 946),
-            "high_heat_forgecraft": (889, 655),
+            "high_heat_forgecraft": (830, 641),
             "refined_alloy_techniques": (958, 353),
             "metalworking_fundamentals": (838, 199),
 
             # Ballistic branch
             "ballistic_engineering": (1356, 198),
             "multibarrel_mechanism": (1621, 347),
-            "advanced_fire_control_system": (1628, 568),
-            "improved_target_acquisition": (1306, 369),
-            "high_caliber_round": (1155, 534),
-            "battle_computer_overclock": (1320, 675),
-            "electromagnetic_rail_system": (1267, 830),
+            "advanced_fire_control_system": (1659, 599),
+            "improved_target_acquisition": (1387, 452),
+            "high_caliber_round": (1116, 520),
+            "battle_computer_overclock": (1367, 650),
+            "electromagnetic_rail_system": (1276, 866),
             "flamethrower_tech": (1564, 950),
         }
 
@@ -206,8 +218,36 @@ class ResearchPanel:
         # Build and update tree nodes, then draw them
         self._build_tree_layout()
         self._update_node_states()
+        self._draw_connections(screen)  # Draw lines before nodes (so lines appear behind)
         self._draw_nodes(screen)
         self._draw_tooltip(screen)
+    
+    def _draw_connections(self, screen: pygame.Surface):
+        """Draw thick pixel-art connection lines between nodes based on prerequisites."""
+        if not self.nodes:
+            return
+        
+        for node in self.nodes.values():
+            for parent_id in node.parents:
+                if parent_id not in self.nodes:
+                    continue
+                parent = self.nodes[parent_id]
+                
+                # Determine line color based on node states
+                # Blue for unlocked, Yellow for unlockable, Red for locked
+                if node.state == "unlocked" and parent.state == "unlocked":
+                    color = LINE_UNLOCKED  # Blue
+                elif node.state == "unlockable" and parent.state == "unlocked":
+                    color = LINE_UNLOCKABLE  # Yellow
+                else:
+                    color = LINE_LOCKED  # Red
+                
+                # Get node center positions
+                start = parent.rect.center
+                end = node.rect.center
+                
+                # Draw thick pixel-art line directly on surface (no transparency)
+                pygame.draw.line(screen, color, start, end, LINE_WIDTH)
     
     def _draw_nodes(self, screen: pygame.Surface):
         """Draw research nodes as clickable buttons using spritesheets."""
