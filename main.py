@@ -1095,9 +1095,11 @@ grass_tiles_day = load_grass_variants('asset/Grass_tile.png', (50, 100, 50))
 # Load night grass tiles
 grass_tiles_night = load_grass_variants('asset/Grassnight_tile.png', (30, 50, 30))
 
-# Load wall auto-tiling sprites
-wall_tiles = {}
-wall_sprite_paths = {
+# Load wall auto-tiling sprites (level 1 and level 2)
+wall_tiles_lv1 = {}
+wall_tiles_lv2 = {}
+
+wall_sprite_paths_lv1 = {
     "4way": "asset/Wall/Wall-4way_lv1.png",
     "corner_tl": "asset/Wall/Wall-corner-tl_lv1.png",
     "corner_tr": "asset/Wall/Wall-corner-tr_lv1.png",
@@ -1112,18 +1114,42 @@ wall_sprite_paths = {
     "t_right": "asset/Wall/Wall-t-right_lv1.png",
 }
 
-for tile_name, path in wall_sprite_paths.items():
-    wall_tiles[tile_name] = load_image_or_placeholder(
+wall_sprite_paths_lv2 = {
+    "4way": "asset/Wall/Wall-4way_lv2.png",
+    "corner_tl": "asset/Wall/Wall-corner-tl_lv2.png",
+    "corner_tr": "asset/Wall/Wall-corner-tr_lv2.png",
+    "corner_bl": "asset/Wall/Wall-corner-bl_lv2.png",
+    "corner_br": "asset/Wall/Wall-corner-br_lv2.png",
+    "horizontal": "asset/Wall/Wall-horizontal_lv2.png",
+    "vertical_l": "asset/Wall/Wall-vertical-l_lv2.png",
+    "vertical_r": "asset/Wall/Wall-vertical-r_lv2.png",
+    "t_up": "asset/Wall/Wall-t-up_lv2.png",
+    "t_down": "asset/Wall/Wall-t-down_lv2.png",
+    "t_left": "asset/Wall/Wall-t-left_lv2.png",
+    "t_right": "asset/Wall/Wall-t-right_lv2.png",
+}
+
+for tile_name, path in wall_sprite_paths_lv1.items():
+    wall_tiles_lv1[tile_name] = load_image_or_placeholder(
         path,
         (TILE, TILE),  # 32x32 pixels
         (100, 100, 100, 255),
-        f"Wall tile: {tile_name}"
+        f"Wall tile Lv1: {tile_name}"
     )
-print(f"Loaded {len(wall_tiles)} wall tile sprites")
+
+for tile_name, path in wall_sprite_paths_lv2.items():
+    wall_tiles_lv2[tile_name] = load_image_or_placeholder(
+        path,
+        (TILE, TILE),  # 32x32 pixels
+        (100, 100, 100, 255),
+        f"Wall tile Lv2: {tile_name}"
+    )
+
+print(f"Loaded {len(wall_tiles_lv1)} wall Lv1 tile sprites and {len(wall_tiles_lv2)} wall Lv2 tile sprites")
 
 # Set wall tiles in WallBase module for auto-tiling
 from world.buildings.wall_base import set_wall_tiles
-set_wall_tiles(wall_tiles)
+set_wall_tiles(wall_tiles_lv1, wall_tiles_lv2)
 
 ###################
 # Game state
@@ -2346,6 +2372,57 @@ def upgrade_building(building):
         resources.wood -= cost_dict.get("wood", 0)
         resources.iron -= cost_dict.get("iron", 0)
         resources.food -= cost_dict.get("food", 0)
+
+    # Special case: upgrade wood wall -> iron wall
+    from world.buildings.wall_wood import WallWood
+    from world.buildings.wall_iron import WallIron
+    if isinstance(building, WallWood):
+        # Use WallIron.COST as upgrade cost (no coins)
+        upgrade_cost_dict = {
+            "wood": WallIron.COST.wood,
+            "iron": WallIron.COST.iron,
+            "food": WallIron.COST.food,
+        }
+        if not has_resources(upgrade_cost_dict):
+            print("Not enough resources to upgrade wall to iron.")
+            return
+
+        # Pay cost
+        pay_resources(upgrade_cost_dict)
+
+        # Replace WallWood with WallIron at same position, carrying over HP ratio
+        gx, gy = building.grid_x, building.grid_y
+        # Compute HP ratio and new HP
+        hp_ratio = building.hp / building.max_hp if building.max_hp > 0 else 1.0
+        new_max_hp = WallIron.BASE_HP
+        new_hp = int(new_max_hp * max(0.0, min(1.0, hp_ratio)))
+
+        # Remove old wall from world registries
+        world.unregister_building(building)
+        building_group.remove(building)
+
+        # Create new iron wall
+        new_wall = WallIron((gx, gy), tier=1)
+        new_wall.world = world
+        new_wall.state = BuildState.ACTIVE
+        new_wall.max_hp = new_max_hp
+        new_wall.hp = max(1, new_hp)
+        new_wall.progress = new_wall.BUILD_TIME
+
+        # Register and add to groups
+        world.register_building(new_wall)
+        building_group.add(new_wall)
+
+        # Auto-tile this wall and its neighbors
+        if hasattr(world, "autotile_wall_and_neighbors"):
+            world.autotile_wall_and_neighbors(gx, gy)
+
+        # Update building panel selection to new wall
+        building_panel.selected_building = new_wall
+
+        sound_system.play("upgrade")
+        print(f"Upgraded wall_wood at ({gx},{gy}) to wall_iron")
+        return
 
     if is_turret_building:
         upgrade_info = get_next_turret_upgrade(building)
@@ -3991,7 +4068,7 @@ while running:
                 if button_clicked == "close":
                     # Clicked outside panel - deselect building and hide panel
                     deselect_building()
-                elif button_clicked == "upgrade":
+                elif button_clicked in ("upgrade", "upgrade_to_iron"):
                     building = building_panel.selected_building
                     if building:
                         upgrade_building(building)

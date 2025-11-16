@@ -2,13 +2,22 @@
 from world.building import Building, Cost, BuildState, TILE
 import pygame
 
-# Module-level variable to store wall tiles (set from main.py)
+# Module-level variables to store wall tiles (set from main.py)
+# Level 1: default (wood walls)
 wall_tiles_dict = {}
+# Level 2: upgraded/iron walls
+wall_tiles_lv2_dict = {}
 
-def set_wall_tiles(tiles_dict):
-    """Set the wall tiles dictionary from main.py"""
-    global wall_tiles_dict
-    wall_tiles_dict = tiles_dict
+def set_wall_tiles(tiles_lv1, tiles_lv2=None):
+    """
+    Set wall tile dictionaries from main.py.
+    tiles_lv1: dict of sprites for level 1 walls
+    tiles_lv2: optional dict of sprites for level 2 walls (used by iron walls)
+    """
+    global wall_tiles_dict, wall_tiles_lv2_dict
+    wall_tiles_dict = tiles_lv1 or {}
+    if tiles_lv2 is not None:
+        wall_tiles_lv2_dict = tiles_lv2 or {}
 
 class WallBase(Building):
     """Base class for walls - shared functionality."""
@@ -69,8 +78,12 @@ class WallBase(Building):
         E = self.has_wall(1, 0)
         W = self.has_wall(-1, 0)
         
-        # Get wall tiles dictionary
-        wall_tiles = wall_tiles_dict if wall_tiles_dict else {}
+        # Choose correct tile set based on wall type (wood vs iron / level 2)
+        # Default: level 1 tiles; iron/level-2 walls use lv2 tiles if provided
+        if hasattr(self, "_is_iron") and self._is_iron and wall_tiles_lv2_dict:
+            wall_tiles = wall_tiles_lv2_dict
+        else:
+            wall_tiles = wall_tiles_dict if wall_tiles_dict else {}
         
         # Determine sprite based on neighbors
         if not wall_tiles:
