@@ -1353,6 +1353,8 @@ class World:
         self.sawmill_level = 0
 
         self.buildings_by_type: Dict[str, list] = {}
+        # Visual phase decoupled from logic state (to control when background changes)
+        self.visual_phase = None  # will be set after WaveManager is attached
     
     def enemy_count(self):
         """Get current enemy count"""
@@ -1504,6 +1506,9 @@ world.research = research_manager
 wave_manager = WaveManager(world, waves_config, difficulty="normal")
 # Update world with wave_manager reference
 world.wave_manager = wave_manager
+
+# Initialize visual phase to current logical state at startup
+world.visual_phase = wave_manager.state
 
 # Initialize responsiveness systems
 input_buffer = InputBuffer(buffer_duration=0.125)  # 125ms buffer
@@ -3152,8 +3157,8 @@ while running:
     tiles_y = (c.SCREEN_HEIGHT + TILE - 1) // TILE  # Ceiling division to ensure full coverage
     
     # Draw grass tiles across the entire screen with variation
-    # Select day or night tiles based on wave manager state
-    is_night = wave_manager.state == WaveManager.STATE_NIGHT
+    # Select day or night tiles based on world.visual_phase (decoupled from logic state)
+    is_night = (getattr(world, "visual_phase", wave_manager.state) == WaveManager.STATE_NIGHT)
     current_grass_tiles = grass_tiles_night if is_night else grass_tiles_day
     
     for y in range(tiles_y):
@@ -3584,6 +3589,9 @@ while running:
                 
                 # STEP 7: Spawn daily resource nodes
                 spawn_daily_resource_nodes()
+
+                # Only after all day-start tasks are complete, switch visual theme to DAY
+                world.visual_phase = WaveManager.STATE_DAY
             elif wave_manager.state == WaveManager.STATE_NIGHT:
                 # PERFECT FLOW FOR NIGHT PHASE START:
                 # 1. Luck Roll → Event Type
@@ -3616,15 +3624,20 @@ while running:
                 
                 sound_system.play("wave_start")
                 wave_manager.enemies_spawned = 0
+
+                # After night-start setup, switch visual theme to NIGHT
+                world.visual_phase = WaveManager.STATE_NIGHT
             elif wave_manager.state == WaveManager.STATE_SUMMARY:
                 # Just started summary - autosave
                 save_system.save_world(world, wave_manager, game_state_manager, resources)
                 # SYSTEM POPUP - "Night X Clear" (separate from events)
                 if hud:
+                    # Use current night number; ensure it never displays 0
+                    last_night_num = max(1, getattr(wave_manager, "night", 1))
                     hud.show_event(
-                        text=f"Night {wave_manager.night - 1} Cleared",
+                        text=f"Night {last_night_num} Cleared",
                         duration=2.0,
-                        title=f"Night {wave_manager.night - 1} Cleared",
+                        title=f"Night {last_night_num} Cleared",
                         description="",
                         effects=[],
                         event_type="neutral"
