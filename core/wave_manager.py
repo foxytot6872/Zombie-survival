@@ -28,13 +28,14 @@ class WaveManager:
         self.world = world
         self.cfg = waves_cfg
         self.difficulty = difficulty
-        self.night = 1
+        self.night = 0  # Start at 0, will increment to 1 for first night
         self.day = 1
         self.state = self.STATE_DAY
         self.timer = 0.0
         self.day_duration = waves_cfg.get("day_duration", 30.0)
         self.summary_duration = waves_cfg.get("summary_duration", 5.0)
         self.win_nights = waves_cfg.get("win_nights", 10)
+        print(f"[NIGHT COUNTER] WaveManager initialized - night={self.night}, day={self.day}")
         
         # Statistics
         self.enemies_killed = 0
@@ -91,6 +92,7 @@ class WaveManager:
         """Start the summary phase after a wave"""
         self.state = self.STATE_SUMMARY
         self.timer = 0.0
+        print(f"[NIGHT COUNTER] start_summary() called - current night={self.night}")
         
         # Record night end stats for adaptation system (after damage)
         self.record_night_end_stats()
@@ -149,6 +151,11 @@ class WaveManager:
         if self.state == self.STATE_DAY:
             # Day phase: wait for day duration, then start night
             if self.timer >= self.day_duration:
+                # Increment night counter when transitioning from day to night
+                # This ensures Night 1 is the first night, Night 2 is the second, etc.
+                print(f"[NIGHT COUNTER] Before increment: night={self.night}")
+                self.night += 1
+                print(f"[NIGHT COUNTER] After increment: night={self.night}, starting night")
                 self.start_night()
                 
         elif self.state == self.STATE_NIGHT:
@@ -193,7 +200,8 @@ class WaveManager:
     
     def reset(self):
         """Reset wave manager"""
-        self.night = 1
+        print(f"[NIGHT COUNTER] reset() called - resetting night from {self.night} to 0")
+        self.night = 0  # Start at 0, will increment to 1 for first night
         self.day = 1
         self.state = self.STATE_DAY
         self.timer = 0.0

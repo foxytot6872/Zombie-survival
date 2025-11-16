@@ -393,7 +393,8 @@ class HUD:
             
             # Calculate popup panel dimensions
             panel_padding = 20
-            popup_width = 600
+            # Increased width to better accommodate text
+            popup_width = 700
             popup_x = (self.screen_width - popup_width) // 2
             popup_y = 150  # Top-center position
             
@@ -415,13 +416,66 @@ class HUD:
                 title_color = (255, 255, 200)
                 border_base = (107, 199, 255)
 
-            # Render title (large font)
+            # Render title (large font) - wrap if needed
+            # Calculate maximum width for title text
+            max_title_width = popup_width - (panel_padding * 2)
             title_surface = self.font_large.render(title_text, True, title_color)
-            title_surface.set_alpha(self.event_fade_alpha)
+            # Check if title needs wrapping
+            if title_surface.get_width() > max_title_width:
+                # Word wrap title if too long
+                words = title_text.split(' ')
+                wrapped_title_lines = []
+                current_line = ""
+                for word in words:
+                    test_line = current_line + (" " if current_line else "") + word
+                    test_surface = self.font_large.render(test_line, True, title_color)
+                    if test_surface.get_width() <= max_title_width:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            wrapped_title_lines.append(current_line)
+                        current_line = word
+                if current_line:
+                    wrapped_title_lines.append(current_line)
+            else:
+                wrapped_title_lines = [title_text]
             
-            # Render description (medium font, wrap if needed)
-            desc_surface = self.font_medium.render(desc_text, True, (255, 255, 255))
-            desc_surface.set_alpha(self.event_fade_alpha)
+            # Render wrapped title lines
+            title_surfaces = []
+            for line in wrapped_title_lines:
+                title_surface = self.font_large.render(line, True, title_color)
+                title_surface.set_alpha(self.event_fade_alpha)
+                title_surfaces.append(title_surface)
+            
+            # Render description (medium font, wrap text if needed)
+            # Calculate maximum width for text (accounting for padding)
+            max_text_width = popup_width - (panel_padding * 2)
+            
+            # Word wrap description text
+            wrapped_desc_lines = []
+            if desc_text:
+                words = desc_text.split(' ')
+                current_line = ""
+                for word in words:
+                    test_line = current_line + (" " if current_line else "") + word
+                    test_surface = self.font_medium.render(test_line, True, (255, 255, 255))
+                    if test_surface.get_width() <= max_text_width:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            wrapped_desc_lines.append(current_line)
+                        current_line = word
+                if current_line:
+                    wrapped_desc_lines.append(current_line)
+            else:
+                wrapped_desc_lines = [desc_text]
+            
+            # Render wrapped description lines
+            desc_surfaces = []
+            for line in wrapped_desc_lines:
+                desc_surface = self.font_medium.render(line, True, (255, 255, 255))
+                desc_surface.set_alpha(self.event_fade_alpha)
+                desc_surfaces.append(desc_surface)
             
             # Render effects if any (small font)
             effect_surfaces = []
@@ -433,13 +487,13 @@ class HUD:
             
             # Calculate panel height based on content
             line_spacing = 8
-            title_height = title_surface.get_height()
-            desc_height = desc_surface.get_height()
+            title_height = sum(s.get_height() + line_spacing for s in title_surfaces) if title_surfaces else 0
+            desc_height = sum(s.get_height() + line_spacing for s in desc_surfaces) if desc_surfaces else 0
             effects_height = sum(s.get_height() + line_spacing for s in effect_surfaces) if effect_surfaces else 0
             
             popup_height = (panel_padding * 2 + 
                            title_height + line_spacing * 2 +
-                           desc_height + line_spacing * 2 +
+                           desc_height + line_spacing +
                            effects_height)
             
             # Draw popup panel background
@@ -454,17 +508,26 @@ class HUD:
             popup_bg.set_alpha(int(self.event_fade_alpha * 0.95))
             surface.blit(popup_bg, (popup_x, popup_y))
             
-            # Draw title
-            title_rect = title_surface.get_rect(centerx=popup_x + popup_width // 2, y=popup_y + panel_padding)
-            surface.blit(title_surface, title_rect)
+            # Draw title (wrapped lines if needed)
+            title_y = popup_y + panel_padding
+            last_title_rect = None
+            for title_surface in title_surfaces:
+                title_rect = title_surface.get_rect(centerx=popup_x + popup_width // 2, y=title_y)
+                surface.blit(title_surface, title_rect)
+                title_y += title_surface.get_height() + line_spacing
+                last_title_rect = title_rect
             
-            # Draw description (wrap if too long)
-            desc_y = title_rect.bottom + line_spacing * 2
-            desc_rect = desc_surface.get_rect(centerx=popup_x + popup_width // 2, y=desc_y)
-            surface.blit(desc_surface, desc_rect)
+            # Draw description (wrapped lines)
+            desc_y = last_title_rect.bottom + line_spacing * 2 if last_title_rect else popup_y + panel_padding
+            last_desc_rect = None
+            for desc_surface in desc_surfaces:
+                desc_rect = desc_surface.get_rect(centerx=popup_x + popup_width // 2, y=desc_y)
+                surface.blit(desc_surface, desc_rect)
+                desc_y += desc_surface.get_height() + line_spacing
+                last_desc_rect = desc_rect
             
             # Draw effects
-            effect_y = desc_rect.bottom + line_spacing * 2
+            effect_y = last_desc_rect.bottom + line_spacing * 2 if last_desc_rect else title_rect.bottom + line_spacing * 2
             for effect_surface in effect_surfaces:
                 effect_rect = effect_surface.get_rect(x=popup_x + panel_padding + 20, y=effect_y)
                 surface.blit(effect_surface, effect_rect)

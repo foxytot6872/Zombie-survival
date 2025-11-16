@@ -20,10 +20,11 @@ class SelectDifficultyScreen:
     TEXT_NUM_FRAMES = 17
     TEXT_ANIMATION_SPEED = 0.05  # seconds per frame
 
-    def __init__(self, screen_width: int, screen_height: int):
+    def __init__(self, screen_width: int, screen_height: int, sound_system=None):
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.is_visible = False
+        self.sound_system = sound_system
 
         # Optional legacy background sprite sheet (not used when static bg present)
         self.sprite_sheet = self._load_sprite_sheet()
@@ -153,12 +154,20 @@ class SelectDifficultyScreen:
 
         if event.type == pygame.KEYDOWN:
             if event.key in (pygame.K_LEFT, pygame.K_a):
+                old_index = self.selected_index
                 self.selected_index = (self.selected_index - 1) % len(self.options)
                 self.hover_index = self.selected_index
+                # Play hover sound on keyboard navigation
+                if old_index != self.selected_index and self.sound_system:
+                    self.sound_system.play("sci_fi_hover")
                 return True
             if event.key in (pygame.K_RIGHT, pygame.K_d):
+                old_index = self.selected_index
                 self.selected_index = (self.selected_index + 1) % len(self.options)
                 self.hover_index = self.selected_index
+                # Play hover sound on keyboard navigation
+                if old_index != self.selected_index and self.sound_system:
+                    self.sound_system.play("sci_fi_hover")
                 return True
             if event.key in (pygame.K_RETURN, pygame.K_SPACE):
                 self._confirm_selection()
@@ -189,6 +198,10 @@ class SelectDifficultyScreen:
     def _update_hover(self, pos):
         """Update hover state based on mouse position."""
         idx = self._option_index_at(pos)
+        # Play hover sound if hovering over a new button
+        if idx is not None and idx != self.hover_index:
+            if self.sound_system:
+                self.sound_system.play("sci_fi_hover")
         self.hover_index = idx
         if idx is not None:
             self.selected_index = idx

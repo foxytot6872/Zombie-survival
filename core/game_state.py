@@ -8,6 +8,7 @@ class GameState(Enum):
     """Game state enumeration"""
     MENU = "menu"
     SELECT_DIFFICULTY = "select_difficulty"
+    SELECT_MODE = "select_mode"
     PLAYING = "playing"
     PAUSED = "paused"
     DAY = "day"

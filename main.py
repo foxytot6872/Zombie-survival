@@ -32,6 +32,7 @@ from ui.research_button import ResearchButton
 from ui.research_panel import ResearchPanel
 from ui.start_screen import StartScreen
 from ui.difficulty_screen import SelectDifficultyScreen
+from ui.mode_screen import SelectModeScreen, GameMode
 from ui.build_tooltip import BuildTooltipManager
 from ui.custom_font import load_custom_font, CustomFont
 from upgrade_config import get_next_turret_upgrade, scale_upgrade_cost
@@ -1170,6 +1171,7 @@ except:
 grid = Grid(GRID_WIDTH, GRID_HEIGHT, c.SCREEN_WIDTH, c.SCREEN_HEIGHT, upper_fraction)
 resources = Resources(wood=0, iron=0, food=0, coins=0)
 current_difficulty = Difficulty.EASY
+current_game_mode = GameMode.TEN_DAY
 
 # Building groups
 building_group = pygame.sprite.Group()
@@ -1525,7 +1527,8 @@ world.day_events = day_event_manager
 game_over_screen = GameOverScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium, font_small)
 pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
-difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT)
+difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, sound_system)
+mode_screen = SelectModeScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, sound_system)
 # Play gamestart sound when start screen is first shown
 sound_system.play("gamestart")
 # Create scaled versions for building panel fonts
@@ -2404,12 +2407,14 @@ def open_difficulty_selection():
 
 
 def handle_difficulty_selected(selection: Difficulty):
-    """Apply difficulty and start gameplay."""
+    """Apply difficulty and show mode selection."""
     global current_difficulty
     current_difficulty = selection
     apply_difficulty_settings(selection, reset_resources=True)
     difficulty_screen.hide()
-    game_state_manager.set_state(GameState.PLAYING)
+    mode_screen.show()
+    sound_system.play("gamestart")
+    game_state_manager.set_state(GameState.SELECT_MODE)
 
 
 def handle_difficulty_cancel():
@@ -2420,9 +2425,26 @@ def handle_difficulty_cancel():
     game_state_manager.set_state(GameState.MENU)
 
 
+def handle_mode_selected(mode: GameMode):
+    """Apply mode and start gameplay."""
+    global current_game_mode
+    current_game_mode = mode
+    mode_screen.hide()
+    game_state_manager.set_state(GameState.PLAYING)
+
+
+def handle_mode_cancel():
+    """Return to difficulty selection from mode selection."""
+    mode_screen.hide()
+    difficulty_screen.show()
+    game_state_manager.set_state(GameState.SELECT_DIFFICULTY)
+
+
 start_screen.on_start = open_difficulty_selection
 difficulty_screen.on_select = handle_difficulty_selected
 difficulty_screen.on_cancel = handle_difficulty_cancel
+mode_screen.on_select = handle_mode_selected
+mode_screen.on_cancel = handle_mode_cancel
 
 # Building panel callbacks (will be set up in game loop)
 def upgrade_building(building):
@@ -2733,7 +2755,10 @@ def debug_skip_state():
     """Skip to the next game state (DAY -> NIGHT -> SUMMARY -> DAY)"""
     current_state = wave_manager.state
     if current_state == WaveManager.STATE_DAY:
-        # Skip to night
+        # Skip to night - increment night counter when transitioning from DAY to NIGHT
+        print(f"[NIGHT COUNTER] debug_skip_state: Before increment: night={wave_manager.night}")
+        wave_manager.night += 1
+        print(f"[NIGHT COUNTER] debug_skip_state: After increment: night={wave_manager.night}")
         wave_manager.start_night()
         recipe = wave_manager.get_wave_recipe()
         spawn_config = waves_config["spawn"]
@@ -3165,6 +3190,17 @@ while running:
                 running = False
             else:
                 difficulty_screen.handle_event(event)
+        pygame.display.flip()
+        continue
+    
+    if game_state_manager.get_state() == GameState.SELECT_MODE:
+        mode_screen.update(dt)
+        mode_screen.draw(screen)
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            else:
+                mode_screen.handle_event(event)
         pygame.display.flip()
         continue
     
@@ -3654,8 +3690,11 @@ while running:
                 save_system.save_world(world, wave_manager, game_state_manager, resources)
                 # SYSTEM POPUP - "Night X Clear" (separate from events)
                 if hud:
-                    # Use current night number; ensure it never displays 0
-                    last_night_num = max(1, getattr(wave_manager, "night", 1))
+                    # Use wave_manager.night value (the night that just completed)
+                    # When summary starts, night number is correct (before increment)
+                    print(f"[NIGHT COUNTER] In STATE_SUMMARY - wave_manager.night={wave_manager.night}")
+                    last_night_num = max(1, wave_manager.night)
+                    print(f"[NIGHT COUNTER] Announcement will show: 'Night {last_night_num} Cleared'")
                     hud.show_event(
                         text=f"Night {last_night_num} Cleared",
                         duration=2.0,
@@ -4107,6 +4146,8 @@ while running:
         start_screen.draw(screen)
     if difficulty_screen.is_visible:
         difficulty_screen.draw(screen)
+    if mode_screen.is_visible:
+        mode_screen.draw(screen)
     
     ###################
     # Draw preview when in build mode - use cached ghost position for responsiveness
@@ -4235,6 +4276,10 @@ while running:
         
         if game_state_manager.get_state() == GameState.SELECT_DIFFICULTY:
             if difficulty_screen.handle_event(event):
+                continue
+        
+        if game_state_manager.get_state() == GameState.SELECT_MODE:
+            if mode_screen.handle_event(event):
                 continue
         
         # Handle MOUSEMOTION for responsive build ghost (NOT tied to frame rate)
@@ -4613,7 +4658,11 @@ while running:
                     # Debug action handled by debug system (F1, F2, F4-F7)
                     continue
                 elif event.key == pygame.K_F9:
-                    # F9: Skip to night
+                    # F9: Skip to night - increment night counter when transitioning from DAY to NIGHT
+                    if wave_manager.state == WaveManager.STATE_DAY:
+                        print(f"[NIGHT COUNTER] F9 skip: Before increment: night={wave_manager.night}")
+                        wave_manager.night += 1
+                        print(f"[NIGHT COUNTER] F9 skip: After increment: night={wave_manager.night}")
                     wave_manager.start_night()
                     recipe = wave_manager.get_wave_recipe()
                     spawn_config = waves_config["spawn"]

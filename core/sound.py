@@ -65,8 +65,8 @@ class SoundSystem:
                 except Exception as e:
                     print(f"Warning: Could not load sound {event_name}: {e}")
         
-        # Load additional sounds (coin, gamestart)
-        additional_sounds = ["coin", "gamestart"]
+        # Load additional sounds (coin, gamestart, hover sounds)
+        additional_sounds = ["coin", "gamestart", "sci_fi_hover", "sci_fi_hover_high"]
         for event_name in additional_sounds:
             # Try .mp3 first, then .wav
             sound_file = self.audio_dir / f"{event_name}.mp3"
