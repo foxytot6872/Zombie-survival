@@ -20,8 +20,8 @@ LOCKED_FILL = (40, 40, 40)  # Dark gray for locked
 LOCKED_BORDER = (80, 80, 80)
 LOCKED_UNAFFORDABLE_FILL = (25, 25, 25)  # Darker gray for unaffordable
 LOCKED_UNAFFORDABLE_BORDER = (60, 60, 60)
-UNLOCKABLE_FILL = (50, 100, 50)  # Light green for unlockable
-UNLOCKABLE_BORDER = (100, 200, 120)
+UNLOCKABLE_FILL = (200, 200, 50)  # Yellow for unlockable
+UNLOCKABLE_BORDER = (240, 240, 120)
 UNLOCKED_FILL = (60, 120, 60)  # Green for unlocked
 UNLOCKED_BORDER = (120, 220, 120)
 LINE_LOCKED = (60, 60, 60, 80)  # Semi-transparent
@@ -30,10 +30,11 @@ LINE_UNLOCKED = (120, 220, 120, 80)
 TOOLTIP_BG = (20, 20, 20)
 TOOLTIP_BORDER = (140, 140, 140)
 
-NODE_WIDTH = 180  # 20% bigger (150 * 1.2)
-NODE_HEIGHT = 72  # 20% bigger (60 * 1.2)
+NODE_WIDTH = 220  # From provided node sheet frame size
+NODE_HEIGHT = 90  # From provided node sheet frame size
 NODE_RADIUS = 6  # Rounded corners
 ICON_SIZE = 40
+DEBUG_RESEARCH_SPRITES = True  # Enable debug logs for missing node sprites
 
 
 def _load_icon(*paths: str) -> pygame.Surface:
@@ -60,11 +61,7 @@ ICON_MAP: Dict[str, pygame.Surface] = {
     "forge": _load_icon("asset/smelter/Bricks_03.png", "asset/smelter/Bricks_03-Sheet.png"),
 }
 
-RESEARCH_BUILDING_UPGRADES: Dict[str, List[Tuple[str, int]]] = {
-    "sawmill": [("smelter", 1)],
-    "alloy": [("smelter", 2)],
-    "forge": [("smelter", 3)],
-}
+RESEARCH_BUILDING_UPGRADES: Dict[str, List[Tuple[str, int]]] = {}
 
 # Persist node states between openings (deprecated - now uses ResearchManager)
 GLOBAL_NODE_STATES: Dict[str, str] = {}
@@ -125,8 +122,19 @@ class ResearchTreeUI:
         self.font_bold = pygame.font.Font(None, 24)  # For node names
 
         self.panel_rect = self._build_panel_rect()
+        # Optional panel image background (reuse ResearchPanel look)
+        self.panel_image = None
+        try:
+            import os
+            img_path = os.path.join('asset', 'hud', 'ResearchPanel.png')
+            if os.path.exists(img_path):
+                self.panel_image = pygame.image.load(img_path).convert_alpha()
+        except Exception:
+            self.panel_image = None
         self.sections = self._build_sections()
         self.nodes: Dict[str, ResearchNode] = {}
+        self.node_sprites: Dict[str, pygame.Surface] = {}
+        self._missing_sprite_logged = set()
         self._create_nodes_from_json()
 
     # ------------------------------------------------------------------
@@ -142,32 +150,20 @@ class ResearchTreeUI:
     def _build_sections(self) -> Dict[str, pygame.Rect]:
         margin = 20
         header = 70
+        padding = 8
         section_width = (self.panel_rect.width - margin * 3) // 2
-        section_height = (self.panel_rect.height - header - margin * 3) // 2
-        padding = 8  # Internal padding for sections
+        section_height = (self.panel_rect.height - header - margin * 2)
 
         sections = {}
-        sections["resource"] = pygame.Rect(
+        sections["agriculture"] = pygame.Rect(
             self.panel_rect.x + margin + padding,
             self.panel_rect.y + header + padding,
             section_width - padding * 2,
             section_height - padding * 2,
         )
-        sections["turret"] = pygame.Rect(
-            sections["resource"].right + margin + padding * 2,
-            sections["resource"].y,
-            section_width - padding * 2,
-            section_height - padding * 2,
-        )
-        sections["npc"] = pygame.Rect(
-            self.panel_rect.x + margin + padding,
-            sections["resource"].bottom + margin + padding * 2,
-            section_width - padding * 2,
-            section_height - padding * 2,
-        )
-        sections["base"] = pygame.Rect(
-            sections["npc"].right + margin + padding * 2,
-            sections["npc"].y,
+        sections["ballistic"] = pygame.Rect(
+            sections["agriculture"].right + margin + padding * 2,
+            sections["agriculture"].y,
             section_width - padding * 2,
             section_height - padding * 2,
         )
@@ -177,69 +173,72 @@ class ResearchTreeUI:
     # Node creation from JSON
     # ------------------------------------------------------------------
     def _create_nodes_from_json(self):
-        """Load nodes from research.json and position them by tier."""
+        """Load nodes from research.json and position them by branch and tier."""
         if not self.research_manager:
             print("Warning: No research manager provided, cannot load research tree")
             return
-        
+
         research_defs = self.research_manager.research_defs
-        
-        # Group by category and tier
-        by_category_tier: Dict[str, Dict[int, List[Tuple[str, Dict]]]] = {
-            "resource": {}, "turret": {}, "npc": {}, "base": {}, "hq": {}
-        }
-        
+
+        def get_branch(node_id: str, seen=None) -> str:
+            """Determine branch by tracing prerequisites to root."""
+            if seen is None:
+                seen = set()
+            if node_id in seen:
+                return "agriculture"
+            seen.add(node_id)
+            if node_id in ("agriculture", "ballistic_engineering"):
+                return "agriculture" if node_id == "agriculture" else "ballistic"
+            data = research_defs.get(node_id, {})
+            parents = data.get("prerequisites", [])
+            for p in parents:
+                branch = get_branch(p, seen)
+                if branch in ("agriculture", "ballistic"):
+                    return branch
+            return "agriculture"
+
+        # Group by branch and tier
+        by_branch_tier: Dict[str, Dict[int, List[Tuple[str, Dict]]]] = {"agriculture": {}, "ballistic": {}}
         for key, data in research_defs.items():
-            category = data.get("category", "resource")
             tier = data.get("tier", 1)
-            if category not in by_category_tier:
-                category = "resource"  # Fallback
-            if tier not in by_category_tier[category]:
-                by_category_tier[category][tier] = []
-            by_category_tier[category][tier].append((key, data))
-        
-        # Position nodes within sections by tier
-        for category, section_rect in self.sections.items():
-            if category == "base":
-                # Merge hq and base
-                hq_items = by_category_tier.get("hq", {})
-                base_items = by_category_tier.get("base", {})
-                all_items = {}
-                for tier in set(list(hq_items.keys()) + list(base_items.keys())):
-                    all_items[tier] = (hq_items.get(tier, []) + base_items.get(tier, []))
-                tier_items = all_items
-            else:
-                tier_items = by_category_tier.get(category, {})
-            
+            branch = get_branch(key)
+            if tier not in by_branch_tier[branch]:
+                by_branch_tier[branch][tier] = []
+            by_branch_tier[branch][tier].append((key, data))
+
+        # Layout: 5 tiers vertically per section
+        for branch, section_rect in self.sections.items():
+            tier_items = by_branch_tier.get(branch, {})
             if not tier_items:
                 continue
-            
-            # Calculate positions: tier 1 at top, tier 4 at bottom
-            max_tier = max(tier_items.keys()) if tier_items else 1
+            max_tier = 5
             tier_spacing = (section_rect.height - 16) // max(1, max_tier)
             padding = 8
-            
-            for tier in sorted(tier_items.keys()):
-                items = tier_items[tier]
+
+            for tier in range(1, max_tier + 1):
+                items = tier_items.get(tier, [])
+                if not items:
+                    continue
                 # Horizontal layout within tier
                 item_spacing = (section_rect.width - 16) // max(1, len(items))
                 y_pos = section_rect.y + padding + (tier - 1) * tier_spacing + tier_spacing // 2
-                
+
                 for idx, (key, data) in enumerate(items):
                     x_pos = section_rect.x + padding + idx * item_spacing + item_spacing // 2
-                    
                     node = ResearchNode(
                         node_id=key,
                         name=data.get("name", key),
                         description=data.get("description", ""),
-                        cost=data.get("cost_coins", 0),
+                        cost=data.get("cost", data.get("cost_coins", 0)),
                         position=(x_pos, y_pos),
                         parents=data.get("prerequisites", []),
-                        category=category,
-                        tier=tier
+                        category=branch,
+                        tier=tier,
                     )
                     self.nodes[key] = node
-        
+                    # Preload node sprite
+                    self._ensure_node_sprite_loaded(key)
+
         self.update_node_states(force=True)
 
     # ------------------------------------------------------------------
@@ -413,9 +412,17 @@ class ResearchTreeUI:
             zoom_offset_x = 0
             zoom_offset_y = 0
 
-        panel = pygame.Surface(self.panel_rect.size, pygame.SRCALPHA)
-        panel.fill(PANEL_COLOR)
-        self.screen.blit(panel, self.panel_rect)
+        # Draw panel background (image if available, else fallback box)
+        if self.panel_image:
+            if self.panel_image.get_size() != (self.panel_rect.width, self.panel_rect.height):
+                scaled = pygame.transform.smoothscale(self.panel_image, (self.panel_rect.width, self.panel_rect.height))
+                self.screen.blit(scaled, self.panel_rect)
+            else:
+                self.screen.blit(self.panel_image, self.panel_rect)
+        else:
+            panel = pygame.Surface(self.panel_rect.size, pygame.SRCALPHA)
+            panel.fill(PANEL_COLOR)
+            self.screen.blit(panel, self.panel_rect)
         pygame.draw.rect(self.screen, SECTION_BORDER, self.panel_rect, 3)
 
         title = self.font_large.render("RESEARCH TREE", True, (255, 255, 255))
@@ -429,10 +436,8 @@ class ResearchTreeUI:
         self.screen.blit(esc_hint, (self.panel_rect.right - esc_hint.get_width() - 20, self.panel_rect.y + 20))
 
         section_titles = {
-            "resource": "RESOURCE TREE",
-            "turret": "TURRET TREE",
-            "npc": "NPC TREE",
-            "base": "HQ / BASE TREE",
+            "agriculture": "AGRICULTURE BRANCH",
+            "ballistic": "BALLISTIC ENGINEERING BRANCH",
         }
 
         for key, rect in self.sections.items():
@@ -461,17 +466,17 @@ class ResearchTreeUI:
         # Get tiers for this category
         tiers = set()
         for node in self.nodes.values():
-            if node.category == category or (category == "base" and node.category in ("base", "hq")):
+            if node.category == category:
                 tiers.add(node.tier)
         
         if not tiers:
             return
         
-        max_tier = max(tiers)
+        max_tier = 5
         tier_spacing = (section_rect.height - 16) // max(1, max_tier)
         padding = 8
         
-        for tier in sorted(tiers):
+        for tier in range(1, max_tier + 1):
             y_pos = section_rect.y + padding + (tier - 1) * tier_spacing + tier_spacing // 2
             tier_label = self.font_small.render(f"Tier {tier}", True, (150, 150, 150))
             self.screen.blit(tier_label, (section_rect.x + 5, y_pos - 10))
@@ -522,31 +527,28 @@ class ResearchTreeUI:
         self._update_hover_node(mouse_pos)
 
         for node in self.nodes.values():
-            # Determine colors based on state
+            # Determine frame based on state:
+            # 0 = not researched yet (unlockable)
+            # 1 = researched (unlocked)
+            # 2 = cannot research yet (locked or unaffordable)
             if node.state == "unlocked":
-                fill = UNLOCKED_FILL
-                border = UNLOCKED_BORDER
+                frame_index = 1
             elif node.state == "unlockable":
-                fill = UNLOCKABLE_FILL
-                border = UNLOCKABLE_BORDER
-            elif node.state == "locked_unaffordable":
-                fill = LOCKED_UNAFFORDABLE_FILL
-                border = LOCKED_UNAFFORDABLE_BORDER
+                frame_index = 0
             else:
-                fill = LOCKED_FILL
-                border = LOCKED_BORDER
-            
+                frame_index = 2
+
             # Apply scale for unlock animation
             if node.scale != 1.0:
                 scaled_rect = pygame.Rect(
-                    node.rect.centerx - (node.rect.width * node.scale) // 2,
-                    node.rect.centery - (node.rect.height * node.scale) // 2,
+                    node.rect.centerx - int(node.rect.width * node.scale) // 2,
+                    node.rect.centery - int(node.rect.height * node.scale) // 2,
                     int(node.rect.width * node.scale),
-                    int(node.rect.height * node.scale)
+                    int(node.rect.height * node.scale),
                 )
             else:
                 scaled_rect = node.rect
-            
+
             # Draw drop shadow
             shadow_rect = scaled_rect.copy()
             shadow_rect.x += 2
@@ -554,11 +556,19 @@ class ResearchTreeUI:
             shadow_surface = pygame.Surface((shadow_rect.width, shadow_rect.height), pygame.SRCALPHA)
             shadow_surface.fill((0, 0, 0, 100))
             self.screen.blit(shadow_surface, shadow_rect.topleft)
-            
-            # Draw node with rounded corners
-            self._draw_rounded_rect(self.screen, fill, scaled_rect, NODE_RADIUS)
-            self._draw_rounded_rect(self.screen, border, scaled_rect, NODE_RADIUS, 3)
-            
+
+            # Draw sprite frame
+            sprite = self._ensure_node_sprite_loaded(node.node_id)
+            if sprite:
+                frame_surface = self._get_node_frame(sprite, frame_index)
+                if scaled_rect.size != frame_surface.get_size():
+                    frame_surface = pygame.transform.smoothscale(frame_surface, scaled_rect.size)
+                self.screen.blit(frame_surface, scaled_rect.topleft)
+            else:
+                # Fallback rectangle if sprite missing
+                self._draw_rounded_rect(self.screen, (60, 60, 60), scaled_rect, NODE_RADIUS)
+                self._draw_rounded_rect(self.screen, (120, 120, 120), scaled_rect, NODE_RADIUS, 2)
+
             # Flash effect
             if node.flash_timer > 0 and node.flash_color:
                 flash_alpha = int(255 * (node.flash_timer / 0.15))
@@ -567,28 +577,11 @@ class ResearchTreeUI:
                 self.screen.blit(flash_surface, scaled_rect.topleft)
                 self._draw_rounded_rect(self.screen, node.flash_color, scaled_rect, NODE_RADIUS, 3)
 
-            # Draw checkmark for unlocked
-            if node.state == "unlocked":
-                check = self.font_small.render("✓", True, (255, 255, 255))
-                self.screen.blit(check, (scaled_rect.right - 20, scaled_rect.y + 8))
-
-            # Center text
-            name_surface = self.font_bold.render(node.name, True, TEXT_COLOR)
-            name_rect = name_surface.get_rect(centerx=scaled_rect.centerx, y=scaled_rect.y + 12)
-            self.screen.blit(name_surface, name_rect)
-            
-            cost_surface = self.font_small.render(f"{node.cost} c", True, (200, 200, 200))
-            cost_rect = cost_surface.get_rect(centerx=scaled_rect.centerx, y=scaled_rect.y + 35)
-            self.screen.blit(cost_surface, cost_rect)
-
             # Hover highlight
             if node == self.hover_node:
-                # Brighten background by 10%
-                bright_fill = tuple(min(255, int(c * 1.1)) for c in fill[:3])
-                hover_surface = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
-                hover_surface.fill((*bright_fill, 50))
-                self.screen.blit(hover_surface, scaled_rect.topleft)
-                # White outline
+                outline = pygame.Surface((scaled_rect.width, scaled_rect.height), pygame.SRCALPHA)
+                outline.fill((255, 255, 255, 30))
+                self.screen.blit(outline, scaled_rect.topleft)
                 self._draw_rounded_rect(self.screen, (255, 255, 255), scaled_rect, NODE_RADIUS, 2)
 
     def _update_hover_node(self, mouse_pos: Tuple[int, int]):
@@ -607,7 +600,8 @@ class ResearchTreeUI:
         lines = [node.name]
         if node.description:
             lines.append(node.description)
-        lines.append(f"Cost: {node.cost} coins")
+        if node.cost and node.state != "unlocked":
+            lines.append(f"Cost: {node.cost} coins")
         
         # Add modifier info if available
         if self.research_manager and node.node_id in self.research_manager.research_defs:
@@ -643,6 +637,83 @@ class ResearchTreeUI:
                 surf = self.font_small.render(line, True, TEXT_COLOR)
                 self.screen.blit(surf, (tooltip_rect.x + padding, y))
                 y += 20
+
+    # ------------------------------------------------------------------
+    # Sprite helpers
+    # ------------------------------------------------------------------
+    def _ensure_node_sprite_loaded(self, node_id: str) -> Optional[pygame.Surface]:
+        """Load and cache the spritesheet for a node if available."""
+        if node_id in self.node_sprites:
+            return self.node_sprites[node_id]
+        # Try to load from asset/hud/ResearchNode/{node_id}.png
+        import os
+        # First, try new naming scheme: PascalCase + 'Node-Sheet.png'
+        filename_new = self._node_id_to_sprite_filename(node_id)
+        candidates = [
+            os.path.join("asset", "hud", "ResearchNode", filename_new),
+            # Fallbacks: lowercase id-based names as previously
+            os.path.join("asset", "hud", "ResearchNode", f"{node_id}.png"),
+            os.path.join("asset", "hud", "ResearchNode", f"{node_id}.PNG"),
+        ]
+        surface = None
+        for path in candidates:
+            try:
+                if os.path.exists(path):
+                    surface = pygame.image.load(path).convert_alpha()
+                    break
+            except Exception:
+                continue
+        if surface is None:
+            self.node_sprites[node_id] = None
+            if DEBUG_RESEARCH_SPRITES and node_id not in self._missing_sprite_logged:
+                print(f"[ResearchTreeUI] WARNING: No sprite found for node '{node_id}'. Tried filenames:")
+                for p in candidates:
+                    print(f"  - {p}")
+                self._missing_sprite_logged.add(node_id)
+            return None
+        self.node_sprites[node_id] = surface
+        return surface
+
+    def _get_node_frame(self, sheet: pygame.Surface, frame_index: int) -> pygame.Surface:
+        """Extract a frame from a 3-frame horizontal spritesheet (220x90 each)."""
+        frame_index = max(0, min(2, frame_index))
+        frame_w, frame_h = NODE_WIDTH, NODE_HEIGHT
+        x = frame_index * frame_w
+        rect = pygame.Rect(x, 0, frame_w, frame_h)
+        frame = pygame.Surface((frame_w, frame_h), pygame.SRCALPHA)
+        frame.blit(sheet, (0, 0), rect)
+        return frame
+
+    def _node_id_to_sprite_filename(self, node_id: str) -> str:
+        """
+        Convert a snake_case node_id to PascalCase 'NameNode-Sheet.png' with overrides.
+        Examples:
+          - agriculture -> ArgricultureNode-Sheet.png (override spelling)
+          - ballistic_engineering -> BalisticEngineeringNode-Sheet.png (override spelling)
+          - advanced_fire_control_system -> AdvanceControlSystemNode-Sheet.png (override form)
+          - basic_woodworking -> BasicWoodworkingNode-Sheet.png
+        """
+        overrides = {
+            "agriculture": "ArgricultureNode-Sheet.png",
+            "ballistic_engineering": "BalisticEngineeringNode-Sheet.png",
+            "advanced_fire_control_system": "AdvanceControlSystemNode-Sheet.png",
+            "sleeping_quarters": "SleepingQuarterNode-Sheet.png",
+            "recruitment": "RecruimentNode-Sheet.png",
+            "structural_reinforcement": "StructuralReinforcement-Sheet.png",
+            "refined_alloy_techniques": "RefinedAlloyTechniqueNode-Sheet.png",
+            "combat_droids": "CombatDroidNode-Sheet.png",
+            "improved_target_acquisition": "ImproveTargetAquisitionNode-Sheet.png",
+            "flamethrower_tech": "FlamethrowerTech-Sheet.png",
+            "electromagnetic_rail_system": "EletromagneticRailSystem-Sheet.png",
+            "advanced_wood_processing": "AdvanceWoodProcessing-Sheet.png",
+        }
+        if node_id in overrides:
+            return overrides[node_id]
+
+        # Default conversion: snake_case -> PascalCase + 'Node-Sheet.png'
+        parts = [p for p in node_id.split("_") if p]
+        pascal = "".join(part.capitalize() for part in parts)
+        return f"{pascal}Node-Sheet.png"
 
 
 def open_research_tree(screen, world, research_manager=None, game_state_manager=None):

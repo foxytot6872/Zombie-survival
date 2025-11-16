@@ -38,6 +38,15 @@ class ResearchManager:
             print(f"Error loading research config: {e}")
             self.research_defs = {}
             self.base_research_defs = {}
+
+        # Auto-purchase free root nodes so their branches are available
+        for root_key in ("agriculture", "ballistic_engineering"):
+            if root_key in self.research_defs:
+                data = self.research_defs[root_key]
+                cost = data.get("cost", data.get("cost_coins", 0))
+                prereqs = data.get("prerequisites", [])
+                if cost == 0 and not prereqs:
+                    self.purchased.add(root_key)
     
     def is_unlocked(self, key: str) -> bool:
         """
@@ -61,7 +70,11 @@ class ResearchManager:
             return False
         if research_key in self.purchased:
             return False  # Already purchased
-        cost = self.research_defs[research_key].get("cost_coins", 0)
+        # Check prerequisites
+        if not self._are_prerequisites_met(research_key):
+            return False
+        # Check affordability
+        cost = self.research_defs[research_key].get("cost", self.research_defs[research_key].get("cost_coins", 0))
         return self.world.resources.coins >= cost
     
     def is_research_purchased(self, research_key: str) -> bool:
@@ -88,9 +101,13 @@ class ResearchManager:
         # Check if already purchased
         if research_key in self.purchased:
             return False
+
+        # Check prerequisites before unlocking
+        if not self._are_prerequisites_met(research_key):
+            return False
         
         # Check cost
-        cost = self.research_defs[research_key].get("cost_coins", 0)
+        cost = self.research_defs[research_key].get("cost", self.research_defs[research_key].get("cost_coins", 0))
         if not self.world.resources.spend_coins(cost):
             return False
         
@@ -135,16 +152,16 @@ class ResearchManager:
             factor = 1.0
         self.research_cost_multiplier = factor
         for key, data in self.base_research_defs.items():
-            base_cost = max(0, data.get("cost_coins", 0))
+            base_cost = max(0, data.get("cost", data.get("cost_coins", 0)))
             scaled_cost = max(1, int(round(base_cost * factor)))
             if key not in self.research_defs:
                 self.research_defs[key] = data.copy()
-            self.research_defs[key]["cost_coins"] = scaled_cost
+            self.research_defs[key]["cost"] = scaled_cost
     
     def _base_total_cost(self) -> float:
         if not self.base_research_defs:
             return 0.0
-        return sum(max(0, data.get("cost_coins", 0)) for data in self.base_research_defs.values())
+        return sum(max(0, data.get("cost", data.get("cost_coins", 0))) for data in self.base_research_defs.values())
     
     def get_research_list(self) -> Dict:
         """Get all research definitions."""
@@ -225,4 +242,15 @@ class ResearchManager:
                 tiered[tier] = {}
             tiered[tier][key] = data
         return tiered
+
+    # ------------------------------
+    # Internal helpers
+    # ------------------------------
+    def _are_prerequisites_met(self, research_key: str) -> bool:
+        """Check that all prerequisites are already purchased for a research item."""
+        data = self.research_defs.get(research_key, {})
+        parents = data.get("prerequisites", [])
+        if not parents:
+            return True
+        return all(parent in self.purchased for parent in parents)
 

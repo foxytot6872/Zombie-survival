@@ -1190,6 +1190,7 @@ selected_building = None  # Currently selected building
 pending_construction = None  # Building being constructed (can cancel)
 
 gather_mode = False  # True when player wants to assign workers to nodes
+debug_movable_nodes = False  # True when player wants to move research nodes (M key)
 
 # Build ghost responsiveness - track mouse position separately for instant updates
 build_ghost_grid_pos = None  # Grid position for build ghost (updated on MOUSEMOTION)
@@ -2754,6 +2755,25 @@ def debug_skip_state():
         hud.show_event(f"Debug: Skipped to Day {wave_manager.day}", 3.0)
         print(f"Debug: Skipped to day {wave_manager.day}")
 
+def debug_pause_cycle():
+    """Pause/stop the current wave cycle (stop spawning, freeze enemies)"""
+    global zombie_spawner
+    if zombie_spawner.active:
+        zombie_spawner.done = True
+        zombie_spawner.active = False
+        hud.show_event("Debug: Cycle Paused", 3.0)
+        print("Debug: Wave cycle paused")
+    else:
+        # Resume if paused
+        if wave_manager.state == WaveManager.STATE_NIGHT:
+            zombie_spawner.active = True
+            zombie_spawner.done = False
+            hud.show_event("Debug: Cycle Resumed", 3.0)
+            print("Debug: Wave cycle resumed")
+        else:
+            hud.show_event("Debug: Not in night phase", 2.0)
+            print("Debug: Cannot resume - not in night phase")
+
 # Register debug actions
 debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources)
 debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build)
@@ -2761,8 +2781,8 @@ debug_system.register_action(pygame.K_F3, "Spawn Zombie @ Mouse", lambda: None) 
 debug_system.register_action(pygame.K_F4, "Clear All Enemies", debug_clear_enemies)
 debug_system.register_action(pygame.K_F5, "Clear All Buildings", debug_clear_buildings)
 debug_system.register_action(pygame.K_F6, "Toggle Spawner", debug_toggle_spawner)
-debug_system.register_action(pygame.K_F7, "Kill All Enemies", debug_kill_all_enemies)
-debug_system.register_action(pygame.K_F8, "Complete All Buildings", debug_complete_all_buildings)
+debug_system.register_action(pygame.K_F7, "Pause/Resume Cycle", debug_pause_cycle)
+# F8: Skip State (handled manually in event loop to support Shift+F8 for Complete All Buildings)
 # Additional debug actions (using number keys)
 debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins)
 debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research)
@@ -2770,7 +2790,7 @@ debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event)
 debug_system.register_action(pygame.K_f, "Toggle Footprints", debug_toggle_footprints)
 debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rectangles)
 # F9-F11: Wave skipping (handled in event loop)
-# F12: Skip state (handled in event loop)
+# F12: Toggle debug mode only (handled in event loop)
 
 ###################
 # Helper functions for buttons
@@ -2852,10 +2872,8 @@ def rebuild_building_buttons():
 rebuild_building_buttons()
 
 def launch_research_tree():
-    """Toggle the research panel and rebuild buttons afterwards when closing."""
-    # Toggle panel visibility
+    """Toggle the research panel overlay."""
     research_panel_ui.toggle()
-    # Rebuild building buttons next frame after closing via event loop
 
 research_button = ResearchButton(10, 10, 120, 40, launch_research_tree)
 
@@ -4060,14 +4078,15 @@ while running:
         research_panel_ui.draw(screen, show_ui_rects)
     
     ###################
-    # Draw research button
+    # Draw research button (only when panel is not visible)
     ###################
-    # DEBUG: Draw overlay rectangle for research button (top-left, 10px padding)
-    if debug_system.is_active() and debug_system.show_ui_rectangles and hasattr(research_button, 'rect'):
-        research_overlay = pygame.Surface((research_button.rect.width, research_button.rect.height), pygame.SRCALPHA)
-        research_overlay.fill((128, 0, 255, 80))  # Purple overlay
-        screen.blit(research_overlay, research_button.rect)
-    research_button.draw(screen)
+    if not research_panel_ui.visible:
+        # DEBUG: Draw overlay rectangle for research button (top-left, 10px padding)
+        if debug_system.is_active() and debug_system.show_ui_rectangles and hasattr(research_button, 'rect'):
+            research_overlay = pygame.Surface((research_button.rect.width, research_button.rect.height), pygame.SRCALPHA)
+            research_overlay.fill((128, 0, 255, 80))  # Purple overlay
+            screen.blit(research_overlay, research_button.rect)
+        research_button.draw(screen)
     
     ###################
     # Draw pause menu
@@ -4139,9 +4158,10 @@ while running:
         screen.blit(gather_text, text_rect)
     
     ###################
-    # Draw resources
+    # Draw resources (only when research panel is not visible)
     ###################
-    draw_resources(screen, resources, font)
+    if not research_panel_ui.visible:
+        draw_resources(screen, resources, font)
     
     ################### 
     # Update debug info
@@ -4236,6 +4256,12 @@ while running:
                     or resources.coins < effective_cost.coins
                 ):
                     build_ghost_can_place = False
+
+            # Debug: drag research nodes when research panel is open and movable nodes mode is ON
+            if debug_movable_nodes and research_panel_ui.visible:
+                mouse_pos = event.pos
+                left_down = pygame.mouse.get_pressed()[0]
+                research_panel_ui.debug_handle_drag(mouse_pos, left_down)
         
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             mouse_pos = event.pos
@@ -4254,11 +4280,16 @@ while running:
                     continue
                 continue
             
-            # Debug mode: F3 + Click to spawn zombie at mouse
+            # Debug mode helpers
             if debug_system.is_active():
                 keys = pygame.key.get_pressed()
+                # F3 + Click to spawn zombie at mouse
                 if keys[pygame.K_F3]:
                     debug_spawn_zombie_at_mouse(mouse_pos)
+                    continue
+                # When research panel is open and movable nodes mode is ON, use mouse to drag nodes instead of unlocking
+                if debug_movable_nodes and research_panel_ui.visible:
+                    research_panel_ui.debug_handle_drag(mouse_pos, True)
                     continue
             
             # Handle research button click (with animation feedback)
@@ -4462,18 +4493,19 @@ while running:
                 launch_research_tree()
                 sound_system.play("button_click")
                 continue
-            # F12: Toggle debug mode OR skip state
-            # - When debug mode is OFF: Toggle debug mode ON
-            # - When debug mode is ON and game is playing: Skip to next state
-            # - When debug mode is ON but paused/over: Toggle debug mode OFF
+            # F12: Toggle debug mode only
             if event.key == pygame.K_F12:
-                if debug_system.is_active() and not game_over_screen.is_visible and not game_state_manager.is_paused():
-                    # Debug mode is ON and game is playing - skip state instead
-                    debug_skip_state()
-                else:
-                    # Toggle debug mode
-                    debug_system.toggle()
-                    print(f"Debug mode: {'ON' if debug_system.is_active() else 'OFF'}")
+                debug_system.toggle()
+                print(f"Debug mode: {'ON' if debug_system.is_active() else 'OFF'}")
+                continue
+            
+            # M: Toggle movable nodes mode (for research panel node positioning)
+            if event.key == pygame.K_m:
+                debug_movable_nodes = not debug_movable_nodes
+                status = "ON" if debug_movable_nodes else "OFF"
+                print(f"Debug: Movable nodes mode {status} (M key)")
+                if debug_movable_nodes:
+                    hud.show_event("Movable Nodes Mode: ON (Press M to toggle)", 2.0)
                 continue
             
             # Handle game over screen
@@ -4567,8 +4599,18 @@ while running:
                     # F3: Spawn zombie at current mouse position
                     debug_spawn_zombie_at_mouse(mouse_pos)
                     continue
+                elif event.key == pygame.K_F8:
+                    # F8: Skip state (or Shift+F8: Complete All Buildings)
+                    keys = pygame.key.get_pressed()
+                    if keys[pygame.K_LSHIFT] or keys[pygame.K_RSHIFT]:
+                        # Shift+F8: Complete All Buildings
+                        debug_complete_all_buildings()
+                    else:
+                        # F8: Skip state
+                        debug_skip_state()
+                    continue
                 elif debug_system.handle_key(event.key):
-                    # Debug action handled by debug system (F1, F2, F4-F8)
+                    # Debug action handled by debug system (F1, F2, F4-F7)
                     continue
                 elif event.key == pygame.K_F9:
                     # F9: Skip to night
