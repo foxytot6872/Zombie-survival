@@ -4,26 +4,68 @@ from typing import Dict, Optional, Union
 
 from difficulty_config import Difficulty
 
-UPGRADE_STEPS_PER_TIER = 2  # Changed from 3 to 2: 1->2->MAX(3) means 2 steps per tier
+import json
+import os
 
-TURRET_UPGRADE_CONFIG: Dict[str, list] = {
-    "tier_1": [
-        {"step": 1, "base_cost": {"wood": 30, "iron": 10}},
-        {"step": 2, "base_cost": {"wood": 50, "iron": 20}},  # Step 2 upgrades to tier 2
-    ],
-    "tier_2": [
-        {"step": 1, "base_cost": {"wood": 60, "iron": 25}},
-        {"step": 2, "base_cost": {"wood": 80, "iron": 35}},  # Step 2 upgrades to tier 3 (MAX)
-    ],
-    # Tier 3 is MAX - no upgrades available
-}
+def _load_upgrade_config_from_balance() -> tuple[Dict[str, list], Dict[Difficulty, float], int]:
+    """Load upgrade config from central balance.json if available."""
+    config_path = os.path.join('data', 'config', 'balance.json')
+    try:
+        with open(config_path, 'r') as f:
+            balance_config = json.load(f)
+        
+        # Get upgrade config
+        upgrade_config = balance_config.get("base", {}).get("upgrades", {})
+        steps_per_tier = upgrade_config.get("steps_per_tier", 2)
+        
+        # Build turret upgrade config (exclude steps_per_tier)
+        turret_config = {}
+        for key, value in upgrade_config.items():
+            if key != "steps_per_tier":
+                turret_config[key] = value
+        
+        # Get difficulty multipliers
+        multipliers = balance_config.get("difficulty_multipliers", {})
+        difficulty_mult = {}
+        for diff in Difficulty:
+            diff_key = diff.name.lower()
+            mult = multipliers.get(diff_key, {}).get("upgrade_cost", 1.0)
+            difficulty_mult[diff] = mult
+        
+        return turret_config, difficulty_mult, steps_per_tier
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return None, None, None
 
-DIFFICULTY_UPGRADE_MULTIPLIER: Dict[Difficulty, float] = {
-    Difficulty.EASY: 0.5,    # Easy: 0.5× upgrade cost (as per requirements)
-    Difficulty.MEDIUM: 1.0,   # Normal: 1.0× upgrade cost
-    Difficulty.HARD: 2.0,     # Hard: 2.0× upgrade cost (as per requirements)
-    Difficulty.EXTREME: 2.5,  # Extreme: 2.5× upgrade cost (more punishing than hard)
-}
+
+# Try to load from balance.json
+_loaded_upgrade_config, _loaded_diff_mult, _loaded_steps = _load_upgrade_config_from_balance()
+
+if _loaded_upgrade_config:
+    TURRET_UPGRADE_CONFIG = _loaded_upgrade_config
+    DIFFICULTY_UPGRADE_MULTIPLIER = _loaded_diff_mult
+    UPGRADE_STEPS_PER_TIER = _loaded_steps
+else:
+    # Fallback: Original hardcoded values
+    UPGRADE_STEPS_PER_TIER = 2  # Changed from 3 to 2: 1->2->MAX(3) means 2 steps per tier
+
+    TURRET_UPGRADE_CONFIG: Dict[str, list] = {
+        "tier_1": [
+            {"step": 1, "base_cost": {"wood": 30, "iron": 10}},
+            {"step": 2, "base_cost": {"wood": 50, "iron": 20}},  # Step 2 upgrades to tier 2
+        ],
+        "tier_2": [
+            {"step": 1, "base_cost": {"wood": 60, "iron": 25}},
+            {"step": 2, "base_cost": {"wood": 80, "iron": 35}},  # Step 2 upgrades to tier 3 (MAX)
+        ],
+        # Tier 3 is MAX - no upgrades available
+    }
+
+    DIFFICULTY_UPGRADE_MULTIPLIER: Dict[Difficulty, float] = {
+        Difficulty.EASY: 0.5,    # Easy: 0.5× upgrade cost (as per requirements)
+        Difficulty.MEDIUM: 1.0,   # Normal: 1.0× upgrade cost
+        Difficulty.HARD: 2.0,     # Hard: 2.0× upgrade cost (as per requirements)
+        Difficulty.EXTREME: 2.5,  # Extreme: 2.5× upgrade cost (more punishing than hard)
+    }
 
 
 def _normalize_difficulty(value: Union[str, Difficulty, None]) -> Difficulty:

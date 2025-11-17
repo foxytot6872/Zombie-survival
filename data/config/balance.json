@@ -1,0 +1,293 @@
+{
+  "_comment": "Central game balance configuration. Base values are for NORMAL difficulty. Other difficulties use multipliers.",
+  
+  "base": {
+    "buildings": {
+      "farm": {
+        "cost": {"wood": 60},
+        "base_hp": 150,
+        "build_time": 1.5,
+        "production": {"food_per_min": 120}
+      },
+      "sawmill": {
+        "cost": {"wood": 50, "iron": 50},
+        "base_hp": 150,
+        "build_time": 3.0,
+        "production": {"wood_per_min": 120}
+      },
+      "smelter": {
+        "cost": {"wood": 65, "iron": 50},
+        "base_hp": 150,
+        "build_time": 3.0,
+        "production": {"iron_per_min": 120}
+      },
+      "wall": {
+        "cost": {"wood": 20, "iron": 5},
+        "base_hp": 280,
+        "build_time": 1.2
+      },
+      "hq": {
+        "cost": {"wood": 0, "iron": 0},
+        "base_hp": 2000,
+        "build_time": 0.0
+      },
+      "gate": {
+        "cost": {"wood": 30, "iron": 10},
+        "base_hp": 300,
+        "build_time": 2.0
+      },
+      "housing": {
+        "cost": {"wood": 50, "iron": 20},
+        "base_hp": 150,
+        "build_time": 3.0
+      },
+      "wall_wood": {
+        "cost": {"wood": 30},
+        "base_hp": 250,
+        "build_time": 1.0
+      },
+      "wall_iron": {
+        "base_hp": 400,
+        "build_time": 0.8,
+        "upgrade_cost": {"wood": 10, "iron": 40}
+      },
+      "upgrade_cost_mult": 1.25,
+      "repair_cost": {"wood_per_hp": 0.2}
+    },
+    
+    "turrets": {
+      "turret_ballistic": {
+        "cost": {"wood": 40, "iron": 30},
+        "base_hp": 220,
+        "build_time": 2.5,
+        "range": 200,
+        "damage": 10,
+        "cooldown": 1500,
+        "projectile_speed": 400
+      },
+      "turret_gatling": {
+        "cost": {"wood": 30, "iron": 20},
+        "base_hp": 150,
+        "build_time": 2.0,
+        "range": 150,
+        "damage": 5,
+        "cooldown": 300,
+        "projectile_speed": 500
+      },
+      "turret_piercer": {
+        "cost": {"wood": 50, "iron": 70},
+        "base_hp": 250,
+        "build_time": 3.0,
+        "range": 250,
+        "damage": 25,
+        "cooldown": 2000,
+        "projectile_speed": 600,
+        "pierce": true,
+        "pierce_count": 3
+      }
+    },
+    
+    "enemies": {
+      "walker": {
+        "base_hp": 50,
+        "speed": 30.0,
+        "damage": 5,
+        "attack_range": 32.0,
+        "attack_cooldown": 1.0
+      },
+      "runner": {
+        "base_hp": 25,
+        "speed": 60.0,
+        "damage": 3,
+        "attack_range": 32.0,
+        "attack_cooldown": 0.8
+      },
+      "brute": {
+        "base_hp": 200,
+        "speed": 15.0,
+        "damage": 15,
+        "attack_range": 40.0,
+        "attack_cooldown": 1.5
+      },
+      "spitter": {
+        "base_hp": 40,
+        "speed": 25.0,
+        "damage": 8,
+        "attack_range": 150.0,
+        "attack_cooldown": 2.0,
+        "ranged_damage": 12,
+        "projectile_speed": 200.0
+      },
+      "swarmling": {
+        "base_hp": 10,
+        "speed": 80.0,
+        "damage": 2,
+        "attack_range": 24.0,
+        "attack_cooldown": 0.5
+      },
+      "skeleton": {
+        "base_hp": 60,
+        "speed": 35.0,
+        "damage": 6,
+        "attack_range": 32.0,
+        "attack_cooldown": 1.2
+      },
+      "archer_skeleton": {
+        "base_hp": 50,
+        "speed": 30.0,
+        "damage": 5,
+        "attack_range": 200.0,
+        "attack_cooldown": 1.5,
+        "ranged_damage": 8,
+        "projectile_speed": 300.0
+      },
+      "warrior_skeleton": {
+        "base_hp": 80,
+        "speed": 30.0,
+        "damage": 8,
+        "attack_range": 32.0,
+        "attack_cooldown": 1.3,
+        "block_chance": 0.3,
+        "block_damage_reduction": 0.5
+      }
+    },
+    
+    "survivors": {
+      "worker": {
+        "hp": 100,
+        "speed": 70,
+        "carry_capacity": 20
+      },
+      "guard": {
+        "hp": 120,
+        "speed": 85,
+        "range": 160,
+        "ranged_dmg": 8,
+        "cooldown": 0.8
+      }
+    },
+    
+    "waves": {
+      "nights": [
+        {"mix": {"walker": 12}},
+        {"mix": {"walker": 16, "runner": 6}},
+        {"mix": {"walker": 20, "runner": 8, "brute": 2}},
+        {"mix": {"walker": 24, "runner": 10, "brute": 4, "spitter": 2}}
+      ],
+      "increment": {
+        "per_night_mult": 1.12
+      },
+      "spawn": {
+        "interval_sec": 1.0,
+        "batch_size": 2
+      },
+      "day_duration": 30.0,
+      "summary_duration": 5.0,
+      "win_nights": 10
+    },
+    
+    "nodes": {
+      "tree_patch": {
+        "resource": "wood",
+        "yield_total": 120,
+        "gather_per_tick": 6,
+        "tick_sec": 0.6
+      },
+      "scrap_pile": {
+        "resource": "iron",
+        "yield_total": 100,
+        "gather_per_tick": 5,
+        "tick_sec": 0.7
+      },
+      "daily_spawn": {
+        "trees": 4,
+        "scrap": 3,
+        "min_dist_from_wall_px": 96
+      }
+    },
+    
+    "economy": {
+      "coin_rewards": {
+        "base_reward": 2,
+        "walker": 2,
+        "runner": 3,
+        "brute": 5,
+        "spitter": 4,
+        "swarmling": 1,
+        "skeleton": 3,
+        "archer_skeleton": 4,
+        "warrior_skeleton": 5
+      },
+      "hire_survivor_cost": 50,
+      "food_per_survivor_per_day": 1
+    },
+    
+    "upgrades": {
+      "tier_1": [
+        {"step": 1, "base_cost": {"wood": 30, "iron": 10}},
+        {"step": 2, "base_cost": {"wood": 50, "iron": 20}}
+      ],
+      "tier_2": [
+        {"step": 1, "base_cost": {"wood": 60, "iron": 25}},
+        {"step": 2, "base_cost": {"wood": 80, "iron": 35}}
+      ],
+      "steps_per_tier": 2
+    }
+  },
+  
+  "difficulty_multipliers": {
+    "easy": {
+      "enemy_count": 0.85,
+      "enemy_hp": 0.85,
+      "enemy_damage": 0.85,
+      "enemy_speed": 0.95,
+      "building_cost": 0.75,
+      "building_hp": 1.1,
+      "production_rate": 1.0,
+      "coin_rewards": 1.2,
+      "research_cost": 1.0,
+      "upgrade_cost": 0.5,
+      "starting_resources": {"wood": 350, "iron": 350, "food": 350}
+    },
+    "medium": {
+      "enemy_count": 1.0,
+      "enemy_hp": 1.0,
+      "enemy_damage": 1.0,
+      "enemy_speed": 1.0,
+      "building_cost": 1.0,
+      "building_hp": 1.0,
+      "production_rate": 0.75,
+      "coin_rewards": 1.0,
+      "research_cost": 1.1,
+      "upgrade_cost": 1.0,
+      "starting_resources": {"wood": 300, "iron": 300, "food": 300}
+    },
+    "hard": {
+      "enemy_count": 1.5,
+      "enemy_hp": 1.3,
+      "enemy_damage": 1.2,
+      "enemy_speed": 1.1,
+      "building_cost": 1.4,
+      "building_hp": 0.9,
+      "production_rate": 0.6,
+      "coin_rewards": 0.9,
+      "research_cost": 1.5,
+      "upgrade_cost": 2.0,
+      "starting_resources": {"wood": 150, "iron": 150, "food": 150}
+    },
+    "extreme": {
+      "enemy_count": 2.0,
+      "enemy_hp": 1.6,
+      "enemy_damage": 1.5,
+      "enemy_speed": 1.2,
+      "building_cost": 2.0,
+      "building_hp": 0.8,
+      "production_rate": 0.4,
+      "coin_rewards": 0.8,
+      "research_cost": 3.0,
+      "upgrade_cost": 2.5,
+      "starting_resources": {"wood": 100, "iron": 100, "food": 100}
+    }
+  }
+}
+

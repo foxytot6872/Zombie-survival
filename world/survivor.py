@@ -59,7 +59,7 @@ class Survivor(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=self.pos)
         
         # Sprite sheet and animation
-        self.all_frames = []  # All 97 frames from the sheet
+        self.all_frames = []  # All frames from the sheet
         self.current_frames = []
         self.frame_index = 0
         self.animation_timer = 0.0
@@ -70,6 +70,7 @@ class Survivor(pygame.sprite.Sprite):
         self.hurt_timer = 0.0
         self.hurt_duration = 0.5  # How long to show hurt animation
         self.sprite_scale = 1.2  # Scale factor for sprite (1.5x = 50% bigger)
+        self.current_animation_type = "idle"  # Track current animation: "idle", "run", "axe", "mining", "carry", "hurt", "death"
         
         # Load sprite sheets
         self.load_sprite_sheets()
@@ -101,36 +102,60 @@ class Survivor(pygame.sprite.Sprite):
         return self.speed
     
     def load_sprite_sheets(self):
-        """Load survivor sprite sheets - survival-Sheet.png with 97 frames (96x64 each)"""
+        """Load new survivor sprite sheets - Survivor1-4-Sheet.png with 78 frames (96x64 each)"""
         try:
-            # Try to load survival-Sheet.png
-            survival_paths = [
-                os.path.join('asset', 'survival-Sheet.png'),
-                os.path.join('asset', 'survival-Sheet.png'),
-                'asset/survival-Sheet.png',
+            # Try to load one of the new survivor sprite sheets (randomly select for variety)
+            survivor_paths = [
+                os.path.join('asset', 'Survivor', 'Survivor1-Sheet.png'),
+                os.path.join('asset', 'Survivor', 'Survivor2-Sheet.png'),
+                os.path.join('asset', 'Survivor', 'Survivor3-Sheet.png'),
+                os.path.join('asset', 'Survivor', 'Survivor4-Sheet.png'),
             ]
             
-            survival_sheet = None
-            for path in survival_paths:
-                if os.path.exists(path):
-                    try:
-                        survival_sheet = pygame.image.load(path).convert_alpha()
-                        break
-                    except:
-                        continue
+            # Randomly select one of the available sprite sheets for variety
+            available_paths = [path for path in survivor_paths if os.path.exists(path)]
+            survivor_sheet = None
             
-            # If survival-Sheet.png exists, use it
-            if survival_sheet:
+            if available_paths:
+                # Randomly pick one
+                selected_path = random.choice(available_paths)
+                try:
+                    survivor_sheet = pygame.image.load(selected_path).convert_alpha()
+                except:
+                    # If selected one fails, try others
+                    for path in available_paths:
+                        if path != selected_path:
+                            try:
+                                survivor_sheet = pygame.image.load(path).convert_alpha()
+                                break
+                            except:
+                                continue
+            
+            # If no new sprites found, try old path as fallback
+            if not survivor_sheet:
+                old_paths = [
+                    os.path.join('asset', 'survival-Sheet.png'),
+                    'asset/survival-Sheet.png',
+                ]
+                for path in old_paths:
+                    if os.path.exists(path):
+                        try:
+                            survivor_sheet = pygame.image.load(path).convert_alpha()
+                            break
+                        except:
+                            continue
+            
+            if survivor_sheet:
                 frame_width = 96
                 frame_height = 64
-                total_frames = 97
+                total_frames = 78
                 
-                # Extract all 97 frames
+                # Extract all 78 frames
                 self.all_frames = []
                 for i in range(total_frames):
                     frame_rect = pygame.Rect(i * frame_width, 0, frame_width, frame_height)
-                    if frame_rect.right <= survival_sheet.get_width():
-                        frame = survival_sheet.subsurface(frame_rect)
+                    if frame_rect.right <= survivor_sheet.get_width():
+                        frame = survivor_sheet.subsurface(frame_rect)
                         self.all_frames.append(frame)
                     else:
                         # Frame out of bounds - create placeholder
@@ -144,11 +169,11 @@ class Survivor(pygame.sprite.Sprite):
                 self.image = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
                 self.rect = self.image.get_rect(center=self.pos)
                 
-                # Set initial frames (idle-s)
+                # Set initial frames (idle: frames 1-4, 0-indexed: 0-3)
                 if len(self.all_frames) >= 4:
-                    self.current_frames = self.all_frames[0:4]  # idle-s frames 1-4
+                    self.current_frames = self.all_frames[0:4]
             else:
-                # Fallback to existing sprite sheets
+                # Fallback to old sprite sheets if new ones don't exist
                 try:
                     idle_sheet = pygame.image.load('asset/16x32 Idle-Sheet.png').convert_alpha()
                     run_sheet = pygame.image.load('asset/16x32 Run Cycle-Sheet.png').convert_alpha()
@@ -216,16 +241,16 @@ class Survivor(pygame.sprite.Sprite):
         elif 157.5 <= angle < 202.5:
             return "s"  # West (use s, will be flipped)
         elif 202.5 <= angle < 247.5:
-            return "ne"  # Northwest (use ne, will be flipped)
+            return "ne"  # Northwest (use ne frames, will be flipped for correct NW display)
         elif 247.5 <= angle < 292.5:
             return "n"  # North
         elif 292.5 <= angle < 337.5:
-            return "ne"  # Northeast
+            return "ne"  # Northeast (use ne frames, not flipped - correct NE display)
         else:  # 337.5-360 or 0-22.5
             return "se"  # East (use se)
     
     def update_animation(self, dt: float):
-        """Update animation frame based on state and direction"""
+        """Update animation frame based on state and direction - new sprite sheet format"""
         if not self.all_frames:
             return
         
@@ -239,100 +264,92 @@ class Survivor(pygame.sprite.Sprite):
         # Determine direction from velocity
         self.direction = self.get_direction_from_velocity()
         
+        # Update facing direction for horizontal flipping (East/West)
+        if self.velocity.length() > 0.1:
+            if self.velocity.x > 0:
+                self.facing_right = True  # Moving right (East)
+            elif self.velocity.x < 0:
+                self.facing_right = False  # Moving left (West)
+        
         # Determine which frames to use based on state
+        # New sprite sheet frame mapping:
+        # 1-4: idle (0-3 indexed)
+        # 13-20: carry (12-19 indexed)
+        # 30-37: hurt (29-36 indexed)
+        # 38-50: death (37-49 indexed)
+        # 51-58: run East (50-57 indexed) - flip for West
+        # 59-68: axe East (58-67 indexed) - flip for West (wood gathering)
+        # 69-78: mining East (68-77 indexed) - flip for West (iron gathering)
+        
         # Check if dead first
         if not self.alive:
-            # Death animation (frames 65-77, 0-indexed: 64-76)
-            if len(self.all_frames) >= 77:
-                self.current_frames = self.all_frames[64:77]
+            # Death animation (frames 38-50, 0-indexed: 37-49)
+            if len(self.all_frames) >= 50:
+                self.current_frames = self.all_frames[37:50]
+                self.current_animation_type = "death"
                 # Don't loop death animation - stay on last frame
                 if self.frame_index >= len(self.current_frames):
                     self.frame_index = len(self.current_frames) - 1
         elif self.is_hurt:
-            # Hurt animation (frames 57-64, 0-indexed: 56-63)
-            if len(self.all_frames) >= 64:
-                self.current_frames = self.all_frames[56:64]
+            # Hurt animation (frames 30-37, 0-indexed: 29-36)
+            if len(self.all_frames) >= 37:
+                self.current_frames = self.all_frames[29:37]
+                self.current_animation_type = "hurt"
         elif hasattr(self, 'state'):
             # Check worker-specific states
             if self.state == SurvivorState.GATHERING:
-                # Check if gathering wood or stone
+                # Check if gathering wood or iron
                 if hasattr(self, 'target_node') and self.target_node:
                     if hasattr(self.target_node, 'resource'):
                         if self.target_node.resource == "wood":
-                            # Wood gathering (frames 78-87, 0-indexed: 77-86)
-                            if len(self.all_frames) >= 87:
-                                self.current_frames = self.all_frames[77:87]
+                            # Wood gathering - axe animation (frames 59-68, 0-indexed: 58-67) - East facing
+                            if len(self.all_frames) >= 68:
+                                self.current_frames = self.all_frames[58:68]
+                                self.current_animation_type = "axe"
                         elif self.target_node.resource == "iron":
-                            # Stone gathering (frames 88-97, 0-indexed: 87-96)
-                            if len(self.all_frames) >= 97:
-                                self.current_frames = self.all_frames[87:97]
+                            # Iron gathering - mining animation (frames 69-78, 0-indexed: 68-77) - East facing
+                            if len(self.all_frames) >= 78:
+                                self.current_frames = self.all_frames[68:78]
+                                self.current_animation_type = "mining"
                         else:
-                            # Default to wood gathering
-                            if len(self.all_frames) >= 87:
-                                self.current_frames = self.all_frames[77:87]
+                            # Default to wood gathering (axe)
+                            if len(self.all_frames) >= 68:
+                                self.current_frames = self.all_frames[58:68]
+                                self.current_animation_type = "axe"
                     else:
-                        # Default to wood gathering
-                        if len(self.all_frames) >= 87:
-                            self.current_frames = self.all_frames[77:87]
+                        # Default to wood gathering (axe)
+                        if len(self.all_frames) >= 68:
+                            self.current_frames = self.all_frames[58:68]
+                            self.current_animation_type = "axe"
                 else:
-                    # Default to wood gathering
-                    if len(self.all_frames) >= 87:
-                        self.current_frames = self.all_frames[77:87]
+                    # Default to wood gathering (axe)
+                    if len(self.all_frames) >= 68:
+                        self.current_frames = self.all_frames[58:68]
+                        self.current_animation_type = "axe"
             elif self.state == SurvivorState.HAUL_TO_HQ or self.state == SurvivorState.DEPOSIT:
-                # Hauling (frames 49-56, 0-indexed: 48-55)
-                if len(self.all_frames) >= 56:
-                    self.current_frames = self.all_frames[48:56]
+                # Hauling - carry animation (frames 13-20, 0-indexed: 12-19)
+                if len(self.all_frames) >= 20:
+                    self.current_frames = self.all_frames[12:20]
+                    self.current_animation_type = "carry"
             else:
-                # Idle or moving - use direction-based frames
+                # Idle or moving
                 is_moving = self.velocity.length() > 0.1
                 
                 if is_moving:
-                    # Run animations based on direction
-                    if self.direction == "s":
-                        # Run-s (frames 17-24, 0-indexed: 16-23)
-                        if len(self.all_frames) >= 24:
-                            self.current_frames = self.all_frames[16:24]
-                    elif self.direction == "se":
-                        # Run-se (frames 25-32, 0-indexed: 24-31)
-                        if len(self.all_frames) >= 32:
-                            self.current_frames = self.all_frames[24:32]
-                    elif self.direction == "ne":
-                        # Run-ne (frames 33-40, 0-indexed: 32-39)
-                        if len(self.all_frames) >= 40:
-                            self.current_frames = self.all_frames[32:40]
-                    else:  # "n"
-                        # Run-n (frames 41-48, 0-indexed: 40-47)
-                        if len(self.all_frames) >= 48:
-                            self.current_frames = self.all_frames[40:48]
+                    # Run animation (frames 51-58, 0-indexed: 50-57) - East facing, will flip for West
+                    if len(self.all_frames) >= 58:
+                        self.current_frames = self.all_frames[50:58]
+                        self.current_animation_type = "run"
                 else:
-                    # Idle animations based on direction
-                    if self.direction == "s":
-                        # Idle-s (frames 1-4, 0-indexed: 0-3)
-                        if len(self.all_frames) >= 4:
-                            self.current_frames = self.all_frames[0:4]
-                    elif self.direction == "se":
-                        # Idle-se (frames 5-8, 0-indexed: 4-7)
-                        if len(self.all_frames) >= 8:
-                            self.current_frames = self.all_frames[4:8]
-                    elif self.direction == "ne":
-                        # Idle-ne (frames 9-12, 0-indexed: 8-11)
-                        if len(self.all_frames) >= 12:
-                            self.current_frames = self.all_frames[8:12]
-                    else:  # "n"
-                        # Idle-n (frames 13-16, 0-indexed: 12-15)
-                        if len(self.all_frames) >= 16:
-                            self.current_frames = self.all_frames[12:16]
+                    # Idle animation (frames 1-4, 0-indexed: 0-3)
+                    if len(self.all_frames) >= 4:
+                        self.current_frames = self.all_frames[0:4]
+                        self.current_animation_type = "idle"
         else:
-            # Fallback: use idle-s
+            # Fallback: use idle
             if len(self.all_frames) >= 4:
                 self.current_frames = self.all_frames[0:4]
-        
-        # Update facing direction for horizontal flipping
-        if self.velocity.length() > 0.1:
-            if self.velocity.x > 0:
-                self.facing_right = True
-            elif self.velocity.x < 0:
-                self.facing_right = False
+                self.current_animation_type = "idle"
         
         # Update animation timer
         if self.current_frames:
@@ -544,11 +561,21 @@ class Survivor(pygame.sprite.Sprite):
             # Draw sprite frame
             frame = self.current_frames[self.frame_index]
             
-            # Flip frame if facing left (for se/ne directions)
-            # Note: For 8-directional sprites, we might need more complex flipping logic
-            # For now, flip se/ne when moving left
-            if not self.facing_right and self.direction in ("se", "ne"):
-                frame = pygame.transform.flip(frame, True, False)
+            # Flip frame for East-facing sprites when moving West
+            # New sprite sheet: run, axe, mining, and carry animations are East-facing
+            # Need to flip when moving left (West direction)
+            if len(self.all_frames) >= 78:
+                # New sprite sheet format - flip East-facing animations when moving West
+                if self.current_animation_type in ("run", "axe", "mining", "carry"):
+                    if not self.facing_right:  # Moving left (West) - flip East-facing sprite
+                        frame = pygame.transform.flip(frame, True, False)
+            else:
+                # Old sprite sheet format - use old flipping logic
+                if self.direction == "ne":
+                    if self.facing_right:
+                        frame = pygame.transform.flip(frame, True, False)
+                elif self.direction == "se" and not self.facing_right:
+                    frame = pygame.transform.flip(frame, True, False)
             
             # Scale frame
             if self.sprite_scale != 1.0:
@@ -874,19 +901,134 @@ class Worker(Survivor):
                 return
             
             # Move toward HQ (apply haul speed modifier)
-            hq_reach_distance = 32.0  # Within 1 tile of HQ center
+            # Check if survivor is adjacent to HQ footprint (not just center)
+            from world.building import TILE
+            from world.buildings.hq import HQ
+            
+            # Get HQ footprint
+            hq_footprint = self.target_hq.FOOTPRINT  # (width, height) in tiles
+            hq_grid_x = self.target_hq.grid_x
+            hq_grid_y = self.target_hq.grid_y
+            
+            # Get survivor grid position
+            survivor_grid_x = int(self.pos.x // TILE)
+            survivor_grid_y = int(self.pos.y // TILE)
+            
+            # Check if survivor is adjacent to any tile in HQ footprint
+            # Adjacent means 1 tile away horizontally or vertically (not diagonally)
+            is_adjacent = False
+            for fx in range(hq_footprint[0]):
+                for fy in range(hq_footprint[1]):
+                    hq_tile_x = hq_grid_x + fx
+                    hq_tile_y = hq_grid_y + fy
+                    
+                    # Check if survivor is adjacent (horizontally or vertically)
+                    dx = abs(survivor_grid_x - hq_tile_x)
+                    dy = abs(survivor_grid_y - hq_tile_y)
+                    if (dx == 1 and dy == 0) or (dx == 0 and dy == 1):
+                        is_adjacent = True
+                        break
+                if is_adjacent:
+                    break
+            
             # Temporarily apply haul speed modifier
             if world and hasattr(world, 'modifiers'):
                 haul_speed_mult = world.modifiers.get("survivor_haul_speed_mult", 
                                                       world.modifiers.get("haul_speed_mult", 1.0))
                 old_base_speed = self.base_speed
                 self.base_speed = self.SPEED * haul_speed_mult
-                reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=hq_reach_distance)
+                # Move toward nearest adjacent tile if not already adjacent
+                if not is_adjacent:
+                    # Find nearest adjacent tile to move toward
+                    nearest_adjacent = None
+                    min_dist = float('inf')
+                    for fx in range(hq_footprint[0]):
+                        for fy in range(hq_footprint[1]):
+                            hq_tile_x = hq_grid_x + fx
+                            hq_tile_y = hq_grid_y + fy
+                            
+                            # Check adjacent positions (N, S, E, W)
+                            for adj_dx, adj_dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                                adj_x = hq_tile_x + adj_dx
+                                adj_y = hq_tile_y + adj_dy
+                                
+                                # Check if this adjacent tile is not part of HQ footprint
+                                is_hq_tile = False
+                                for check_fx in range(hq_footprint[0]):
+                                    for check_fy in range(hq_footprint[1]):
+                                        if (hq_grid_x + check_fx == adj_x and 
+                                            hq_grid_y + check_fy == adj_y):
+                                            is_hq_tile = True
+                                            break
+                                    if is_hq_tile:
+                                        break
+                                
+                                if not is_hq_tile:
+                                    # This is a valid adjacent tile
+                                    adj_pos = pygame.Vector2(
+                                        adj_x * TILE + TILE // 2,
+                                        adj_y * TILE + TILE // 2
+                                    )
+                                    dist = (self.pos - adj_pos).length()
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        nearest_adjacent = adj_pos
+                    
+                    if nearest_adjacent:
+                        reached = self.move_toward(nearest_adjacent, dt, world, stop_distance=16.0)
+                    else:
+                        # Fallback: move toward HQ center
+                        reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=16.0)
+                else:
+                    reached = True  # Already adjacent
                 self.base_speed = old_base_speed  # Restore
             else:
-                reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=hq_reach_distance)
+                # Same logic without speed modifier
+                if not is_adjacent:
+                    # Find nearest adjacent tile to move toward
+                    nearest_adjacent = None
+                    min_dist = float('inf')
+                    for fx in range(hq_footprint[0]):
+                        for fy in range(hq_footprint[1]):
+                            hq_tile_x = hq_grid_x + fx
+                            hq_tile_y = hq_grid_y + fy
+                            
+                            # Check adjacent positions (N, S, E, W)
+                            for adj_dx, adj_dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                                adj_x = hq_tile_x + adj_dx
+                                adj_y = hq_tile_y + adj_dy
+                                
+                                # Check if this adjacent tile is not part of HQ footprint
+                                is_hq_tile = False
+                                for check_fx in range(hq_footprint[0]):
+                                    for check_fy in range(hq_footprint[1]):
+                                        if (hq_grid_x + check_fx == adj_x and 
+                                            hq_grid_y + check_fy == adj_y):
+                                            is_hq_tile = True
+                                            break
+                                    if is_hq_tile:
+                                        break
+                                
+                                if not is_hq_tile:
+                                    # This is a valid adjacent tile
+                                    adj_pos = pygame.Vector2(
+                                        adj_x * TILE + TILE // 2,
+                                        adj_y * TILE + TILE // 2
+                                    )
+                                    dist = (self.pos - adj_pos).length()
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        nearest_adjacent = adj_pos
+                    
+                    if nearest_adjacent:
+                        reached = self.move_toward(nearest_adjacent, dt, world, stop_distance=16.0)
+                    else:
+                        # Fallback: move toward HQ center
+                        reached = self.move_toward(self.target_hq.pos, dt, world, stop_distance=16.0)
+                else:
+                    reached = True  # Already adjacent
             
-            if reached:
+            if reached and is_adjacent:
                 # Reached HQ - deposit
                 self.state = SurvivorState.DEPOSIT
                 self.velocity = pygame.Vector2(0, 0)

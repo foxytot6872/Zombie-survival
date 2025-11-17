@@ -8,7 +8,7 @@ class HQ(Building):
     BASE_HP = 2000
     BUILD_TIME = 0.0  # Spawns active (no construction time)
     COST = Cost()  # No cost for initial HQ
-    FOOTPRINT = (2, 2)
+    FOOTPRINT = (2, 3)  # 2 wide, 3 high
     TIER_MAX = 1  # No upgrades for now
     
     # Class-level image (set from main.py after loading)

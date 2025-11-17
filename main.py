@@ -1733,7 +1733,7 @@ def create_organic_wall_shape(cfg_wall, start_cx, wall_row, W_TILES, H_TILES):
     return wall_positions, gate_positions
 
 def spawn_starting_layout():
-    """Spawn starting layout: HQ in center, walls surrounding it, gate, and turrets outside"""
+    """Spawn starting layout: HQ in center, 1 starting turret"""
     global building_group, grid, turret_group, world
     
     TILE = grid.TILE
@@ -1797,141 +1797,13 @@ def spawn_starting_layout():
         world.hq = hq
     
     print(f"HQ spawned at grid position ({hq_gx}, {hq_gy}) - center")
-    print(f"Compound: left={compound_left}, right={compound_right}, top={compound_top}, bottom={compound_bottom}")
     
-    # --- Place walls surrounding HQ ---
-    walls_placed = []
-    
-    # Top wall
-    for gx in range(compound_left, compound_right + 1):
-        if 0 <= gx < W_TILES and 0 <= compound_top < H_TILES:
-            w = WallWood((gx, compound_top), tier=1, world=world)
-            w.state = BuildState.ACTIVE
-            w.hp = w.max_hp
-            w.progress = w.BUILD_TIME
-            building_group.add(w)
-            world.register_building(w)
-            grid.set_footprint_blocked((gx, compound_top), WallWood.FOOTPRINT, True)
-            # Mark tiles as solid in collision map
-            w.on_complete(world)
-            walls_placed.append((gx, compound_top))
-    
-    # Bottom wall
-    for gx in range(compound_left, compound_right + 1):
-        if 0 <= gx < W_TILES and 0 <= compound_bottom < H_TILES:
-            w = WallWood((gx, compound_bottom), tier=1, world=world)
-            w.state = BuildState.ACTIVE
-            w.hp = w.max_hp
-            w.progress = w.BUILD_TIME
-            building_group.add(w)
-            world.register_building(w)
-            grid.set_footprint_blocked((gx, compound_bottom), WallWood.FOOTPRINT, True)
-            # Mark tiles as solid in collision map
-            w.on_complete(world)
-            walls_placed.append((gx, compound_bottom))
-    
-    # Left wall (excluding corners already placed)
-    for gy in range(compound_top + 1, compound_bottom):
-        if 0 <= compound_left < W_TILES and 0 <= gy < H_TILES:
-            w = WallWood((compound_left, gy), tier=1, world=world)
-            w.state = BuildState.ACTIVE
-            w.hp = w.max_hp
-            w.progress = w.BUILD_TIME
-            building_group.add(w)
-            world.register_building(w)
-            grid.set_footprint_blocked((compound_left, gy), WallWood.FOOTPRINT, True)
-            # Mark tiles as solid in collision map
-            w.on_complete(world)
-            walls_placed.append((compound_left, gy))
-    
-    # Right wall (excluding corners already placed)
-    for gy in range(compound_top + 1, compound_bottom):
-        if 0 <= compound_right < W_TILES and 0 <= gy < H_TILES:
-            w = WallWood((compound_right, gy), tier=1, world=world)
-            w.state = BuildState.ACTIVE
-            w.hp = w.max_hp
-            w.progress = w.BUILD_TIME
-            building_group.add(w)
-            world.register_building(w)
-            grid.set_footprint_blocked((compound_right, gy), WallWood.FOOTPRINT, True)
-            # Mark tiles as solid in collision map
-            w.on_complete(world)
-            walls_placed.append((compound_right, gy))
-    
-    # After all walls are placed, refresh all wall variants so they see their neighbors
-    for gx, gy in walls_placed:
-        world.autotile_wall_and_neighbors(gx, gy)
-    
-    print(f"Walls placed: {len(walls_placed)} segments forming compound")
-    
-    # --- Place gate (bottom side, center) ---
-    gate_gx = center_x
-    gate_gy = compound_bottom
-    if 0 <= gate_gx < W_TILES and 0 <= gate_gy < H_TILES:
-        # Remove wall at gate position if it exists
-        for gx, gy in walls_placed[:]:
-            if gx == gate_gx and gy == gate_gy:
-                # Find and remove the wall building
-                for building in building_group:
-                    if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
-                        building.grid_x == gate_gx and building.grid_y == gate_gy and
-                        isinstance(building, WallWood)):
-                        world.unregister_building(building)
-                        building_group.remove(building)
-                        grid.set_footprint_blocked((gate_gx, gate_gy), WallWood.FOOTPRINT, False)
-                        walls_placed.remove((gate_gx, gate_gy))
-                        break
-        
-        g = Gate((gate_gx, gate_gy), tier=1, world=world)
-        g.state = BuildState.ACTIVE
-        g.hp = g.max_hp
-        g.progress = g.BUILD_TIME
-        building_group.add(g)
-        world.register_building(g)
-        grid.set_footprint_blocked((gate_gx, gate_gy), Gate.FOOTPRINT, True)
-        # Mark tiles as solid in collision map (gates are solid for enemies)
-        g.on_complete(world)
-        print(f"Gate placed at ({gate_gx}, {gate_gy})")
-    
-    # --- Place turrets outside walls ---
+    # --- Place single starting turret ---
     global turret_sprite_sheets, turret_base_images
     
-    # Turret positions outside the compound (one tile away from walls)
-    turret_offset = 2  # tiles outside the wall
-    
-    # Top turrets
-    for dx in [-3, 0, 3]:
-        turret_gx = center_x + dx
-        turret_gy = compound_top - turret_offset
-        if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
-            t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
-            t.state = BuildState.ACTIVE
-            t.hp = t.max_hp
-            t.progress = t.BUILD_TIME
-            building_group.add(t)
-            world.register_building(t)
-            turret_group.add(t)
-            grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
-            print(f"Turret placed at ({turret_gx}, {turret_gy}) - top")
-    
-    # Bottom turrets (avoid gate area)
-    for dx in [-4, 4]:
-        turret_gx = center_x + dx
-        turret_gy = compound_bottom + turret_offset
-        if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
-            t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
-            t.state = BuildState.ACTIVE
-            t.hp = t.max_hp
-            t.progress = t.BUILD_TIME
-            building_group.add(t)
-            world.register_building(t)
-            turret_group.add(t)
-            grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
-            print(f"Turret placed at ({turret_gx}, {turret_gy}) - bottom")
-    
-    # Side turrets
-    turret_gx = compound_left - turret_offset
-    turret_gy = center_y
+    # Place 1 turret above HQ
+    turret_gx = center_x
+    turret_gy = center_y - 4  # 4 tiles above HQ center
     if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
         t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
         t.state = BuildState.ACTIVE
@@ -1941,22 +1813,9 @@ def spawn_starting_layout():
         world.register_building(t)
         turret_group.add(t)
         grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
-        print(f"Turret placed at ({turret_gx}, {turret_gy}) - left")
+        print(f"Starting turret placed at ({turret_gx}, {turret_gy})")
     
-    turret_gx = compound_right + turret_offset
-    turret_gy = center_y
-    if 0 <= turret_gx < W_TILES and 0 <= turret_gy < H_TILES:
-        t = BallisticTurret((turret_gx, turret_gy), turret_sprite_sheets, turret_base_images, tier=1)
-        t.state = BuildState.ACTIVE
-        t.hp = t.max_hp
-        t.progress = t.BUILD_TIME
-        building_group.add(t)
-        world.register_building(t)
-        turret_group.add(t)
-        grid.set_footprint_blocked((turret_gx, turret_gy), BallisticTurret.FOOTPRINT, True)
-        print(f"Turret placed at ({turret_gx}, {turret_gy}) - right")
-    
-    print(f"Starting layout spawned: HQ at center ({hq_gx}, {hq_gy}), walls surrounding, gate at bottom, turrets outside")
+    print(f"Starting layout spawned: HQ at center ({hq_gx}, {hq_gy}), 1 turret")
     
     # Update pathfinding building group reference (after all buildings are placed)
     if 'pathfinding' in globals():
@@ -2084,7 +1943,7 @@ def apply_special_event_effects(world, building_group, survivor_group, node_grou
 
 def spawn_daily_resource_nodes():
     """Spawn daily resource nodes in clusters around the starting structure"""
-    global node_group, world, grid, building_group
+    global node_group, world, grid, building_group, building_panel
     
     # Load nodes config
     try:
@@ -2244,9 +2103,30 @@ def spawn_daily_resource_nodes():
                 node_gx = int(node_x_px // TILE)
                 node_gy = int(node_y_px // TILE)
                 
-                # Ensure position is valid and not too close to compound
+                # Check if position is in building panel area (bottom-right corner)
+                in_building_panel_area = False
+                if building_panel and hasattr(building_panel, 'panel_rect'):
+                    panel_rect = building_panel.panel_rect
+                    # Add some padding around the panel to prevent nodes from spawning too close
+                    padding = 64  # 2 tiles
+                    panel_area = pygame.Rect(
+                        panel_rect.left - padding,
+                        panel_rect.top - padding,
+                        panel_rect.width + padding * 2,
+                        panel_rect.height + padding * 2
+                    )
+                    if panel_area.collidepoint(node_x_px, node_y_px):
+                        in_building_panel_area = True
+                
+                # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
+                ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
+                in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
+                
+                # Ensure position is valid and not too close to compound and not in building panel or UI exclusion area
                 if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
                     not grid.is_blocked(node_gx, node_gy) and
+                    not in_building_panel_area and
+                    not in_ui_exclusion_area and
                     (node_gx < compound_bounds['left'] - 2 or node_gx > compound_bounds['right'] + 2 or
                      node_gy < compound_bounds['top'] - 2 or node_gy > compound_bounds['bottom'] + 2)):
                     
@@ -2303,8 +2183,29 @@ def spawn_daily_resource_nodes():
             node_gx = int(node_x_px // TILE)
             node_gy = int(node_y_px // TILE)
             
+            # Check if position is in building panel area (bottom-right corner)
+            in_building_panel_area = False
+            if building_panel and hasattr(building_panel, 'panel_rect'):
+                panel_rect = building_panel.panel_rect
+                # Add some padding around the panel to prevent nodes from spawning too close
+                padding = 64  # 2 tiles
+                panel_area = pygame.Rect(
+                    panel_rect.left - padding,
+                    panel_rect.top - padding,
+                    panel_rect.width + padding * 2,
+                    panel_rect.height + padding * 2
+                )
+                if panel_area.collidepoint(node_x_px, node_y_px):
+                    in_building_panel_area = True
+            
+            # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
+            ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
+            in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
+            
             if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
-                not grid.is_blocked(node_gx, node_gy)):
+                not grid.is_blocked(node_gx, node_gy) and
+                not in_building_panel_area and
+                not in_ui_exclusion_area):
                 # Check distance from existing nodes (using pixel positions)
                 too_close = False
                 node_pos = pygame.Vector2(node_x_px, node_y_px)
@@ -2347,8 +2248,29 @@ def spawn_daily_resource_nodes():
             node_gx = int(node_x_px // TILE)
             node_gy = int(node_y_px // TILE)
             
+            # Check if position is in building panel area (bottom-right corner)
+            in_building_panel_area = False
+            if building_panel and hasattr(building_panel, 'panel_rect'):
+                panel_rect = building_panel.panel_rect
+                # Add some padding around the panel to prevent nodes from spawning too close
+                padding = 64  # 2 tiles
+                panel_area = pygame.Rect(
+                    panel_rect.left - padding,
+                    panel_rect.top - padding,
+                    panel_rect.width + padding * 2,
+                    panel_rect.height + padding * 2
+                )
+                if panel_area.collidepoint(node_x_px, node_y_px):
+                    in_building_panel_area = True
+            
+            # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
+            ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
+            in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
+            
             if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
-                not grid.is_blocked(node_gx, node_gy)):
+                not grid.is_blocked(node_gx, node_gy) and
+                not in_building_panel_area and
+                not in_ui_exclusion_area):
                 # Check distance from existing nodes (using pixel positions)
                 too_close = False
                 node_pos = pygame.Vector2(node_x_px, node_y_px)
@@ -3355,32 +3277,6 @@ while running:
     # Day/night divider line removed
     # Overlay removed - using original texture without tinting
     
-    # Draw gate icon/banner on gate columns (if gate exists)
-    try:
-        # Find gate buildings using isinstance (Gate is already imported)
-        gate_buildings = [b for b in building_group if isinstance(b, Gate)]
-        if gate_buildings:
-            # Get gate center position (use first gate)
-            gate_building = gate_buildings[0]
-            gate_center_x_px = gate_building.pos.x
-            gate_pixel_y = gate_building.pos.y - 25  # Above the gate
-            # Draw simple "GATE" text banner (use blue font for selection/identification)
-            gate_font = custom_font_tiny if custom_font_blue and hasattr(custom_font_blue, 'render') else font_tiny
-            if custom_font_blue and hasattr(custom_font_blue, 'render'):
-                # Use scaled blue font for gate label
-                gate_font_scaled = create_scaled_custom_font(custom_font_blue, 0.91, 20) if custom_font_blue else font_tiny
-                gate_text = gate_font_scaled.render("GATE", True, (200, 200, 100)) if gate_font_scaled else font_tiny.render("GATE", True, (200, 200, 100))
-            else:
-                gate_text = font_tiny.render("GATE", True, (200, 200, 100))
-            gate_text_rect = gate_text.get_rect(center=(gate_center_x_px, gate_pixel_y))
-            # Draw background for text
-            banner_bg = pygame.Surface((64, 20), pygame.SRCALPHA)
-            banner_bg.fill((0, 0, 0, 100))
-            screen.blit(banner_bg, (gate_text_rect.x - 10, gate_text_rect.y - 2))
-            screen.blit(gate_text, gate_text_rect)
-    except Exception:
-        # Silently fail if gate banner drawing fails (non-critical)
-        pass
     
     # Update selection highlight animation
     if selection_highlight_timer:
@@ -4123,10 +4019,11 @@ while running:
                 pygame.draw.line(screen, (200, 200, 0), (px, line_y), (px + w * TILE, line_y), 1)
     
     ###################
-    # Draw nodes
+    # Draw nodes (hide when building panel is visible)
     ###################
-    for node in node_group:
-        node.draw(screen)
+    if not building_panel.is_visible:
+        for node in node_group:
+            node.draw(screen)
     
     ###################
     # Draw survivors
@@ -4225,47 +4122,7 @@ while running:
         night_overlay.fill((30, 40, 80, 80))  # Darkish blue tint with transparency
         screen.blit(night_overlay, (0, 0))
     
-    ###################
-    # Draw HUD
-    ###################
-    # Find HQ for HP display
-    hq = None
-    hq_hp = 0
-    hq_max_hp = 2000
-    # OPTIMIZED: Use cached HQ reference instead of searching building_group
-    hq = world.hq if world and hasattr(world, 'hq') and world.hq else None
-    if hq:
-        hq_hp = hq.hp
-        hq_max_hp = hq.max_hp
-    else:
-        hq_hp = 0
-        hq_max_hp = 1
-    
-    hud.update(dt, wave_manager.day, wave_manager.night, wave_manager.state, {
-        "enemies_spawned": zombie_spawner.spawn_count,
-        "total_to_spawn": zombie_spawner.total_to_spawn,
-        "enemies_killed": wave_manager.enemies_killed
-    }, hq_hp, hq_max_hp)
-    
-    # Show "Starting Defenses" hint on Day 1 (once)
-    if wave_manager.day == 1 and wave_manager.state == "DAY" and not hasattr(hud, '_starting_hint_shown'):
-        hud.show_starting_defenses_hint()
-        hud._starting_hint_shown = True
-    
-    # Get UI rectangle toggle state for passing to UI components
-    show_ui_rects = debug_system.is_active() and debug_system.show_ui_rectangles
-    
-    hud.draw(screen, show_ui_rects)
-    
-    ###################
-    # Draw building panel
-    ###################
-    if building_panel.is_visible:
-        building_panel.draw(screen, resources, mouse_pos, show_ui_rects, dt)
-    
-    # Draw research panel (overlay UI)
-    if research_panel_ui.visible:
-        research_panel_ui.draw(screen, show_ui_rects)
+    # Note: HUD and UI panels are drawn later, after all game world elements, to ensure they're on top
     
     ###################
     # Draw research button (only when panel is not visible)
@@ -4428,7 +4285,49 @@ while running:
                 debug_system.update_info("Modifiers", ", ".join(mods))
     
     ###################
-    # Draw debug overlay
+    # Draw HUD (after all game world elements to ensure it's on top)
+    ###################
+    # Find HQ for HP display
+    hq = None
+    hq_hp = 0
+    hq_max_hp = 2000
+    # OPTIMIZED: Use cached HQ reference instead of searching building_group
+    hq = world.hq if world and hasattr(world, 'hq') and world.hq else None
+    if hq:
+        hq_hp = hq.hp
+        hq_max_hp = hq.max_hp
+    else:
+        hq_hp = 0
+        hq_max_hp = 1
+    
+    hud.update(dt, wave_manager.day, wave_manager.night, wave_manager.state, {
+        "enemies_spawned": zombie_spawner.spawn_count,
+        "total_to_spawn": zombie_spawner.total_to_spawn,
+        "enemies_killed": wave_manager.enemies_killed
+    }, hq_hp, hq_max_hp)
+    
+    # Show "Starting Defenses" hint on Day 1 (once)
+    if wave_manager.day == 1 and wave_manager.state == "DAY" and not hasattr(hud, '_starting_hint_shown'):
+        hud.show_starting_defenses_hint()
+        hud._starting_hint_shown = True
+    
+    # Get UI rectangle toggle state for passing to UI components
+    show_ui_rects = debug_system.is_active() and debug_system.show_ui_rectangles
+    
+    hud.draw(screen, show_ui_rects)
+    
+    ###################
+    # Draw building panel (after HUD, on top of everything)
+    ###################
+    if building_panel.is_visible:
+        building_panel.draw(screen, resources, mouse_pos, show_ui_rects, dt)
+    
+    # Draw research panel (overlay UI, on top of everything)
+    if research_panel_ui.visible:
+        research_panel_ui.draw(screen, show_ui_rects)
+    
+    ###################
+    # Draw debug system (after HUD and UI panels)
     ###################
     debug_system.draw(screen, mouse_pos, current_fps)
     

@@ -83,6 +83,44 @@ class Pathfinding:
                     neighbor[1] < 0 or neighbor[1] >= self.grid.height):
                     continue
                 
+                # Prevent diagonal corner cutting (fixes survivor corner-stuck)
+                if dx != 0 and dy != 0:
+                    # If moving diagonally, both adjacent cardinal tiles must be free
+                    # Check horizontal adjacent tile: (current[0] + dx, current[1])
+                    # Check vertical adjacent tile: (current[0], current[1] + dy)
+                    if not ignore_walls:
+                        # Use same blocking logic as regular pathfinding
+                        if (self.grid.is_blocked(current[0] + dx, current[1], check_passable=allow_gates, building_group=self.building_group) or
+                            self.grid.is_blocked(current[0], current[1] + dy, check_passable=allow_gates, building_group=self.building_group)):
+                            continue
+                    else:
+                        # If ignoring walls, check for non-wall buildings only
+                        horizontal_blocked = False
+                        vertical_blocked = False
+                        if self.building_group:
+                            for building in self.building_group:
+                                if hasattr(building, 'grid_x') and hasattr(building, 'grid_y'):
+                                    # Check horizontal adjacent
+                                    if building.grid_x == current[0] + dx and building.grid_y == current[1]:
+                                        type_id = getattr(building, 'TYPE_ID', '').lower()
+                                        is_gate = type_id == 'gate'
+                                        is_wall = type_id.startswith('wall')
+                                        if not is_wall and (not is_gate or not allow_gates):
+                                            if not getattr(building, 'PASSABLE', False):
+                                                horizontal_blocked = True
+                                    # Check vertical adjacent
+                                    if building.grid_x == current[0] and building.grid_y == current[1] + dy:
+                                        type_id = getattr(building, 'TYPE_ID', '').lower()
+                                        is_gate = type_id == 'gate'
+                                        is_wall = type_id.startswith('wall')
+                                        if not is_wall and (not is_gate or not allow_gates):
+                                            if not getattr(building, 'PASSABLE', False):
+                                                vertical_blocked = True
+                                    if horizontal_blocked and vertical_blocked:
+                                        break
+                        if horizontal_blocked or vertical_blocked:
+                            continue
+                
                 # Check if blocked (gates are passable only if allow_gates=True, walls ignored if ignore_walls=True)
                 if not ignore_walls:
                     if self.grid.is_blocked(neighbor[0], neighbor[1], check_passable=allow_gates, building_group=self.building_group):
