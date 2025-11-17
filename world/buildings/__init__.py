@@ -11,6 +11,7 @@ from world.buildings.smelter import Smelter
 from world.buildings.turret import BallisticTurret
 from world.buildings.gatling_turret import GatlingTurret
 from world.buildings.piercer_turret import PiercerTurret
+from world.buildings.flamethrower_turret import FlamethrowerTurret
 
-__all__ = ['HQ', 'Wall', 'WallWood', 'WallIron', 'Gate', 'Housing', 'Farm', 'Sawmill', 'Smelter', 'BallisticTurret', 'GatlingTurret', 'PiercerTurret']
+__all__ = ['HQ', 'Wall', 'WallWood', 'WallIron', 'Gate', 'Housing', 'Farm', 'Sawmill', 'Smelter', 'BallisticTurret', 'GatlingTurret', 'PiercerTurret', 'FlamethrowerTurret']
 

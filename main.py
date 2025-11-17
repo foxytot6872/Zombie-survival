@@ -4,7 +4,7 @@ import os
 import random
 from typing import Dict, Optional
 import constants as c
-from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
+from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, FlamethrowerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
 from world.spawner import Spawner
 from world.projectile import Projectile, ArrowProjectile, GatlingBullet, ZombieBullet
@@ -317,6 +317,50 @@ gatling_sheet_lv3 = load_image_or_placeholder(
     "Gatling turret sprite sheet Lv3"
 )
 gatling_sprite_sheets = [gatling_sheet_lv1, gatling_sheet_lv2, gatling_sheet_lv3]
+
+# Flamethrower turret images - using placeholders for now
+flamethrower_base_lv1 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv1.png',  # Reuse gatling base for now
+    (64, 64),
+    (200, 100, 50, 255),  # Orange/red tint
+    "Flamethrower turret base Lv1"
+)
+flamethrower_base_lv2 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv2.png',
+    (64, 64),
+    (200, 100, 50, 255),
+    "Flamethrower turret base Lv2"
+)
+flamethrower_base_lv3 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_base_lv3.png',
+    (256, 64),
+    (200, 100, 50, 255),
+    "Flamethrower turret base Lv3"
+)
+flamethrower_base_images = [flamethrower_base_lv1, flamethrower_base_lv2, flamethrower_base_lv3]
+
+# Flamethrower turret sprite sheets - using placeholders (8 frames, 64x64 each)
+flamethrower_frame_size = 64
+flamethrower_sheet_width = flamethrower_frame_size * 8  # 8 frames * 64 = 512
+flamethrower_sheet_lv1 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv1.png',  # Reuse gatling for now
+    (flamethrower_sheet_width, flamethrower_frame_size),
+    (255, 150, 0, 255),  # Bright orange
+    "Flamethrower turret sprite sheet Lv1"
+)
+flamethrower_sheet_lv2 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv2.png',
+    (flamethrower_sheet_width, flamethrower_frame_size),
+    (255, 150, 0, 255),
+    "Flamethrower turret sprite sheet Lv2"
+)
+flamethrower_sheet_lv3 = load_image_or_placeholder(
+    'asset/Tiwtir_gun_turret_lv3.png',
+    (flamethrower_sheet_width, flamethrower_frame_size),
+    (255, 150, 0, 255),
+    "Flamethrower turret sprite sheet Lv3"
+)
+flamethrower_sprite_sheets = [flamethrower_sheet_lv1, flamethrower_sheet_lv2, flamethrower_sheet_lv3]
 
 # Backward compatibility - use lv1 for old code paths
 gatling_image = None
@@ -2865,6 +2909,7 @@ building_types = [
     (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
     (GatlingTurret, "Gatling", (200, 150, 100), gatling_sprite_sheets, gatling_base_images),
     (PiercerTurret, "Piercer", (150, 100, 150), railgun_sprite_sheets, railgun_base_images),
+    (FlamethrowerTurret, "Flamethrower", (255, 100, 0), flamethrower_sprite_sheets, flamethrower_base_images),
     (WallWood, "Wall", (120, 120, 120)),  # WallWood is level 1 wall, unlocked via perimeter_fortification
     (Gate, "Gate", (100, 100, 100)),
     (Farm, "Farm", (100, 150, 100)),
@@ -2879,6 +2924,7 @@ building_to_research = {
     Smelter: "smelter",
     PiercerTurret: "railgun",  # Research "railgun" unlocks "railgun"
     GatlingTurret: "gatling",  # Research "multibarrel_mechanism" unlocks "gatling"
+    FlamethrowerTurret: "flamethrower",  # Research "flamethrower_tech" unlocks "flamethrower"
     WallWood: "wall_wood",  # Research "perimeter_fortification" unlocks "wall_wood"
     WallIron: "wall_iron",  # Research "structural_reinforcement" unlocks "wall_iron"
     Gate: "gate",  # Research "perimeter_fortification" unlocks "gate" (lv1)
@@ -3165,6 +3211,13 @@ def create_building(building_class, grid_pos, *args):
             turret_group.add(building)
             return building
     elif building_class is GatlingTurret:
+        if len(args) >= 2:
+            sprite_sheets, base_images = args[0], args[1]
+            building = building_class(grid_pos, sprite_sheets, base_images, tier=1, world=world)
+            world.register_building(building)
+            turret_group.add(building)
+            return building
+    elif building_class is FlamethrowerTurret:
         if len(args) >= 2:
             sprite_sheets, base_images = args[0], args[1]
             building = building_class(grid_pos, sprite_sheets, base_images, tier=1, world=world)
