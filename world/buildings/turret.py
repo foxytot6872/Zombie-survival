@@ -415,6 +415,10 @@ class BallisticTurret(Building):
             # Debug: Draw line to target (optional, can be removed)
             # if self.target_enemy and self.target_enemy.alive:
             #     pygame.draw.line(surface, (255, 0, 0), self.pos, self.target_enemy.pos, 2)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
     
     @staticmethod
     def create_turret(grid_pos, sprite_sheets, base_images, turret_group, tier=1):

@@ -1,6 +1,6 @@
 {
   "BallisticTurret": {
-    "name": "Ballista Turret",
+    "name": "Ballistic Turret",
     "description": "Reliable single-target defense.",
     "base_cost": {"wood": 40, "iron": 30},
     "requires": []
@@ -17,6 +17,13 @@
     "base_cost": {"wood": 50, "iron": 40},
     "requires": ["railgun"],
     "requires_display": ["Railgun Research"]
+  },
+  "FlamethrowerTurret": {
+    "name": "Flamethrower Turret",
+    "description": "Short-range area damage with continuous fire.",
+    "base_cost": {"wood": 50, "iron": 40},
+    "requires": ["flamethrower"],
+    "requires_display": ["Flamethrower Tech"]
   },
   "Wall": {
     "name": "Wooden Wall",

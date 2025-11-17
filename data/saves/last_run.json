@@ -1,34 +1,34 @@
 {
   "version": "1.0",
   "wave_manager": {
-    "night": 8,
-    "day": 8,
+    "night": 1,
+    "day": 1,
     "state": "SUMMARY",
     "difficulty": "easy",
     "enemies_killed": 0,
-    "enemies_spawned": 15,
-    "timer": 0.0
+    "enemies_spawned": 50,
+    "timer": 0.02
   },
   "resources": {
-    "wood": 466,
-    "iron": 349,
-    "food": 327
+    "wood": 46,
+    "iron": 231,
+    "food": 350
   },
   "buildings": [
     {
-      "uid": "9da61cc5-2946-4fde-a1b9-0cf43a1ccec3",
+      "uid": "1d4a7e11-ada4-4159-ae35-24c38f29893e",
       "type": "hq",
       "grid": [
         29,
         14
       ],
       "tier": 1,
-      "hp": 116.03049999998973,
+      "hp": 1247.0649999999387,
       "state": "active",
       "progress": 0.0
     },
     {
-      "uid": "5bb7f65a-f349-4c6d-a549-44f39b7f5523",
+      "uid": "c9e0683d-141b-4ab8-9535-bab0456e97d9",
       "type": "turret_ballistic",
       "grid": [
         30,
@@ -39,6 +39,42 @@
       "state": "active",
       "progress": 2.5,
       "turret_type": "turret_ballistic"
+    },
+    {
+      "uid": "c79e4713-7c77-488d-b22d-532377579bd7",
+      "type": "turret_flamethrower",
+      "grid": [
+        18,
+        22
+      ],
+      "tier": 3,
+      "hp": 483,
+      "state": "active",
+      "progress": 2.5
+    },
+    {
+      "uid": "419a183b-a171-4d80-bb35-f868613544b9",
+      "type": "wall_wood",
+      "grid": [
+        19,
+        22
+      ],
+      "tier": 1,
+      "hp": 683,
+      "state": "active",
+      "progress": 1.0
+    },
+    {
+      "uid": "6fcf53b9-ddc0-4cc6-a0f5-09bc54177fee",
+      "type": "gate",
+      "grid": [
+        20,
+        22
+      ],
+      "tier": 3,
+      "hp": 805,
+      "state": "active",
+      "progress": 2.0
     }
   ],
   "game_state": "playing"

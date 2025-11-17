@@ -245,3 +245,61 @@ def load_custom_font(font_sheet_path: str, letter_width: int = 17, letter_height
         print(f"Error loading custom font from {font_sheet_path}: {e}")
         return None
 
+
+def load_number_font(number_sheet_path: str, number_width: int = 17, number_height: int = 22) -> Optional[list]:
+    """
+    Load number font frames from sprite sheet.
+    
+    Args:
+        number_sheet_path: Path to the number sheet PNG file
+        number_width: Width of each number frame
+        number_height: Height of each number frame
+    
+    Returns:
+        List of 10 pygame.Surface frames (0-9) or None if loading fails
+    """
+    try:
+        # Load number sheet
+        number_sheet = pygame.image.load(number_sheet_path).convert_alpha()
+        sheet_width = number_sheet.get_width()
+        sheet_height = number_sheet.get_height()
+        
+        # Extract 10 frames (0-9)
+        number_frames = []
+        
+        for i in range(10):  # 0-9
+            try:
+                frame_x = i * number_width
+                frame_rect = pygame.Rect(frame_x, 0, number_width, number_height)
+                
+                # Check bounds
+                if frame_rect.right <= sheet_width and frame_rect.bottom <= sheet_height:
+                    frame = number_sheet.subsurface(frame_rect)
+                    number_frames.append(frame.copy())
+                else:
+                    print(f"Warning: Number {i} frame out of bounds in {number_sheet_path}")
+                    # Create placeholder
+                    placeholder = pygame.Surface((number_width, number_height), pygame.SRCALPHA)
+                    placeholder.fill((255, 0, 255, 255))  # Magenta placeholder
+                    number_frames.append(placeholder)
+            except (ValueError, pygame.error) as e:
+                print(f"Warning: Failed to extract number {i} from {number_sheet_path}: {e}")
+                # Create placeholder
+                placeholder = pygame.Surface((number_width, number_height), pygame.SRCALPHA)
+                placeholder.fill((255, 0, 255, 255))  # Magenta placeholder
+                number_frames.append(placeholder)
+        
+        # Ensure we have exactly 10 frames
+        while len(number_frames) < 10:
+            if number_frames:
+                number_frames.append(number_frames[0])
+            else:
+                placeholder = pygame.Surface((number_width, number_height), pygame.SRCALPHA)
+                placeholder.fill((255, 0, 255, 255))  # Magenta placeholder
+                number_frames.append(placeholder)
+        
+        return number_frames
+        
+    except Exception as e:
+        print(f"Error loading number font from {number_sheet_path}: {e}")
+        return None

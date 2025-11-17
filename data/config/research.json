@@ -156,11 +156,11 @@
 	"combat_droids": {
 		"id": "combat_droids",
 		"name": "Combat Droids",
-		"description": "Deploy robotic combat support.",
+		"description": "Deploy robotic support.",
 		"cost": 260,
 		"tier": 4,
 		"prerequisites": ["automation"],
-		"unlocks": ["combat_npc"],
+		"unlocks": ["combat_npc", "drilling_droid", "wood_cutting_droid"],
 		"modifiers": {}
 	},
 	"high_bandwidth": {

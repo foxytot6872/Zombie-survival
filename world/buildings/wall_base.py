@@ -30,6 +30,7 @@ class WallBase(Building):
         if world is not None:
             self.world = world
         self.sprite = None
+        self.selected = False
         w, h = self.FOOTPRINT
         self.image = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
         self.rect = self.image.get_rect(center=self.pos)
@@ -245,3 +246,7 @@ class WallBase(Building):
 
         self.rect = self.image.get_rect(center=self.pos)
         surface.blit(self.image, self.rect)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)

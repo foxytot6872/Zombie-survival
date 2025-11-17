@@ -76,6 +76,7 @@ class Sawmill(Building):
         # Sync level with tier for sprite selection
         self.level = self.tier
         self.level_sprites = self._load_level_sprites()
+        self.selected = False
         
         # Animation state
         self.frame_index = 0
@@ -211,4 +212,8 @@ class Sawmill(Building):
             hp_bar_width = int(bar_width * hp_pct)
             if hp_bar_width > 0:
                 pygame.draw.rect(surface, hp_color, (bar_x, bar_y, hp_bar_width, bar_height))
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
 

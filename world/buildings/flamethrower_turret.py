@@ -5,7 +5,7 @@ import pygame
 import math
 import constants as c
 from world.building import Building, Cost, BuildState
-from world.projectile import Projectile
+from world.projectile import FlameBullet
 
 class FlamethrowerTurret(Building):
     """Flamethrower turret - short range, area damage"""
@@ -54,12 +54,16 @@ class FlamethrowerTurret(Building):
             self.sprite_sheet = placeholder_turret
         
         # Animation state
-        self.animation_state = "idle"
+        self.animation_state = "idle"  # "idle", "windup", "firing"
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_delay = 0.08  # seconds per frame
-        self.animation_list = []
+        self.animation_list = []  # All frames from sprite sheet
+        self.windup_frames = []  # Frames 1-6 (indices 0-5)
+        self.firing_frames = []  # Frames 7-8 (indices 6-7)
+        self.current_frames = []  # Points to current frame set (windup or firing)
         self.is_animated = False
+        self.windup_complete = False
         
         # Load animation frames
         if self.sprite_sheet:
@@ -76,6 +80,9 @@ class FlamethrowerTurret(Building):
         
         # Projectile group (will be set by world)
         self.projectile_group = None
+        
+        # Range circle for selection display
+        self.create_range_circle()
         
         # Update rect
         self._refresh_rect()
@@ -129,8 +136,23 @@ class FlamethrowerTurret(Building):
                 frame = self.sprite_sheet.subsurface((i * size, 0, size, size))
                 self.animation_list.append(frame)
         
+        # Set up windup/firing frames from animation_list (slices, not copies)
+        if len(self.animation_list) >= 8:
+            self.windup_frames = self.animation_list[0:6]  # Frames 1-6 (indices 0-5)
+            self.firing_frames = self.animation_list[6:8]   # Frames 7-8 (indices 6-7)
+        elif len(self.animation_list) >= 6:
+            self.windup_frames = self.animation_list[0:6]
+            self.firing_frames = self.animation_list[5:] if len(self.animation_list) > 6 else [self.animation_list[-1]]
+        else:
+            # Fallback: use all frames for both
+            self.windup_frames = self.animation_list
+            self.firing_frames = self.animation_list
+        
         if self.animation_list:
             self.is_animated = True
+            # Initialize to idle state
+            self.current_frames = [self.animation_list[0]] if self.animation_list else []
+            self.frame_index = 0
     
     def _refresh_rect(self):
         """Update rect to match base image size"""
@@ -139,6 +161,17 @@ class FlamethrowerTurret(Building):
         else:
             self.rect = pygame.Rect(0, 0, 32, 32)
             self.rect.center = self.pos
+    
+    def create_range_circle(self):
+        """Create range circle for display when selected"""
+        self.range_image = pygame.Surface((self.range * 2, self.range * 2), pygame.SRCALPHA)
+        pygame.draw.circle(self.range_image, (255, 100, 0, 100), (self.range, self.range), self.range)
+        self.range_rect = self.range_image.get_rect()
+        self.range_rect.center = self.rect.center
+    
+    def update_range_position(self):
+        """Update range circle position"""
+        self.range_rect.center = self.rect.center
     
     def find_nearest_enemy(self, enemy_group, spatial_grid=None):
         """Find the nearest enemy within range"""
@@ -165,6 +198,127 @@ class FlamethrowerTurret(Building):
         
         return nearest_enemy
     
+    def update_animation(self, dt, is_firing):
+        """Update animation based on firing state (similar to gatling turret)"""
+        if not self.is_animated or not self.animation_list:
+            return
+        
+        # Update animation timer
+        self.animation_timer += dt
+        
+        # State transitions
+        if is_firing:
+            if self.animation_state == "idle":
+                # Start windup
+                self.animation_state = "windup"
+                self.current_frames = self.windup_frames
+                self.frame_index = 0
+                self.animation_timer = 0.0
+                self.windup_complete = False
+            elif self.animation_state == "windup":
+                # Check if windup complete
+                if self.frame_index >= len(self.windup_frames) - 1:
+                    # Transition to firing
+                    self.animation_state = "firing"
+                    self.current_frames = self.firing_frames
+                    self.frame_index = 0
+                    self.animation_timer = 0.0
+                    self.windup_complete = True
+            elif self.animation_state == "firing":
+                # Continue firing - loop frames 7-8
+                pass  # Keep firing
+        else:
+            # Not firing
+            if self.animation_state == "firing":
+                # Stop firing, go back to idle
+                self.animation_state = "idle"
+                self.current_frames = [self.animation_list[0]] if self.animation_list else []
+                self.frame_index = 0
+                self.animation_timer = 0.0
+                self.windup_complete = False
+            elif self.animation_state == "windup":
+                # Interrupt windup - go to idle
+                self.animation_state = "idle"
+                self.current_frames = [self.animation_list[0]] if self.animation_list else []
+                self.frame_index = 0
+                self.animation_timer = 0.0
+                self.windup_complete = False
+            elif self.animation_state == "idle":
+                # Stay idle - use first frame
+                if not self.current_frames and self.animation_list:
+                    self.current_frames = [self.animation_list[0]]
+                    self.frame_index = 0
+        
+        # Update frame index
+        if self.animation_timer >= self.animation_delay and self.current_frames:
+            self.animation_timer = 0.0
+            
+            if self.animation_state == "firing":
+                # Loop firing frames 7-8
+                self.frame_index = (self.frame_index + 1) % len(self.current_frames)
+            elif self.animation_state == "windup":
+                # Play windup forward (1-6)
+                if self.frame_index < len(self.current_frames) - 1:
+                    self.frame_index += 1
+                else:
+                    # Already at end, will transition to firing
+                    pass
+        
+        # Ensure frame_index is valid
+        if self.current_frames and len(self.current_frames) > 0:
+            if self.frame_index >= len(self.current_frames):
+                self.frame_index = len(self.current_frames) - 1
+        elif self.animation_list and len(self.animation_list) > 0:
+            # Fallback to first frame if current_frames is empty
+            self.current_frames = [self.animation_list[0]]
+            self.frame_index = 0
+    
+    def calculate_angle_to_target(self, target_pos):
+        """Calculate angle to target"""
+        dx = target_pos.x - self.pos.x
+        dy = target_pos.y - self.pos.y
+        
+        angle_rad = math.atan2(dy, dx)
+        angle_deg = math.degrees(angle_rad)
+        
+        # Rotation offset (sprite points up by default)
+        rotation_offset = 90
+        angle_deg += rotation_offset
+        
+        return angle_deg
+    
+    def rotate_toward_target(self, dt, target_angle):
+        """Rotate toward target"""
+        # Normalize angles
+        while self.angle < 0:
+            self.angle += 360
+        while self.angle >= 360:
+            self.angle -= 360
+        while target_angle < 0:
+            target_angle += 360
+        while target_angle >= 360:
+            target_angle -= 360
+        
+        # Calculate shortest rotation
+        diff = target_angle - self.angle
+        if diff > 180:
+            diff -= 360
+        elif diff < -180:
+            diff += 360
+        
+        # Rotate toward target
+        max_rotation = self.rotation_speed * dt
+        if abs(diff) <= max_rotation:
+            self.angle = target_angle
+        else:
+            self.angle += max_rotation if diff > 0 else -max_rotation
+        
+        # Normalize again
+        while self.angle < 0:
+            self.angle += 360
+        while self.angle >= 360:
+            self.angle -= 360
+    
     def update(self, dt, world=None, enemy_group=None, projectile_group=None, spatial_grid=None):
         """Update turret"""
         super().update(dt, world)
@@ -186,6 +340,7 @@ class FlamethrowerTurret(Building):
             self.projectile_group = projectile_group
         
         # Update range and damage from modifiers
+        old_range = self.range
         if world and hasattr(world, 'modifiers'):
             range_mult = world.modifiers.get("turret_range_mult", 1.0)
             self.range = int(self.base_range * range_mult)
@@ -193,6 +348,11 @@ class FlamethrowerTurret(Building):
             self.effective_damage = int(self.damage * damage_mult)
             fire_rate_mult = world.modifiers.get("turret_fire_rate_mult", 1.0)
             self.cooldown = int(self.base_cooldown / fire_rate_mult)
+        
+        # Recreate range circle if range changed
+        if old_range != self.range:
+            self.create_range_circle()
+            self.update_range_position()
         
         if not enemy_group:
             return
@@ -206,53 +366,39 @@ class FlamethrowerTurret(Building):
         
         # Rotate toward target
         if self.target_enemy and hasattr(self.target_enemy, 'pos'):
-            direction = self.target_enemy.pos - self.pos
-            if direction.length() > 0:
-                target_angle = math.degrees(math.atan2(direction.y, direction.x))
-                # Normalize angle
-                angle_diff = target_angle - self.angle
-                while angle_diff > 180:
-                    angle_diff -= 360
-                while angle_diff < -180:
-                    angle_diff += 360
-                
-                # Rotate toward target
-                max_rotation = self.rotation_speed * dt
-                if abs(angle_diff) <= max_rotation:
-                    self.angle = target_angle
-                else:
-                    self.angle += max_rotation if angle_diff > 0 else -max_rotation
+            target_angle = self.calculate_angle_to_target(self.target_enemy.pos)
+            self.target_angle = target_angle
+            self.rotate_toward_target(dt, target_angle)
         else:
             self.target_enemy = None
         
         # Fire at target
+        is_firing = False
         if self.target_enemy and hasattr(self.target_enemy, 'pos'):
             distance = (self.pos - self.target_enemy.pos).length()
             if distance <= self.range:
-                if current_time - self.last_shot >= self.cooldown:
+                is_firing = True
+                # Fire continuously while in firing state
+                if self.animation_state == "firing" and current_time - self.last_shot >= self.cooldown:
                     self.fire(self.target_enemy.pos)
                     self.last_shot = current_time
                     self.is_shooting = True
             else:
                 self.target_enemy = None
+                self.is_shooting = False
+        else:
+            self.is_shooting = False
         
-        # Update animation
-        if self.is_animated and self.animation_list:
-            self.animation_timer += dt
-            if self.animation_timer >= self.animation_delay:
-                self.animation_timer = 0.0
-                if self.is_shooting:
-                    self.frame_index = (self.frame_index + 1) % len(self.animation_list)
-                else:
-                    self.frame_index = 0
+        # Update animation (similar to gatling turret)
+        self.update_animation(dt, is_firing)
     
     def fire(self, target_pos):
-        """Fire a projectile at target"""
+        """Fire a flame projectile at target"""
         if not self.projectile_group:
             return
         
-        # Create projectile
-        projectile = Projectile(
+        # Create flame projectile
+        projectile = FlameBullet(
             start_pos=self.pos,
             target_pos=target_pos,
             speed=self.effective_projectile_speed,
@@ -260,13 +406,84 @@ class FlamethrowerTurret(Building):
             target_type="enemy"
         )
         
+        # Set world reference for modifiers
+        world_ref = getattr(self, 'world', None)
+        if world_ref:
+            projectile.world = world_ref
+        
         self.projectile_group.add(projectile)
+    
+    def get_rotated_turret(self):
+        """Get rotated turret image"""
+        current_frame = None
+        
+        # Use current_frames if available (like gatling turret)
+        if self.current_frames and len(self.current_frames) > 0:
+            if 0 <= self.frame_index < len(self.current_frames):
+                current_frame = self.current_frames[self.frame_index]
+            else:
+                current_frame = self.current_frames[0] if self.current_frames else None
+        elif self.is_animated and self.animation_list:
+            # Fallback to animation_list
+            if 0 <= self.frame_index < len(self.animation_list):
+                current_frame = self.animation_list[self.frame_index]
+            else:
+                current_frame = self.animation_list[0] if self.animation_list else None
+        elif self.sprite_sheet:
+            current_frame = self.sprite_sheet
+        
+        if current_frame is None:
+            return None
+        
+        rotated_image = pygame.transform.rotate(current_frame, -self.angle)
+        return rotated_image
+    
+    def on_upgrade(self):
+        """Handle tier upgrades - swap base texture and sprite sheet when available"""
+        super().on_upgrade()
+        
+        # Update base image and sprite sheet for new tier
+        if hasattr(self, 'base_images') and self.base_images:
+            self.base_image = self._get_base_image_for_tier(self.tier)
+        
+        if hasattr(self, 'sprite_sheets') and self.sprite_sheets:
+            self.sprite_sheet = self._get_sprite_sheet_for_tier(self.tier)
+            # Reload animation frames from new sprite sheet
+            if self.sprite_sheet:
+                self._load_animation_frames()
+        
+        # Update rect
+        self._refresh_rect()
+        
+        # Recreate range circle (range might change with tier)
+        self.create_range_circle()
+        self.update_range_position()
     
     def draw(self, surface):
         """Draw turret"""
+        # Draw range circle if selected (behind base)
+        if self.selected and self.state == BuildState.ACTIVE:
+            self.update_range_position()
+            surface.blit(self.range_image, self.range_rect)
+        
         if self.state == BuildState.CONSTRUCTING:
-            # Draw construction state
-            alpha = int(128 + 127 * (self.progress / self.BUILD_TIME))
+            # Draw construction overlay
+            w, h = self.FOOTPRINT
+            overlay = pygame.Surface((w * 32, h * 32), pygame.SRCALPHA)
+            overlay.fill((0, 0, 0, 128))
+            overlay_rect = overlay.get_rect(center=self.pos)
+            surface.blit(overlay, overlay_rect)
+            
+            # Draw progress bar
+            pct = self.progress / self.BUILD_TIME if self.BUILD_TIME > 0 else 1.0
+            bar_width = w * 32 - 4
+            bar_height = 4
+            bar_x = overlay_rect.x + 2
+            bar_y = overlay_rect.bottom - 6
+            pygame.draw.rect(surface, (200, 220, 80), (bar_x, bar_y, int(bar_width * pct), bar_height))
+            
+            # Draw base with alpha
+            alpha = int(128 + 127 * pct)
             if self.base_image:
                 temp_image = self.base_image.copy()
                 temp_image.set_alpha(alpha)
@@ -278,20 +495,25 @@ class FlamethrowerTurret(Building):
         
         # Draw base
         if self.base_image:
-            surface.blit(self.base_image, self.rect)
+            base_rect = self.base_image.get_rect(center=self.pos)
+            surface.blit(self.base_image, base_rect)
         
         # Draw turret (rotated)
-        if self.is_animated and self.animation_list:
-            turret_frame = self.animation_list[self.frame_index]
-        elif self.sprite_sheet:
-            turret_frame = self.sprite_sheet
-        else:
-            return
+        rotated_turret = self.get_rotated_turret()
+        if rotated_turret:
+            turret_rect = rotated_turret.get_rect(center=self.rect.center)
+            surface.blit(rotated_turret, turret_rect)
         
-        # Rotate turret to face target angle
-        rotated_turret = pygame.transform.rotate(turret_frame, -self.angle)
-        turret_rect = rotated_turret.get_rect(center=self.rect.center)
-        surface.blit(rotated_turret, turret_rect)
+        # Draw HP bar if damaged
+        if self.hp < self.max_hp:
+            hp_pct = self.hp / self.max_hp
+            hp_color = (0, 255, 0) if hp_pct > 0.5 else (255, 255, 0) if hp_pct > 0.25 else (255, 0, 0)
+            bar_width = 30
+            bar_height = 4
+            bar_x = self.rect.centerx - bar_width // 2
+            bar_y = self.rect.top - 8
+            pygame.draw.rect(surface, (0, 0, 0), (bar_x - 1, bar_y - 1, bar_width + 2, bar_height + 2))
+            pygame.draw.rect(surface, hp_color, (bar_x, bar_y, int(bar_width * hp_pct), bar_height))
         
         # Draw selection highlight
         if self.selected:

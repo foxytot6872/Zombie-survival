@@ -2,12 +2,13 @@
 HUD (Heads-Up Display) for game information.
 """
 import pygame
+import re
 from typing import Optional, Dict
 
 class HUD:
     """HUD for displaying game information"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None, font_large=None, font_medium=None, font_small=None, hq_health_bar_frames=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, daycounter_frames=None, red_number_frames=None, blue_number_frames=None, yellow_number_frames=None, font_large=None, font_medium=None, font_small=None, hq_health_bar_frames=None):
         """
         Initialize HUD.
         Args:
@@ -37,9 +38,11 @@ class HUD:
         self.is_transitioning = False  # Whether we're currently in a transition animation
         self.transition_animation_timer = 0.0
         
-        # Number sprite frames (0-9)
+        # Number sprite frames (0-9) - large HUD numbers (42x74)
         self.red_number_frames = red_number_frames if red_number_frames else []
         self.blue_number_frames = blue_number_frames if blue_number_frames else []
+        # Small number font frames (17x22) for UI elements
+        self.yellow_number_frames = yellow_number_frames if yellow_number_frames else []
         
         # HQ health bar sprite frames (21 frames: Frame 0 = 100%, Frame 20 = 0%)
         self.hq_health_bar_frames = hq_health_bar_frames if hq_health_bar_frames else []
@@ -218,7 +221,7 @@ class HUD:
     
     def draw_number(self, surface: pygame.Surface, number: int, x: int, y: int, use_red: bool = True):
         """
-        Draw a number using sprite frames.
+        Draw a number using sprite frames (large HUD numbers 42x74).
         Args:
             surface: Surface to draw on
             number: Number to draw (0-9, or multi-digit)
@@ -242,6 +245,158 @@ class HUD:
                 # Move to next digit position
                 digit_width = digit_frame.get_width()
                 current_x += digit_width - 0 #increase gap by 0 (more number = more gap)
+    
+    def draw_small_number(self, surface: pygame.Surface, number: int, x: int, y: int, color: str = "yellow"):
+        """
+        Draw a small number using sprite frames (17x22 UI numbers).
+        Args:
+            surface: Surface to draw on
+            number: Number to draw (0-9, or multi-digit)
+            x: X position (left edge)
+            y: Y position (top edge)
+            color: Color to use - "yellow", "red", or "blue" (default: "yellow")
+        """
+        # Use yellow_number_frames for small UI numbers (17x22)
+        # Note: red/blue_number_frames are large HUD numbers (42x74)
+        number_frames = self.yellow_number_frames
+        
+        if not number_frames or len(number_frames) < 10:
+            return
+        
+        # Convert number to string to get individual digits
+        number_str = str(number)
+        current_x = x
+        
+        for digit_char in number_str:
+            digit = int(digit_char)
+            if 0 <= digit <= 9:
+                digit_frame = number_frames[digit]
+                surface.blit(digit_frame, (current_x, y))
+                # Move to next digit position (17 pixels per digit)
+                current_x += digit_frame.get_width()
+    
+    def _render_text_with_numbers(self, text: str, font, color: tuple, number_color: str = "yellow", scale_to_font: bool = True):
+        """
+        Render text with numbers using number sprite sheets.
+        Args:
+            text: Text to render (may contain numbers)
+            font: Font to use for text (pygame.font.Font or CustomFont)
+            color: Color tuple for text
+            number_color: Color of number sprites ("yellow", "red", "blue")
+            scale_to_font: If True, scale numbers to match font height
+        Returns:
+            pygame.Surface with rendered text and numbers
+        """
+        
+        # Get font height
+        if hasattr(font, 'letter_height'):
+            font_height = font.letter_height  # CustomFont
+        elif hasattr(font, 'get_height'):
+            font_height = font.get_height()  # pygame.font.Font
+        else:
+            font_height = 32  # Fallback
+        
+        # Choose number frames
+        if number_color == "red":
+            number_frames = self.red_number_frames if hasattr(self, 'red_number_frames') else []
+        elif number_color == "blue":
+            number_frames = self.blue_number_frames if hasattr(self, 'blue_number_frames') else []
+        else:
+            number_frames = self.yellow_number_frames if hasattr(self, 'yellow_number_frames') else []
+        
+        if not number_frames or len(number_frames) < 10:
+            # Fallback to regular font rendering
+            if hasattr(font, 'render'):
+                return font.render(text, True, color)
+            else:
+                return pygame.Surface((0, 0), pygame.SRCALPHA)
+        
+        # Calculate scale factor
+        scale_factor = (font_height / 22.0) if scale_to_font and 22 > 0 else 1.0
+        
+        # Split text into parts (text and numbers)
+        parts = re.split(r'(\d+)', text)  # Split on numbers, keeping them
+        
+        # Calculate total width
+        total_width = 0
+        for part in parts:
+            if part.isdigit():
+                # Number part
+                scaled_width = int((17 - 2) * scale_factor) * len(part)  # Reduced gap between digits
+                total_width += scaled_width
+            else:
+                # Text part
+                if hasattr(font, 'render'):
+                    text_surface = font.render(part, True, color)
+                    total_width += text_surface.get_width()
+                else:
+                    total_width += len(part) * 10  # Fallback estimate
+        
+        # Create output surface
+        output = pygame.Surface((total_width, font_height), pygame.SRCALPHA)
+        
+        # Render parts
+        current_x = 0
+        for part in parts:
+            if part.isdigit():
+                # Render number using sprite sheets
+                for digit_char in part:
+                    digit = int(digit_char)
+                    if 0 <= digit <= 9:
+                        digit_frame = number_frames[digit]
+                        if scale_to_font:
+                            scaled_width = int(digit_frame.get_width() * scale_factor)
+                            scaled_height = int(digit_frame.get_height() * scale_factor)
+                            scaled_frame = pygame.transform.scale(digit_frame, (scaled_width, scaled_height))
+                        else:
+                            scaled_frame = digit_frame
+                        
+                        # Center vertically
+                        y_offset = (font_height - scaled_frame.get_height()) // 2
+                        output.blit(scaled_frame, (current_x, y_offset))
+                        current_x += scaled_frame.get_width() - 2  # Reduced gap
+            else:
+                # Render text
+                if part:  # Skip empty strings
+                    if hasattr(font, 'render'):
+                        text_surface = font.render(part, True, color)
+                        # Center vertically
+                        y_offset = (font_height - text_surface.get_height()) // 2
+                        output.blit(text_surface, (current_x, y_offset))
+                        current_x += text_surface.get_width()
+        
+        return output
+    
+    def _draw_scaled_number(self, surface: pygame.Surface, number: int, x: int, y: int, scale_factor: float):
+        """
+        Draw a number scaled to match font size.
+        Args:
+            surface: Surface to draw on
+            number: Number to draw
+            x: X position
+            y: Y position
+            scale_factor: Scale factor to apply (e.g., font_height / 22.0)
+        """
+        number_frames = self.yellow_number_frames
+        if not number_frames or len(number_frames) < 10:
+            return
+        
+        number_str = str(number)
+        current_x = x
+        for digit_char in number_str:
+            digit = int(digit_char)
+            if 0 <= digit <= 9:
+                digit_frame = number_frames[digit]
+                
+                # Scale the frame
+                if scale_factor != 1.0:
+                    scaled_width = int(digit_frame.get_width() * scale_factor)
+                    scaled_height = int(digit_frame.get_height() * scale_factor)
+                    digit_frame = pygame.transform.scale(digit_frame, (scaled_width, scaled_height))
+                
+                surface.blit(digit_frame, (current_x, y))
+                # Reduce gap between digits by using actual width minus 2px overlap
+                current_x += digit_frame.get_width() - 2
     
     def draw(self, surface: pygame.Surface, show_ui_rectangles: bool = False):
         """Draw HUD"""
@@ -371,17 +526,57 @@ class HUD:
         
         # Draw wave info (top-right, below day counter)
         if self.wave_info:
-            wave_text = f"Zombies: {self.wave_info.get('enemies_spawned', 0)} / {self.wave_info.get('total_to_spawn', 0)}"
-            wave_surface = self.font_medium.render(wave_text, True, (255, 255, 255))
             # Position below day counter (128 pixels tall + 5 pixel spacing)
             wave_y = 10 + 128 + 5 if (self.daycounter_frames and len(self.daycounter_frames) > 0) else 60
-            wave_rect = wave_surface.get_rect(topright=(self.screen_width - 10, wave_y))
+            
+            # Draw "Zombies: " text
+            label_text = "Zombies: "
+            label_surface = self.font_medium.render(label_text, True, (255, 255, 255))
+            # Move label left by 150px (another 50px more)
+            label_x = self.screen_width - 10 - label_surface.get_width() - 125
+            
+            # Draw numbers using number fonts - scale to match font_medium size
+            enemies_spawned = self.wave_info.get('enemies_spawned', 0)
+            total_to_spawn = self.wave_info.get('total_to_spawn', 0)
+            
+            # Get font height for scaling and positioning
+            if hasattr(self.font_medium, 'letter_height'):
+                font_height = self.font_medium.letter_height  # CustomFont
+            elif hasattr(self.font_medium, 'get_height'):
+                font_height = self.font_medium.get_height()  # pygame.font.Font
+            else:
+                font_height = 32  # Fallback
+            
+            # Scale factor to match font size (original number frames are 22px tall)
+            scale_factor = font_height / 22.0 if 22 > 0 else 1.0
+            # Calculate scaled width per digit (reduced gap: 17px - 2px overlap = 15px effective)
+            scaled_number_width = int((17 - 2) * scale_factor)  # Reduced gap between digits
+            
+            number_y = wave_y + (font_height - font_height) // 2 + 3  # Center vertically with text, then move down 3px
+            number_start_x = label_x + label_surface.get_width()
+            
+            # Draw first number (enemies_spawned) - scaled to match font
+            self._draw_scaled_number(surface, enemies_spawned, number_start_x, number_y, scale_factor)
+            
+            # Draw " / " separator - calculate position based on actual number width
+            separator_text = " / "
+            separator_surface = self.font_medium.render(separator_text, True, (255, 255, 255))
+            # Calculate separator position: start + (number of digits * scaled width per digit)
+            separator_x = number_start_x + len(str(enemies_spawned)) * scaled_number_width
+            surface.blit(separator_surface, (separator_x, wave_y))
+            
+            # Draw second number (total_to_spawn) - scaled to match font
+            second_number_x = separator_x + separator_surface.get_width()
+            self._draw_scaled_number(surface, total_to_spawn, second_number_x, number_y, scale_factor)
+            
+            # Draw label
+            surface.blit(label_surface, (label_x, wave_y))
+            
             # Overlay rectangle for wave info (estimated ~250x30)
             if show_ui_rectangles:
                 overlay = pygame.Surface((250, 30), pygame.SRCALPHA)
                 overlay.fill((255, 255, 0, 80))  # Yellow overlay
                 surface.blit(overlay, (self.screen_width - 260, wave_y))
-            surface.blit(wave_surface, wave_rect)
         
         # Draw event popup panel (top-center, with overlay and fade animation)
         if self.event_visible and self.event_fade_alpha > 0:
@@ -419,7 +614,7 @@ class HUD:
             # Render title (large font) - wrap if needed
             # Calculate maximum width for title text
             max_title_width = popup_width - (panel_padding * 2)
-            title_surface = self.font_large.render(title_text, True, title_color)
+            title_surface = self._render_text_with_numbers(title_text, self.font_large, title_color, "yellow", True)
             # Check if title needs wrapping
             if title_surface.get_width() > max_title_width:
                 # Word wrap title if too long
@@ -428,7 +623,7 @@ class HUD:
                 current_line = ""
                 for word in words:
                     test_line = current_line + (" " if current_line else "") + word
-                    test_surface = self.font_large.render(test_line, True, title_color)
+                    test_surface = self._render_text_with_numbers(test_line, self.font_large, title_color, "yellow", True)
                     if test_surface.get_width() <= max_title_width:
                         current_line = test_line
                     else:
@@ -443,7 +638,7 @@ class HUD:
             # Render wrapped title lines
             title_surfaces = []
             for line in wrapped_title_lines:
-                title_surface = self.font_large.render(line, True, title_color)
+                title_surface = self._render_text_with_numbers(line, self.font_large, title_color, "yellow", True)
                 title_surface.set_alpha(self.event_fade_alpha)
                 title_surfaces.append(title_surface)
             
@@ -458,7 +653,7 @@ class HUD:
                 current_line = ""
                 for word in words:
                     test_line = current_line + (" " if current_line else "") + word
-                    test_surface = self.font_medium.render(test_line, True, (255, 255, 255))
+                    test_surface = self._render_text_with_numbers(test_line, self.font_medium, (255, 255, 255), "yellow", True)
                     if test_surface.get_width() <= max_text_width:
                         current_line = test_line
                     else:
@@ -473,7 +668,7 @@ class HUD:
             # Render wrapped description lines
             desc_surfaces = []
             for line in wrapped_desc_lines:
-                desc_surface = self.font_medium.render(line, True, (255, 255, 255))
+                desc_surface = self._render_text_with_numbers(line, self.font_medium, (255, 255, 255), "yellow", True)
                 desc_surface.set_alpha(self.event_fade_alpha)
                 desc_surfaces.append(desc_surface)
             
@@ -481,7 +676,7 @@ class HUD:
             effect_surfaces = []
             if self.event_effects:
                 for effect in self.event_effects:
-                    effect_surface = self.font_small.render(f"• {effect}", True, (200, 255, 200))  # Light green
+                    effect_surface = self._render_text_with_numbers(f"• {effect}", self.font_small, (200, 255, 200), "yellow", True)  # Light green
                     effect_surface.set_alpha(self.event_fade_alpha)
                     effect_surfaces.append(effect_surface)
             

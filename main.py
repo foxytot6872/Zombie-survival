@@ -7,7 +7,7 @@ import constants as c
 from world.buildings import BallisticTurret, GatlingTurret, PiercerTurret, FlamethrowerTurret, HQ, Wall, Gate, Farm, Sawmill, Smelter, WallWood, WallIron
 from world.enemies import BasicZombie, RunnerZombie, BruteZombie, SpitterZombie, SwarmlingZombie, Skeleton, ArcherSkeleton, WarriorSkeleton
 from world.spawner import Spawner
-from world.projectile import Projectile, ArrowProjectile, GatlingBullet, ZombieBullet
+from world.projectile import Projectile, ArrowProjectile, GatlingBullet, ZombieBullet, FlameBullet
 from world.buildings.piercer_turret import PiercingProjectile
 from world.debug import DebugSystem
 from button import Button
@@ -35,7 +35,7 @@ from ui.start_screen import StartScreen
 from ui.difficulty_screen import SelectDifficultyScreen
 from ui.mode_screen import SelectModeScreen, GameMode
 from ui.build_tooltip import BuildTooltipManager
-from ui.custom_font import load_custom_font, CustomFont
+from ui.custom_font import load_custom_font, CustomFont, load_number_font
 from upgrade_config import get_next_turret_upgrade, scale_upgrade_cost
 from research_tree import open_research_tree
 from world.research import ResearchManager
@@ -43,6 +43,7 @@ from difficulty_config import Difficulty, DIFFICULTY_CONFIG
 # Nodes and survivors
 from world.nodes import TreePatch, ScrapPile, spawn_daily_nodes
 from world.survivor import Worker, Guard
+from world.droid import DrillingDroid, WoodCuttingDroid
 
 # pygame setup
 pygame.init()
@@ -189,38 +190,38 @@ build_item_config = load_build_item_config()
 # Turret images
 frame_width = 32 * c.ANIMATION_STEPS
 turret_sheet_lv1 = load_image_or_placeholder(
-    'asset/Turret_lv1.png',
+    'asset/Turret/Turret_lv1.png',
     (frame_width, 32),
     (150, 150, 150, 255),
     "Ballistic turret sprite sheet Lv1"
 )
 turret_sheet_lv2 = load_image_or_placeholder(
-    'asset/Turret_lv2.png',
+    'asset/Turret/Turret_lv2.png',
     (frame_width, 32),
     (160, 150, 150, 255),
     "Ballistic turret sprite sheet Lv2"
 )
 turret_sheet_lv3 = load_image_or_placeholder(
-    'asset/Turret_lv3.png',
+    'asset/Turret/Turret_lv3.png',
     (frame_width, 32),
     (170, 150, 150, 255),
     "Ballistic turret sprite sheet Lv3"
 )
 turret_sprite_sheets = [turret_sheet_lv1, turret_sheet_lv2, turret_sheet_lv3]
 turret_base_lv1 = load_image_or_placeholder(
-    'asset/Base_lv1.png',
+    'asset/Turret/Base_lv1.png',
     (32, 32),
     (100, 100, 100, 255),
     "Ballistic turret base Lv1"
 )
 turret_base_lv2 = load_image_or_placeholder(
-    'asset/Base_lv2.png',
+    'asset/Turret/Base_lv2.png',
     (32, 32),
     (110, 110, 110, 255),
     "Ballistic turret base Lv2"
 )
 turret_base_lv3 = load_image_or_placeholder(
-    'asset/Base_lv3.png',
+    'asset/Turret/Base_lv3.png',
     (32, 32),
     (120, 120, 120, 255),
     "Ballistic turret base Lv3"
@@ -229,19 +230,19 @@ turret_base_images = [turret_base_lv1, turret_base_lv2, turret_base_lv3]
 
 # Railgun (Piercer) turret base images
 railgun_base_lv1 = load_image_or_placeholder(
-    'asset/Railgunbase_lv1.png',
+    'asset/Turret/Railgunbase_lv1.png',
     (32, 32),
     (120, 100, 100, 255),
     "Railgun turret base Lv1"
 )
 railgun_base_lv2 = load_image_or_placeholder(
-    'asset/Railgunbase_lv2.png',
+    'asset/Turret/Railgunbase_lv2.png',
     (32, 32),
     (130, 110, 110, 255),
     "Railgun turret base Lv2"
 )
 railgun_base_lv3 = load_image_or_placeholder(
-    'asset/Railgunbase_lv3.png',
+    'asset/Turret/Railgunbase_lv3.png',
     (32, 32),
     (140, 120, 120, 255),
     "Railgun turret base Lv3"
@@ -252,19 +253,19 @@ railgun_base_images = [railgun_base_lv1, railgun_base_lv2, railgun_base_lv3]
 railgun_frame_size = 64
 railgun_sheet_width = railgun_frame_size * c.ANIMATION_STEPS  # 8 frames * 64 = 512
 railgun_sheet_lv1 = load_image_or_placeholder(
-    'asset/Railgunturret_lv1.png',
+    'asset/Turret/Railgunturret_lv1.png',
     (railgun_sheet_width, railgun_frame_size),
     (150, 100, 100, 255),
     "Railgun turret sprite sheet Lv1"
 )
 railgun_sheet_lv2 = load_image_or_placeholder(
-    'asset/Railgunturret_lv2.png',
+    'asset/Turret/Railgunturret_lv2.png',
     (railgun_sheet_width, railgun_frame_size),
     (150, 100, 100, 255),
     "Railgun turret sprite sheet Lv2"
 )
 railgun_sheet_lv3 = load_image_or_placeholder(
-    'asset/Railgunturret_lv3.png',
+    'asset/Turret/Railgunturret_lv3.png',
     (railgun_sheet_width, railgun_frame_size),
     (150, 100, 100, 255),
     "Railgun turret sprite sheet Lv3"
@@ -275,20 +276,20 @@ railgun_sprite_sheets = [railgun_sheet_lv1, railgun_sheet_lv2, railgun_sheet_lv3
 # Gatling turret images - try new tiwtir textures first, fallback to old
 # Load all three tiers for Gatling turret
 gatling_base_lv1 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv1.png',
+    'asset/Turret/Tiwtir_gun_base_lv1.png',
     (64, 64),
     (120, 100, 80, 255),
     "Gatling turret base Lv1"
 )
 gatling_base_lv2 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv2.png',
+    'asset/Turret/Tiwtir_gun_base_lv2.png',
     (64, 64),
     (120, 100, 80, 255),
     "Gatling turret base Lv2"
 )
 # Lv3 base is a sprite sheet with 4 frames (64x64 each) - 256x64 total
 gatling_base_lv3 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv3.png',
+    'asset/Turret/Tiwtir_gun_base_lv3.png',
     (256, 64),  # 4 frames * 64 = 256 pixels wide, 64 pixels tall
     (120, 100, 80, 255),
     "Gatling turret base Lv3 (sprite sheet)"
@@ -299,19 +300,19 @@ gatling_base_images = [gatling_base_lv1, gatling_base_lv2, gatling_base_lv3]
 gatling_frame_size = 96
 gatling_sheet_width = gatling_frame_size * 9  # 9 frames * 96 = 864
 gatling_sheet_lv1 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv1.png',
+    'asset/Turret/Tiwtir_gun_turret_lv1.png',
     (gatling_sheet_width, gatling_frame_size),
     (180, 160, 140, 255),
     "Gatling turret sprite sheet Lv1"
 )
 gatling_sheet_lv2 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv2.png',
+    'asset/Turret/Tiwtir_gun_turret_lv2.png',
     (gatling_sheet_width, gatling_frame_size),
     (180, 160, 140, 255),
     "Gatling turret sprite sheet Lv2"
 )
 gatling_sheet_lv3 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv3.png',
+    'asset/Turret/Tiwtir_gun_turret_lv3.png',
     (gatling_sheet_width, gatling_frame_size),
     (180, 160, 140, 255),
     "Gatling turret sprite sheet Lv3"
@@ -320,19 +321,19 @@ gatling_sprite_sheets = [gatling_sheet_lv1, gatling_sheet_lv2, gatling_sheet_lv3
 
 # Flamethrower turret images - using placeholders for now
 flamethrower_base_lv1 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv1.png',  # Reuse gatling base for now
+    'asset/Turret/flame_base_lv1.png',  # Reuse gatling base for now
     (64, 64),
     (200, 100, 50, 255),  # Orange/red tint
     "Flamethrower turret base Lv1"
 )
 flamethrower_base_lv2 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv2.png',
+    'asset/Turret/flame_base_lv2.png',
     (64, 64),
     (200, 100, 50, 255),
     "Flamethrower turret base Lv2"
 )
 flamethrower_base_lv3 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_base_lv3.png',
+    'asset/Turret/flame_base_lv3.png',
     (256, 64),
     (200, 100, 50, 255),
     "Flamethrower turret base Lv3"
@@ -343,19 +344,19 @@ flamethrower_base_images = [flamethrower_base_lv1, flamethrower_base_lv2, flamet
 flamethrower_frame_size = 64
 flamethrower_sheet_width = flamethrower_frame_size * 8  # 8 frames * 64 = 512
 flamethrower_sheet_lv1 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv1.png',  # Reuse gatling for now
+    'asset/Turret/flame_turret_lv1.png',  # Reuse gatling for now
     (flamethrower_sheet_width, flamethrower_frame_size),
     (255, 150, 0, 255),  # Bright orange
     "Flamethrower turret sprite sheet Lv1"
 )
 flamethrower_sheet_lv2 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv2.png',
+    'asset/Turret/flame_turret_lv2.png',
     (flamethrower_sheet_width, flamethrower_frame_size),
     (255, 150, 0, 255),
     "Flamethrower turret sprite sheet Lv2"
 )
 flamethrower_sheet_lv3 = load_image_or_placeholder(
-    'asset/Tiwtir_gun_turret_lv3.png',
+    'asset/Turret/flame_turret_lv3.png',
     (flamethrower_sheet_width, flamethrower_frame_size),
     (255, 150, 0, 255),
     "Flamethrower turret sprite sheet Lv3"
@@ -462,7 +463,7 @@ ArrowProjectile.sprite_sheet = arrow_projectile_sheet
 
 # Ballistic Bullet sprite sheet (4 frames, 16x16 each)
 ballistic_bullet_sheet = load_image_or_placeholder(
-    'asset\Balisticbullet-Sheet.png',
+    'asset/Turret/Balisticbullet-Sheet.png',
     (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
     (255, 200, 0, 255),
     "Ballistic Bullet sprite sheet"
@@ -473,7 +474,7 @@ Projectile.sprite_sheet = ballistic_bullet_sheet
 
 # Gatling (Tiwtir) Bullet sprite sheet (4 frames, 16x16 each)
 gatling_bullet_sheet = load_image_or_placeholder(
-    'asset\Tiwtirbullet-Sheet.png',
+    'asset/Turret/Tiwtirbullet-Sheet.png',
     (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
     (255, 150, 0, 255),
     "Gatling Bullet sprite sheet"
@@ -481,7 +482,7 @@ gatling_bullet_sheet = load_image_or_placeholder(
 
 # Railgun Bullet sprite sheet (4 frames, 16x16 each)
 railgun_bullet_sheet = load_image_or_placeholder(
-    'asset\Railgunbullet-Sheet.png',
+    'asset/Turret/Railgunbullet-Sheet.png',
     (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
     (200, 100, 255, 255),
     "Railgun Bullet sprite sheet"
@@ -493,6 +494,14 @@ zombie_bullet_sheet = load_image_or_placeholder(
     (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
     (150, 50, 50, 255),
     "Zombie Bullet sprite sheet"
+)
+
+# Flame Bullet sprite sheet (4 frames, 16x16 each)
+flame_bullet_sheet = load_image_or_placeholder(
+    'asset/Turret/Flamebullet-Sheet.png',
+    (16 * 4, 16),  # 4 frames * 16 pixels = 64 pixels wide, 16 pixels tall
+    (255, 100, 0, 255),
+    "Flame Bullet sprite sheet"
 )
 
 # Coin sprite sheet (frames, 16x16 each)
@@ -518,6 +527,7 @@ if coin_sheet:
 GatlingBullet.sprite_sheet = gatling_bullet_sheet
 PiercingProjectile.sprite_sheet = railgun_bullet_sheet
 ZombieBullet.sprite_sheet = zombie_bullet_sheet
+FlameBullet.sprite_sheet = flame_bullet_sheet
 
 # Warrior Skeleton sprite sheet (46 frames, 48x48 each)
 warrior_skeleton_sprite_sheet = load_image_or_placeholder(
@@ -684,6 +694,11 @@ else:
         placeholder.fill((0, 0, 255, 255))
         blue_number_frames.append(placeholder)
 
+# Load number font sheets (17x22 each, 10 frames 0-9) - for UI elements
+yellow_number_frames = load_number_font('asset/fonts/YellowNumber-Sheet.png', number_width=17, number_height=22) or []
+red_number_font_frames = load_number_font('asset/fonts/RedNumber-Sheet.png', number_width=17, number_height=22) or []
+blue_number_font_frames = load_number_font('asset/fonts/BlueNumber-Sheet.png', number_width=17, number_height=22) or []
+
 # HQ building image
 hq_image = load_image_or_placeholder(
     'asset/base.png',
@@ -694,6 +709,64 @@ hq_image = load_image_or_placeholder(
 
 # Set image for HQ class
 HQ.building_image = hq_image
+
+# Load custom panel assets for 9-slice panel system
+panel_corner_tl = load_image_or_placeholder('asset/hud/Panel-corner-tl.png', (32, 32), (100, 100, 100, 255), "Panel corner top-left")
+panel_corner_tr = load_image_or_placeholder('asset/hud/Panel-corner-tr.png', (32, 32), (100, 100, 100, 255), "Panel corner top-right")
+panel_corner_bl = load_image_or_placeholder('asset/hud/Panel-corner-bl.png', (32, 32), (100, 100, 100, 255), "Panel corner bottom-left")
+panel_corner_br = load_image_or_placeholder('asset/hud/Panel-corner-br.png', (32, 32), (100, 100, 100, 255), "Panel corner bottom-right")
+panel_border_top = load_image_or_placeholder('asset/hud/Panel-border-top.png', (32, 32), (100, 100, 100, 255), "Panel border top")
+panel_border_bottom = load_image_or_placeholder('asset/hud/Panel-border-bottom.png', (32, 32), (100, 100, 100, 255), "Panel border bottom")
+panel_border_left = load_image_or_placeholder('asset/hud/Panel-border-left.png', (32, 32), (100, 100, 100, 255), "Panel border left")
+panel_border_right = load_image_or_placeholder('asset/hud/Panel-border-right.png', (32, 32), (100, 100, 100, 255), "Panel border right")
+panel_center = load_image_or_placeholder('asset/hud/Panel-center.png', (32, 32), (100, 100, 100, 255), "Panel center")
+
+def create_custom_panel(width, height):
+    """
+    Create a custom panel using 9-slice technique.
+    Args:
+        width: Total panel width in pixels
+        height: Total panel height in pixels
+    Returns:
+        pygame.Surface with the panel drawn
+    """
+    # Get corner sizes (assuming corners are square)
+    corner_size = panel_corner_tl.get_width()
+    
+    # Calculate center area dimensions
+    center_width = max(0, width - (corner_size * 2))
+    center_height = max(0, height - (corner_size * 2))
+    
+    # Create output surface
+    panel_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    
+    # Draw corners
+    panel_surface.blit(panel_corner_tl, (0, 0))
+    panel_surface.blit(panel_corner_tr, (width - corner_size, 0))
+    panel_surface.blit(panel_corner_bl, (0, height - corner_size))
+    panel_surface.blit(panel_corner_br, (width - corner_size, height - corner_size))
+    
+    # Draw borders (stretched to fit)
+    if center_width > 0:
+        # Top and bottom borders
+        top_border = pygame.transform.scale(panel_border_top, (center_width, corner_size))
+        bottom_border = pygame.transform.scale(panel_border_bottom, (center_width, corner_size))
+        panel_surface.blit(top_border, (corner_size, 0))
+        panel_surface.blit(bottom_border, (corner_size, height - corner_size))
+    
+    if center_height > 0:
+        # Left and right borders
+        left_border = pygame.transform.scale(panel_border_left, (corner_size, center_height))
+        right_border = pygame.transform.scale(panel_border_right, (corner_size, center_height))
+        panel_surface.blit(left_border, (0, corner_size))
+        panel_surface.blit(right_border, (width - corner_size, corner_size))
+    
+    # Draw center (tiled or stretched)
+    if center_width > 0 and center_height > 0:
+        center_tile = pygame.transform.scale(panel_center, (center_width, center_height))
+        panel_surface.blit(center_tile, (corner_size, corner_size))
+    
+    return panel_surface
 
 # Upgrade panel image - extract 3 frames (375x475 each) - for upgrade progress indicator
 upgrade_panel_sheet = None
@@ -1059,6 +1132,67 @@ try:
 except Exception as e:
     print(f"Warning: Failed to load BuildingButton.png: {e}")
     building_button_image = None
+
+# Load recruitment button image
+recruitment_button_image = None
+try:
+    recruitment_button_image = pygame.image.load('asset/hud/Button.png').convert_alpha()
+    print(f"Loaded recruitment button image: {recruitment_button_image.get_size()}")
+except Exception as e:
+    print(f"Warning: Failed to load Button.png: {e}")
+    recruitment_button_image = None
+
+# Button usable area: (11, 15) to (138, 45)
+# This means content should be positioned at x: 11, y: 15 relative to button top-left
+# Usable area size: 127x30 pixels
+BUTTON_USABLE_AREA_X = 11
+BUTTON_USABLE_AREA_Y = 15
+BUTTON_USABLE_AREA_WIDTH = 127  # 138 - 11
+BUTTON_USABLE_AREA_HEIGHT = 30  # 45 - 15
+
+
+def draw_recruitment_tooltip(surface: pygame.Surface, button_rect: pygame.Rect, title: str, cost: int,
+                              can_afford: bool = True):
+    """Draw a tooltip for recruitment buttons (hire survivor / droid)."""
+    lines = []
+    tooltip_font = custom_font_small if custom_font_small else pygame.font.Font(None, 24)
+    font_height = tooltip_font.get_height() if hasattr(tooltip_font, 'get_height') else 24
+    line_spacing = 6
+    padding = 10
+    
+    lines.append((title, (235, 240, 250)))
+    if cost is not None:
+        cost_color = (235, 240, 250) if can_afford else (255, 120, 120)
+        lines.append((f"Cost: {cost} coins", cost_color))
+    
+    if not lines:
+        return
+    
+    text_surfaces = []
+    max_width = 0
+    for text, color in lines:
+        surface_text = tooltip_font.render(text, True, color)
+        text_surfaces.append(surface_text)
+        max_width = max(max_width, surface_text.get_width())
+    
+    tooltip_width = max_width + padding * 2
+    tooltip_height = len(text_surfaces) * (font_height + line_spacing) - line_spacing + padding * 2
+    
+    tooltip_x = button_rect.right + 12
+    tooltip_y = button_rect.top
+    
+    if tooltip_x + tooltip_width > c.SCREEN_WIDTH - 10:
+        tooltip_x = button_rect.left - tooltip_width - 12
+    tooltip_y = max(10, min(tooltip_y, c.SCREEN_HEIGHT - tooltip_height - 10))
+    
+    tooltip_rect = pygame.Rect(tooltip_x, tooltip_y, tooltip_width, tooltip_height)
+    pygame.draw.rect(surface, (35, 40, 55), tooltip_rect, border_radius=6)
+    pygame.draw.rect(surface, (107, 199, 255), tooltip_rect, width=2, border_radius=6)
+    
+    current_y = tooltip_rect.y + padding
+    for text_surface in text_surfaces:
+        surface.blit(text_surface, (tooltip_rect.x + padding, current_y))
+        current_y += font_height + line_spacing
 
 # Grass tile images (day and night variants)
 def load_grass_variants(sheet_path, default_color=(50, 100, 50)):
@@ -1595,7 +1729,7 @@ world.visual_phase = wave_manager.state
 input_buffer = InputBuffer(buffer_duration=0.125)  # 125ms buffer
 
 # Initialize UI components with pixel fonts
-hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, font_large, font_medium, font_small, hq_health_bar_frames)
+hud = HUD(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, daycounter_frames, red_number_frames, blue_number_frames, yellow_number_frames, font_large, font_medium, font_small, hq_health_bar_frames)
 # Set HUD reference in world for day events
 world.hud = hud
 
@@ -1624,7 +1758,10 @@ building_panel = BuildingPanel(
     font_small=custom_font_small if custom_font_small else font_small,
     font_blue=custom_font_blue_medium_panel if custom_font_blue_medium_panel else custom_font_medium if custom_font_medium else font_medium,  # Blue for hover
     font_red=custom_font_red_medium_panel if custom_font_red_medium_panel else font_medium,  # Red for demolish/unavailable
-    font_yellow=custom_font_medium if custom_font_medium else font_medium  # Yellow for default
+    font_yellow=custom_font_medium if custom_font_medium else font_medium,  # Yellow for default
+    yellow_number_frames=yellow_number_frames,
+    red_number_frames=red_number_font_frames,
+    blue_number_frames=blue_number_font_frames
 )
 # Create scaled versions for tooltip fonts
 custom_font_blue_medium = create_scaled_custom_font(custom_font_blue, 1.45, 32) if custom_font_blue else None  # ~32px for tooltips
@@ -1632,12 +1769,18 @@ custom_font_blue_small = create_scaled_custom_font(custom_font_blue, 1.09, 24) i
 custom_font_red_medium = create_scaled_custom_font(custom_font_red, 1.45, 32) if custom_font_red else None  # ~32px for warnings
 custom_font_red_small = create_scaled_custom_font(custom_font_red, 1.09, 24) if custom_font_red else None  # ~24px for warnings
 
+if 'pause_menu' in globals():
+    pause_menu.font_selected = custom_font_blue_medium if custom_font_blue_medium else pause_menu.font_medium
+
 tooltip_manager = BuildTooltipManager(
     build_item_config, 
     (c.SCREEN_WIDTH, c.SCREEN_HEIGHT),
     font_blue=custom_font_blue_medium if custom_font_blue_medium else custom_font_medium,  # Blue for hover/selection
     font_red=custom_font_red_small if custom_font_red_small else font_small,  # Red for warnings/unavailable
-    font_yellow=custom_font_small if custom_font_small else font_small  # Yellow for default
+    font_yellow=custom_font_small if custom_font_small else font_small,  # Yellow for default
+    yellow_number_frames=yellow_number_frames,
+    red_number_frames=red_number_font_frames,
+    blue_number_frames=blue_number_font_frames
 )
 
 
@@ -2162,8 +2305,8 @@ def spawn_daily_resource_nodes():
                     if panel_area.collidepoint(node_x_px, node_y_px):
                         in_building_panel_area = True
                 
-                # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
-                ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
+                # Check if position is in the bottom UI area (invisible rect: (0,960) to (1550,1080))
+                ui_exclusion_rect = pygame.Rect(0, 960, 1550, 1080 - 960)
                 in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
                 
                 # Ensure position is valid and not too close to compound and not in building panel or UI exclusion area
@@ -2909,7 +3052,7 @@ building_types = [
     (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
     (GatlingTurret, "Gatling", (200, 150, 100), gatling_sprite_sheets, gatling_base_images),
     (PiercerTurret, "Piercer", (150, 100, 150), railgun_sprite_sheets, railgun_base_images),
-    (FlamethrowerTurret, "Flamethrower", (255, 100, 0), flamethrower_sprite_sheets, flamethrower_base_images),
+    (FlamethrowerTurret, "flame\nThrower", (255, 100, 0), flamethrower_sprite_sheets, flamethrower_base_images),
     (WallWood, "Wall", (120, 120, 120)),  # WallWood is level 1 wall, unlocked via perimeter_fortification
     (Gate, "Gate", (100, 100, 100)),
     (Farm, "Farm", (100, 150, 100)),
@@ -2988,20 +3131,41 @@ class HireSurvivorButton:
         self.text = "Hire Survivor"
         self.enabled = True
         self.rect = pygame.Rect(x, y, width, height)
+        # Scale button image to match button size
+        if recruitment_button_image:
+            self.button_image = pygame.transform.scale(recruitment_button_image, (width, height))
+        else:
+            self.button_image = None
+        self.current_scale = 1.0
     
     def draw(self, screen: pygame.Surface):
         """Draw the hire survivor button."""
-        # Draw button background
-        bg_color = (60, 80, 100) if self.enabled else (40, 40, 40)
-        pygame.draw.rect(screen, bg_color, self.rect)
-        pygame.draw.rect(screen, (200, 200, 200) if self.enabled else (100, 100, 100), self.rect, 2)
+        mouse_pos = pygame.mouse.get_pos()
+        is_hovered = self.rect.collidepoint(mouse_pos) and self.enabled
+        target_scale = 1.05 if is_hovered else 1.0
+        self.current_scale += (target_scale - self.current_scale) * 0.2
+        draw_scale = self.current_scale
+        scaled_width = int(self.width * draw_scale)
+        scaled_height = int(self.height * draw_scale)
+        draw_rect = pygame.Rect(0, 0, scaled_width, scaled_height)
+        draw_rect.center = self.rect.center
+
+        if self.button_image:
+            scaled_image = pygame.transform.smoothscale(self.button_image, (scaled_width, scaled_height))
+            screen.blit(scaled_image, draw_rect.topleft)
+        else:
+            bg_color = (60, 80, 100) if self.enabled else (40, 40, 40)
+            fallback_surface = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
+            fallback_surface.fill(bg_color)
+            pygame.draw.rect(fallback_surface, (200, 200, 200) if self.enabled else (100, 100, 100),
+                             fallback_surface.get_rect(), 2)
+            screen.blit(fallback_surface, draw_rect.topleft)
         
-        # Draw text
-        font = pygame.font.Font(None, 24)
+        button_font = custom_font_tiny if custom_font_tiny else pygame.font.Font(None, 24)
         text_color = (255, 255, 255) if self.enabled else (150, 150, 150)
-        label = font.render(self.text, True, text_color)
-        label_rect = label.get_rect(center=(self.rect.centerx, self.rect.centery))
-        screen.blit(label, label_rect)
+        label = button_font.render(self.text, True, text_color)
+        text_rect = label.get_rect(center=draw_rect.center)
+        screen.blit(label, text_rect)
     
     def handle_click(self, mouse_pos: tuple) -> bool:
         """Handle mouse click on button."""
@@ -3010,11 +3174,157 @@ class HireSurvivorButton:
             return True
         return False
 
-hire_survivor_button = HireSurvivorButton(25, 200, 150, 40, hire_survivor_callback)
+hire_survivor_button = HireSurvivorButton(25, 200, 240, 60, hire_survivor_callback)
+
+# Droid purchase costs
+DRILLING_DROID_COST = 100  # coins
+WOOD_CUTTING_DROID_COST = 100  # coins
+
+def purchase_drilling_droid():
+    """Purchase a drilling droid (cost: 100 coins)"""
+    global survivor_group, building_group, resources, world
+    
+    # Check if player has enough coins
+    if resources.coins < DRILLING_DROID_COST:
+        return False
+    
+    # Find HQ position
+    hq_pos = None
+    if world and hasattr(world, 'hq') and world.hq:
+        hq_pos = world.hq.pos
+    else:
+        for building in building_group:
+            if isinstance(building, HQ):
+                hq_pos = building.pos
+                break
+    
+    if not hq_pos:
+        return False
+    
+    # Deduct coins
+    resources.coins -= DRILLING_DROID_COST
+    
+    # Spawn droid near HQ with slight random offset
+    import random
+    offset_x = random.randint(-50, 50)
+    offset_y = random.randint(30, 60)
+    droid_pos = (hq_pos.x + offset_x, hq_pos.y + offset_y)
+    droid = DrillingDroid(droid_pos, world=world)
+    survivor_group.add(droid)
+    
+    print(f"Purchased drilling droid at ({droid_pos[0]:.1f}, {droid_pos[1]:.1f}), cost: {DRILLING_DROID_COST} coins")
+    return True
+
+def purchase_wood_cutting_droid():
+    """Purchase a wood cutting droid (cost: 100 coins)"""
+    global survivor_group, building_group, resources, world
+    
+    # Check if player has enough coins
+    if resources.coins < WOOD_CUTTING_DROID_COST:
+        return False
+    
+    # Find HQ position
+    hq_pos = None
+    if world and hasattr(world, 'hq') and world.hq:
+        hq_pos = world.hq.pos
+    else:
+        for building in building_group:
+            if isinstance(building, HQ):
+                hq_pos = building.pos
+                break
+    
+    if not hq_pos:
+        return False
+    
+    # Deduct coins
+    resources.coins -= WOOD_CUTTING_DROID_COST
+    
+    # Spawn droid near HQ with slight random offset
+    import random
+    offset_x = random.randint(-50, 50)
+    offset_y = random.randint(30, 60)
+    droid_pos = (hq_pos.x + offset_x, hq_pos.y + offset_y)
+    droid = WoodCuttingDroid(droid_pos, world=world)
+    survivor_group.add(droid)
+    
+    print(f"Purchased wood cutting droid at ({droid_pos[0]:.1f}, {droid_pos[1]:.1f}), cost: {WOOD_CUTTING_DROID_COST} coins")
+    return True
+
+def purchase_drilling_droid_callback():
+    """Callback for drilling droid purchase button"""
+    if purchase_drilling_droid():
+        sound_system.play("upgrade")  # Use upgrade sound for now
+    else:
+        sound_system.play("error")  # Use error sound if can't afford
+
+def purchase_wood_cutting_droid_callback():
+    """Callback for wood cutting droid purchase button"""
+    if purchase_wood_cutting_droid():
+        sound_system.play("upgrade")  # Use upgrade sound for now
+    else:
+        sound_system.play("error")  # Use error sound if can't afford
+
+class PurchaseDroidButton:
+    """Button for purchasing droids"""
+    def __init__(self, x, y, width, height, text, callback, cost):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.width = width
+        self.height = height
+        self.text = text
+        self.callback = callback
+        self.cost = cost
+        self.enabled = True
+        # Scale button image to match button size
+        if recruitment_button_image:
+            self.button_image = pygame.transform.scale(recruitment_button_image, (width, height))
+        else:
+            self.button_image = None
+        self.current_scale = 1.0
+        
+    def draw(self, screen):
+        """Draw the button"""
+        mouse_pos = pygame.mouse.get_pos()
+        is_hovered = self.rect.collidepoint(mouse_pos) and self.enabled
+        target_scale = 1.05 if is_hovered else 1.0
+        self.current_scale += (target_scale - self.current_scale) * 0.2
+        draw_scale = self.current_scale
+        scaled_width = int(self.width * draw_scale)
+        scaled_height = int(self.height * draw_scale)
+        draw_rect = pygame.Rect(0, 0, scaled_width, scaled_height)
+        draw_rect.center = self.rect.center
+
+        if self.button_image:
+            scaled_image = pygame.transform.smoothscale(self.button_image, (scaled_width, scaled_height))
+            screen.blit(scaled_image, draw_rect.topleft)
+        else:
+            color = (80, 80, 120) if self.enabled else (100, 100, 100)
+            fallback_surface = pygame.Surface((scaled_width, scaled_height), pygame.SRCALPHA)
+            fallback_surface.fill(color)
+            pygame.draw.rect(fallback_surface, (200, 200, 200), fallback_surface.get_rect(), 2)
+            screen.blit(fallback_surface, draw_rect.topleft)
+        
+        button_font = custom_font_tiny if custom_font_tiny else pygame.font.Font(None, 24)
+        text_color = (255, 255, 255) if self.enabled else (150, 150, 150)
+        text_surface = button_font.render(self.text, True, text_color)
+        text_rect = text_surface.get_rect(center=draw_rect.center)
+        screen.blit(text_surface, text_rect)
+    
+    def handle_click(self, pos):
+        """Handle button click"""
+        if self.enabled and self.rect.collidepoint(pos):
+            self.callback()
+            return True
+        return False
+
+# Create droid purchase buttons
+drilling_droid_button = PurchaseDroidButton(25, 270, 240, 60, f"Drill Droid ({DRILLING_DROID_COST})", purchase_drilling_droid_callback, DRILLING_DROID_COST)
+wood_cutting_droid_button = PurchaseDroidButton(25, 340, 240, 60, f"Wood Droid ({WOOD_CUTTING_DROID_COST})", purchase_wood_cutting_droid_callback, WOOD_CUTTING_DROID_COST)
 
 # Research panel UI
 research_panel_ui = ResearchPanel(world, research_manager, c.SCREEN_WIDTH, c.SCREEN_HEIGHT,
-                                  font_large=font_large, font_medium=font_medium, font_small=font_small)
+                                  font_large=font_large, font_medium=font_medium, font_small=font_small,
+                                  custom_font_yellow=custom_font_medium if custom_font_medium else None,
+                                  yellow_number_frames=yellow_number_frames)
 
 ###################
 # Helper functions
@@ -3144,28 +3454,33 @@ def draw_resources(screen, resources, font):
     padding = 12  # Internal padding inside the panel
     panel_x = 25  # Position from left edge (slightly inset)
     
-    # Prepare resource data with labels and colors
+    # Prepare resource data with labels, values, and number colors
     resource_data = [
-        ("Wood", int(wood_val), (255, 255, 255)),
-        ("Iron", int(iron_val), (255, 255, 255)),
-        ("Food", int(food_val), (255, 255, 255)),
-        ("Coins", int(coins_val), (255, 215, 0)),  # Gold color for coins
-        ("Zombies", len(enemy_group), (255, 120, 120)),  # Light red for zombies
+        ("Wood", int(wood_val), "yellow"),
+        ("Iron", int(iron_val), "yellow"),
+        ("Food", int(food_val), "yellow"),
+        ("Coins", int(coins_val), "yellow"),  # Yellow for coins
+        ("Zombies", len(enemy_group), "red"),  # Red for zombies
     ]
     
-    # Render all text surfaces and calculate panel dimensions
-    text_surfaces = []
+    # Render label text surfaces and calculate panel dimensions
+    label_surfaces = []
     max_width = 0
-    for label, value, color in resource_data:
-        text = f"{label}: {value}"
+    for label, value, number_color in resource_data:
+        # Render label text
+        label_text = f"{label}: "
         if label == "Zombies" and custom_font_red:
-            # Use red custom font for zombie counter if available
+            # Use red custom font for zombie label if available
             zombie_font = create_scaled_custom_font(custom_font_red, 1.09, 24) if custom_font_red else resource_font
-            text_surface = zombie_font.render(text, True, color)
+            label_surface = zombie_font.render(label_text, True, (255, 120, 120))
         else:
-            text_surface = resource_font.render(text, True, color)
-        text_surfaces.append((text_surface, label, value, color))
-        max_width = max(max_width, text_surface.get_width())
+            label_surface = resource_font.render(label_text, True, (255, 255, 255))
+        
+        # Calculate width: label width + number width (approximate)
+        number_width = len(str(value)) * 17  # 17 pixels per digit
+        total_width = label_surface.get_width() + number_width
+        label_surfaces.append((label_surface, label, value, number_color, total_width))
+        max_width = max(max_width, total_width)
     
     # Calculate panel dimensions
     panel_width = max_width + padding * 2
@@ -3183,8 +3498,22 @@ def draw_resources(screen, resources, font):
     
     # Draw resource text lines vertically with proper spacing
     current_y = panel_y + padding
-    for text_surface, label, value, color in text_surfaces:
-        screen.blit(text_surface, (panel_x + padding, current_y))
+    for label_surface, label, value, number_color, total_width in label_surfaces:
+        # Draw label
+        screen.blit(label_surface, (panel_x + padding, current_y))
+        
+        # Draw number using number fonts
+        number_x = panel_x + padding + label_surface.get_width()
+        # Get font height - handle both CustomFont and pygame.font.Font
+        if hasattr(resource_font, 'letter_height'):
+            font_height = resource_font.letter_height  # CustomFont
+        elif hasattr(resource_font, 'get_height'):
+            font_height = resource_font.get_height()  # pygame.font.Font
+        else:
+            font_height = 24  # Fallback
+        number_y = current_y + (font_height - 22) // 2 + 5  # Center vertically with text, then move down 5px
+        building_panel.draw_number(screen, value, number_x, number_y, color=number_color)
+        
         current_y += line_height
     
     # DEBUG: Draw overlay rectangle for resource display area
@@ -3539,9 +3868,24 @@ while running:
             text_color = (255, 255, 255)  # White color with yellow font
         
         # Draw text on top of button
-        text_surface = button_font.render(label, True, text_color)
-        text_rect = text_surface.get_rect(center=button_obj.rect.center)
-        screen.blit(text_surface, text_rect)
+        # Handle multi-line text (for Flamethrower button)
+        if '\n' in label:
+            # Split into lines and render each line
+            lines = label.split('\n')
+            line_height = button_font.get_height() if hasattr(button_font, 'get_height') else 12
+            line_spacing = line_height + 8 # Add extra spacing between lines (4 pixels)
+            total_height = (len(lines) - 1) * line_spacing + line_height
+            start_y = button_obj.rect.centery - total_height // 2 + line_height // 2
+            
+            for i, line in enumerate(lines):
+                text_surface = button_font.render(line, True, text_color)
+                text_rect = text_surface.get_rect(centerx=button_obj.rect.centerx, centery=start_y + i * line_spacing)
+                screen.blit(text_surface, text_rect)
+        else:
+            # Single line text (normal case)
+            text_surface = button_font.render(label, True, text_color)
+            text_rect = text_surface.get_rect(center=button_obj.rect.center)
+            screen.blit(text_surface, text_rect)
         
         # Draw highlight for selected button
         if is_selected:
@@ -4084,11 +4428,10 @@ while running:
                 pygame.draw.line(screen, (200, 200, 0), (px, line_y), (px + w * TILE, line_y), 1)
     
     ###################
-    # Draw nodes (hide when building panel is visible)
+    # Draw nodes
     ###################
-    if not building_panel.is_visible:
-        for node in node_group:
-            node.draw(screen)
+    for node in node_group:
+        node.draw(screen)
     
     ###################
     # Draw survivors
@@ -4288,13 +4631,53 @@ while running:
             # Only show button if hiring is unlocked
             if hiring_unlocked:
                 # Show tooltip if disabled
-                if not can_hire:
-                    hire_survivor_button.text = f"Hire ({world.get_current_survivor_count()}/{world.get_max_survivors()})"
-                elif not can_afford:
-                    hire_survivor_button.text = f"Hire ({HIRE_SURVIVOR_COST} coins)"
-                else:
-                    hire_survivor_button.text = f"Hire Survivor ({HIRE_SURVIVOR_COST} coins)"
+                hire_survivor_button.text = "Hire Survivor"
                 hire_survivor_button.draw(screen)
+                
+                if hire_survivor_button.rect.collidepoint(mouse_pos):
+                    draw_recruitment_tooltip(
+                        screen,
+                        hire_survivor_button.rect,
+                        "Hire Survivor",
+                        HIRE_SURVIVOR_COST,
+                        can_afford
+                    )
+        
+        # Draw droid purchase buttons (below hire survivor button)
+        # Check if droids are unlocked through research
+        droids_unlocked = research_manager.is_unlocked("drilling_droid") and research_manager.is_unlocked("wood_cutting_droid")
+        if droids_unlocked:
+            # Update button states
+            can_afford_drilling = resources.coins >= DRILLING_DROID_COST
+            can_afford_wood = resources.coins >= WOOD_CUTTING_DROID_COST
+            
+            drilling_droid_button.enabled = can_afford_drilling
+            wood_cutting_droid_button.enabled = can_afford_wood
+            
+            # Update button text
+            drilling_droid_button.text = "Drill Droid"
+            wood_cutting_droid_button.text = "Wood Droid"
+            
+            drilling_droid_button.draw(screen)
+            wood_cutting_droid_button.draw(screen)
+            
+            if drilling_droid_button.rect.collidepoint(mouse_pos):
+                draw_recruitment_tooltip(
+                    screen,
+                    drilling_droid_button.rect,
+                    "Drilling Droid",
+                    DRILLING_DROID_COST,
+                    can_afford_drilling
+                )
+            
+            if wood_cutting_droid_button.rect.collidepoint(mouse_pos):
+                draw_recruitment_tooltip(
+                    screen,
+                    wood_cutting_droid_button.rect,
+                    "Wood Cutting Droid",
+                    WOOD_CUTTING_DROID_COST,
+                    can_afford_wood
+                )
     
     ################### 
     # Update debug info
@@ -4478,6 +4861,10 @@ while running:
             
             # Handle hire survivor button click
             if hire_survivor_button and hire_survivor_button.handle_click(mouse_pos):
+                continue
+            if drilling_droid_button and drilling_droid_button.handle_click(mouse_pos):
+                continue
+            if wood_cutting_droid_button and wood_cutting_droid_button.handle_click(mouse_pos):
                 continue  # Sound already played in callback
             
             # Research panel click handling

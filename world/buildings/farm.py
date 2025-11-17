@@ -61,6 +61,8 @@ class Farm(Building):
             self.farm_variant = random.choice(Farm.farm_variants)
         else:
             self.farm_variant = None
+        
+        self.selected = False
     
     def draw(self, surface: pygame.Surface):
         """Draw farm with selected variant"""
@@ -93,4 +95,8 @@ class Farm(Building):
         
         self.rect = self.image.get_rect(center=self.pos)
         surface.blit(self.image, self.rect)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
 

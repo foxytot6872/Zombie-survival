@@ -20,6 +20,7 @@ class PauseMenu:
         self.screen_height = screen_height
         self.font_large = font_large if font_large else pygame.font.Font(None, 72)
         self.font_medium = font_medium if font_medium else pygame.font.Font(None, 48)
+        self.font_selected = self.font_medium
         
         self.is_visible = False
         self.selected_option = 0
@@ -132,8 +133,9 @@ class PauseMenu:
         option_height = 60
         
         for i, option in enumerate(self.options):
-            if i == self.selected_option:
-                color = (255, 255, 0)
+            is_selected = (i == self.selected_option)
+            option_font = self.font_selected if is_selected and self.font_selected else self.font_medium
+            if is_selected:
                 # Draw selection indicator
                 indicator_rect = pygame.Rect(
                     self.screen_width // 2 - 150,
@@ -142,10 +144,9 @@ class PauseMenu:
                     option_height
                 )
                 pygame.draw.rect(surface, (100, 100, 100, 128), indicator_rect)
-            else:
-                color = (255, 255, 255)
+            color = (255, 255, 255)
             
-            option_surface = self.font_medium.render(option, True, color)
+            option_surface = option_font.render(option, True, color)
             option_rect = option_surface.get_rect(center=(self.screen_width // 2, y_offset))
             surface.blit(option_surface, option_rect)
             y_offset += option_height
@@ -153,6 +154,6 @@ class PauseMenu:
         # Draw instructions
         inst_text = "Press ESC to Resume | Arrow Keys to Navigate | Enter to Select"
         inst_surface = self.font_medium.render(inst_text, True, (200, 200, 200))
-        inst_rect = inst_surface.get_rect(center=(self.screen_width // 2, self.screen_height // 2 + 150))
+        inst_rect = inst_surface.get_rect(center=(self.screen_width // 2, self.screen_height - 200))
         surface.blit(inst_surface, inst_rect)
 

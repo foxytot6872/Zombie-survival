@@ -9,7 +9,7 @@ from upgrade_config import get_next_turret_upgrade
 class BuildingPanel:
     """Building panel UI for upgrade and repair"""
     
-    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None, font_large=None, font_medium=None, font_small=None, font_blue=None, font_red=None, font_yellow=None):
+    def __init__(self, screen_width: int = 1920, screen_height: int = 1080, upgrade_panel_frames=None, upgrade_panel_darken_frames=None, panel_background_frames=None, upgrade_button_frames=None, demolish_button_frames=None, health_bar_frames=None, current_level_frames=None, next_level_frames=None, font_large=None, font_medium=None, font_small=None, font_blue=None, font_red=None, font_yellow=None, yellow_number_frames=None, red_number_frames=None, blue_number_frames=None):
         """
         Initialize building panel.
         Args:
@@ -26,6 +26,9 @@ class BuildingPanel:
             font_large: Optional pygame.font.Font for large text (defaults to system font)
             font_medium: Optional pygame.font.Font for medium text (defaults to system font)
             font_small: Optional pygame.font.Font for small text (defaults to system font)
+            yellow_number_frames: List of 10 frames (17x22 each) for yellow numbers (0-9)
+            red_number_frames: List of 10 frames (17x22 each) for red numbers (0-9)
+            blue_number_frames: List of 10 frames (17x22 each) for blue numbers (0-9)
         """
         self.screen_width = screen_width
         self.screen_height = screen_height
@@ -96,6 +99,11 @@ class BuildingPanel:
         self.health_bar_frames = health_bar_frames if health_bar_frames else []
         self.current_level_frames = current_level_frames if current_level_frames else []
         self.next_level_frames = next_level_frames if next_level_frames else []
+        
+        # Number font frames (17x22 each, 0-9)
+        self.yellow_number_frames = yellow_number_frames if yellow_number_frames else []
+        self.red_number_frames = red_number_frames if red_number_frames else []
+        self.blue_number_frames = blue_number_frames if blue_number_frames else []
         
         self.on_upgrade: Optional[Callable] = None
         self.on_repair: Optional[Callable] = None
@@ -230,13 +238,14 @@ class BuildingPanel:
         
         # Building name - remove "turret" word, use smaller font, positioned at (45, 45)
         building_name = building.TYPE_ID.replace('_', ' ').title()
-        building_name = building_name.replace(' Turret', '').replace('turret', '')  # Remove turret from name
+        # Remove "turret" word (case-insensitive) and any leading/trailing spaces
+        building_name = building_name.replace('Turret ', '').replace(' Turret', '').replace('turret ', '').replace(' turret', '').strip()
         name_surface = self.font_small.render(building_name, True, (255, 255, 255))
         surface.blit(name_surface, (self.panel_rect.x + 45, self.panel_rect.y + 45))
         # Don't update y_offset since we're using fixed position
         
         # HP text (default yellow) - positioned at (45, 85) relative to panel
-        hp_text = f"HP: {building.hp} / {building.max_hp}"
+        hp_text = "HP"
         hp_surface = self.font_medium.render(hp_text, True, (255, 255, 255))
         surface.blit(hp_surface, (self.panel_rect.x + 45, self.panel_rect.y + 75))
         # Don't update y_offset since we're using fixed position
@@ -474,7 +483,7 @@ class BuildingPanel:
         # Draw demolish button at position (301, 0) relative to panel
         if self.demolish_button_frames and len(self.demolish_button_frames) > 0:
             demolish_button_x = self.panel_rect.x + 301
-            demolish_button_y = self.panel_rect.y - 7
+            demolish_button_y = self.panel_rect.y - 17
             
             # Get button dimensions from first frame
             demolish_button_width, demolish_button_height = self.demolish_button_frames[0].get_size()
@@ -518,6 +527,39 @@ class BuildingPanel:
             
             # Draw the demolish button
             surface.blit(demolish_button_frame, (demolish_button_x, demolish_button_y))
+    
+    def draw_number(self, surface: pygame.Surface, number: int, x: int, y: int, color: str = "yellow"):
+        """
+        Draw a number using sprite frames.
+        Args:
+            surface: Surface to draw on
+            number: Number to draw (0-9, or multi-digit)
+            x: X position (left edge)
+            y: Y position (top edge)
+            color: Color to use - "yellow", "red", or "blue" (default: "yellow")
+        """
+        # Select number frames based on color
+        if color == "red":
+            number_frames = self.red_number_frames
+        elif color == "blue":
+            number_frames = self.blue_number_frames
+        else:  # default to yellow
+            number_frames = self.yellow_number_frames
+        
+        if not number_frames or len(number_frames) < 10:
+            return
+        
+        # Convert number to string to get individual digits
+        number_str = str(number)
+        current_x = x
+        
+        for digit_char in number_str:
+            digit = int(digit_char)
+            if 0 <= digit <= 9:
+                digit_frame = number_frames[digit]
+                surface.blit(digit_frame, (current_x, y))
+                # Move to next digit position (reduce gap by 2px overlap)
+                current_x += digit_frame.get_width() - 2
     
     def _get_upgrade_cost(self, building: Building):
         """Get upgrade cost for building (per progress step, not per tier)"""

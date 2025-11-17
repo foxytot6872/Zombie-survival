@@ -18,6 +18,7 @@ class Housing(Building):
         super().__init__(grid_pos, tier, uid, world)
         # Use provided image or class-level image
         self.building_image = building_image if building_image is not None else Housing.building_image
+        self.selected = False
     
     def draw(self, surface: pygame.Surface):
         """Draw housing with custom image"""
@@ -74,4 +75,8 @@ class Housing(Building):
         # Update rect position (centered on the building's position)
         self.rect = self.image.get_rect(center=self.pos)
         surface.blit(self.image, self.rect)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
 

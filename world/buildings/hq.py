@@ -22,6 +22,7 @@ class HQ(Building):
         self.state = BuildState.ACTIVE
         self.hp = self.max_hp
         self.progress = 0.0
+        self.selected = False
     
     def update(self, dt, world=None):
         """Update HQ - optional tiny regen during day"""
@@ -129,6 +130,10 @@ class HQ(Building):
         # Update rect position (center on building position, accounting for extra height)
         self.rect = self.image.get_rect(center=self.pos)
         surface.blit(self.image, self.rect)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
     
     def on_destroy(self):
         """Called when HQ is destroyed"""

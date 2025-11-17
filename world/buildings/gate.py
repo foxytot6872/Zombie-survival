@@ -17,6 +17,7 @@ class Gate(Building):
         super().__init__(grid_pos, tier, uid, world)
         # Gates can be passable but still block placement
         self.passable = True
+        self.selected = False
         # Lazy-load sprite assets once per class
         if not hasattr(Gate, "_sprites"):
             Gate._sprites = self._load_sprites()
@@ -95,6 +96,10 @@ class Gate(Building):
         # Update rect position
         self.rect = self.image.get_rect(center=self.pos)
         surface.blit(self.image, self.rect)
+        
+        # Draw selection highlight
+        if self.selected and self.state == BuildState.ACTIVE:
+            pygame.draw.rect(surface, (255, 255, 0), self.rect, 2)
 
     def _load_sprites(self):
         """Load gate sprites for lv1/lv2. Returns dict like {'lv1': {...}, 'lv2': {...}}"""

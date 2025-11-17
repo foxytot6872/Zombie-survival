@@ -18,7 +18,7 @@ LINE_WIDTH = 10  # Thick pixel-art lines
 class ResearchPanel:
     """Popup research panel overlay that renders the node-based tech tree over the game."""
     
-    def __init__(self, world, research_manager, screen_width: int = 1920, screen_height: int = 1080, font_large=None, font_medium=None, font_small=None):
+    def __init__(self, world, research_manager, screen_width: int = 1920, screen_height: int = 1080, font_large=None, font_medium=None, font_small=None, custom_font_yellow=None, yellow_number_frames=None):
         """
         Initialize research panel.
         Args:
@@ -29,6 +29,8 @@ class ResearchPanel:
             font_large: Optional pygame.font.Font for large text (defaults to system font)
             font_medium: Optional pygame.font.Font for medium text (defaults to system font)
             font_small: Optional pygame.font.Font for small text (defaults to system font)
+            custom_font_yellow: Optional CustomFont for yellow text rendering
+            yellow_number_frames: Optional list of yellow number frames (17x22 each, 0-9)
         """
         self.world = world
         self.research = research_manager
@@ -60,6 +62,11 @@ class ResearchPanel:
         self.font_large = font_large if font_large else pygame.font.Font(None, 36)
         self.font_medium = font_medium if font_medium else pygame.font.Font(None, 28)
         self.font_small = font_small if font_small else pygame.font.Font(None, 24)
+        
+        # Custom font for coins display
+        self.custom_font_yellow = custom_font_yellow
+        # Number font frames (17x22 each, 0-9)
+        self.yellow_number_frames = yellow_number_frames if yellow_number_frames else []
         
         # Node data (tree inside panel)
         self.nodes = {}  # node_id -> ResearchNode
@@ -211,9 +218,52 @@ class ResearchPanel:
             screen.blit(panel_bg, self.rect)
         
         # Coins display in top-left of panel
-        coins_text = f"Coins: {int(self.world.resources.coins)}"
-        coins_surface = self.font_medium.render(coins_text, True, (255, 215, 0))
-        screen.blit(coins_surface, (self.rect.x + 50, self.rect.y + 50))
+        coins_value = int(self.world.resources.coins)
+        coins_x = self.rect.x + 50
+        coins_y = self.rect.y + 50
+        
+        # Draw "Coins: " label using custom font if available
+        label_text = "Coins: "
+        if self.custom_font_yellow:
+            label_surface = self.custom_font_yellow.render(label_text, True, (255, 215, 0))
+        else:
+            label_surface = self.font_medium.render(label_text, True, (255, 215, 0))
+        screen.blit(label_surface, (coins_x, coins_y))
+        
+        # Draw coin value using number fonts
+        if self.yellow_number_frames and len(self.yellow_number_frames) >= 10:
+            # Get font height for vertical centering
+            if hasattr(self.font_medium, 'letter_height'):
+                font_height = self.font_medium.letter_height
+            elif hasattr(self.font_medium, 'get_height'):
+                font_height = self.font_medium.get_height()
+            else:
+                font_height = 28
+            # Scale number frames to match font size
+            scale_factor = font_height / 22.0 if 22 > 0 else 1.0
+            
+            number_x = coins_x + label_surface.get_width()
+            number_y = coins_y + (font_height - int(22 * scale_factor)) // 2 + 3  # Move down 3px
+            
+            # Draw number using scaled frames
+            number_str = str(coins_value)
+            current_x = number_x
+            for digit_char in number_str:
+                digit = int(digit_char)
+                if 0 <= digit <= 9:
+                    digit_frame = self.yellow_number_frames[digit]
+                    if scale_factor != 1.0:
+                        scaled_width = int(digit_frame.get_width() * scale_factor)
+                        scaled_height = int(digit_frame.get_height() * scale_factor)
+                        digit_frame = pygame.transform.scale(digit_frame, (scaled_width, scaled_height))
+                    screen.blit(digit_frame, (current_x, number_y))
+                    # Reduce gap between digits by using actual width minus 2px overlap
+                    current_x += digit_frame.get_width() - 2
+        else:
+            # Fallback to text rendering if number frames not available
+            value_text = str(coins_value)
+            value_surface = self.font_medium.render(value_text, True, (255, 215, 0))
+            screen.blit(value_surface, (coins_x + label_surface.get_width(), coins_y))
 
         # Build and update tree nodes, then draw them
         self._build_tree_layout()
