@@ -2314,6 +2314,7 @@ def spawn_daily_resource_nodes():
         pass
     
     new_nodes = []
+    ui_exclusion_rect = pygame.Rect(0, 970, 1920, 1080 - 970)
     
     # Define cluster areas around the compound (4 quadrants + corners)
     # Each cluster will have nodes of the same type
@@ -2385,8 +2386,7 @@ def spawn_daily_resource_nodes():
                     if panel_area.collidepoint(node_x_px, node_y_px):
                         in_building_panel_area = True
                 
-                # Check if position is in the bottom UI area (invisible rect: (0,960) to (1550,1080))
-                ui_exclusion_rect = pygame.Rect(0, 960, 1550, 1080 - 960)
+                # Check if position is in the bottom UI area (invisible rect: (0,970) to (1500,1080))
                 in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
                 
                 # Ensure position is valid and not too close to compound and not in building panel or UI exclusion area
@@ -2465,8 +2465,6 @@ def spawn_daily_resource_nodes():
                 if panel_area.collidepoint(node_x_px, node_y_px):
                     in_building_panel_area = True
             
-            # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
-            ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
             in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
             
             if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
