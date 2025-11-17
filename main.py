@@ -13,7 +13,7 @@ from world.debug import DebugSystem
 from button import Button
 from world.map import Grid
 from world.resources import Resources
-from world.building import BuildState, Building
+from world.building import BuildState, Building, Cost
 from world.collision_map import CollisionMap
 # Core systems
 from core.wave_manager import WaveManager
@@ -289,7 +289,7 @@ gatling_base_lv2 = load_image_or_placeholder(
 )
 # Lv3 base is a sprite sheet with 4 frames (64x64 each) - 256x64 total
 gatling_base_lv3 = load_image_or_placeholder(
-    'asset/Turret/Tiwtir_gun_base_lv3.png',
+    'asset/Turret/Tiwtir_gun_base_lv3-Sheet.png',
     (256, 64),  # 4 frames * 64 = 256 pixels wide, 64 pixels tall
     (120, 100, 80, 255),
     "Gatling turret base Lv3 (sprite sheet)"
@@ -1391,6 +1391,12 @@ debug_movable_nodes = False  # True when player wants to move research nodes (M 
 # Build ghost responsiveness - track mouse position separately for instant updates
 build_ghost_grid_pos = None  # Grid position for build ghost (updated on MOUSEMOTION)
 build_ghost_can_place = False  # Whether current position is valid
+
+# Wall drag placement helpers
+wall_dragging = False
+wall_drag_start = None
+wall_drag_preview_tiles = []
+wall_drag_can_place = False
 
 # Building placement feedback
 placement_glow_tiles = []  # List of (grid_pos, time) for placement glow effects
@@ -3521,6 +3527,116 @@ def draw_preview(screen, grid_pos, can_place, footprint=(1, 1)):
     screen.blit(preview_surface, (px, py))
     pygame.draw.rect(screen, outline_color, (px, py, w * TILE, h * TILE), 2)
 
+def is_wall_building(building_class) -> bool:
+    type_id = getattr(building_class, "TYPE_ID", "").lower()
+    return type_id.startswith("wall")
+
+def cancel_wall_drag():
+    global wall_dragging, wall_drag_start, wall_drag_preview_tiles, wall_drag_can_place
+    wall_dragging = False
+    wall_drag_start = None
+    wall_drag_preview_tiles = []
+    wall_drag_can_place = False
+
+def compute_wall_line_tiles(start, end):
+    if start is None:
+        return []
+    sx, sy = start
+    ex = max(0, min(grid.width - 1, end[0]))
+    ey = max(0, min(grid.height - 1, end[1]))
+    tiles = []
+    if abs(ex - sx) >= abs(ey - sy):
+        step = 1 if ex >= sx else -1
+        stop = ex + step if step > 0 else ex - 1
+        for x in range(sx, stop, step):
+            tiles.append((x, sy))
+    else:
+        step = 1 if ey >= sy else -1
+        stop = ey + step if step > 0 else ey - 1
+        for y in range(sy, stop, step):
+            tiles.append((sx, y))
+    return tiles
+
+def max_wall_line_count(building_class, requested_count):
+    if requested_count <= 0:
+        return 0
+    cost = building_class.get_scaled_cost(world=world)
+    max_count = requested_count
+    if cost.wood > 0:
+        max_count = min(max_count, resources.wood // cost.wood)
+    if cost.iron > 0:
+        max_count = min(max_count, resources.iron // cost.iron)
+    if cost.food > 0:
+        max_count = min(max_count, resources.food // cost.food)
+    if cost.coins > 0:
+        max_count = min(max_count, resources.coins // cost.coins)
+    return max(max_count, 0)
+
+def get_wall_line_preview(start, end, building_class):
+    if not is_wall_building(building_class) or start is None:
+        return []
+    raw_line = compute_wall_line_tiles(start, end)
+    preview = []
+    for tile in raw_line:
+        if not can_place_building(building_class, tile, grid, building_group):
+            break
+        preview.append(tile)
+    if not preview:
+        return []
+    max_affordable = max_wall_line_count(building_class, len(preview))
+    if max_affordable <= 0:
+        return []
+    return preview[:max_affordable]
+
+def update_wall_drag_preview(current_grid):
+    global wall_drag_preview_tiles, wall_drag_can_place
+    if not (wall_dragging and selected_building_type):
+        wall_drag_preview_tiles = []
+        wall_drag_can_place = False
+        return
+    preview = get_wall_line_preview(wall_drag_start, current_grid, selected_building_type)
+    wall_drag_preview_tiles = preview
+    wall_drag_can_place = len(preview) > 0
+
+def build_wall_line_from_preview():
+    """Place multiple wall segments based on drag preview."""
+    global build_mode, selected_building_type, pending_construction
+    if not (wall_drag_preview_tiles and selected_building_type and is_wall_building(selected_building_type)):
+        return
+    if wave_manager.state != WaveManager.STATE_DAY:
+        hud.show_event("Can only build during Day Phase!", 2.0)
+        sound_system.play("button_click")
+        return
+    button_data = buttons.get(selected_building_type)
+    if not button_data:
+        return
+    built_count = 0
+    last_building = None
+    import time as time_module
+    for tile in wall_drag_preview_tiles:
+        if not can_place_building(selected_building_type, tile, grid, building_group):
+            continue
+        if not selected_building_type.pay_cost(resources, world):
+            break
+        building = create_building(selected_building_type, tile, *button_data['args'])
+        if not building:
+            continue
+        building_group.add(building)
+        if hasattr(building, 'world'):
+            building.world = world
+        building.start_construction()
+        grid.set_footprint_blocked(tile, selected_building_type.FOOTPRINT, True)
+        pending_construction = building
+        last_building = building
+        built_count += 1
+        placement_glow_tiles.append((tile, time_module.time()))
+    if built_count > 0:
+        sound_system.play("build_placed")
+        build_mode = False
+        cancel_wall_drag()
+        selected_building_type = None
+    else:
+        sound_system.play("error")
 def deselect_building():
     """Deselect currently selected building and hide panel."""
     global selected_building
@@ -3914,10 +4030,12 @@ while running:
                 # Deselect if clicking the same button
                 selected_building_type = None
                 build_mode = False
+                cancel_wall_drag()
             else:
                 # Select this building type
                 selected_building_type = building_class
                 build_mode = True
+                cancel_wall_drag()
                 # Deselect any selected building when entering build mode
                 deselect_building()
         
@@ -4728,41 +4846,56 @@ while running:
     # Draw preview when in build mode - use cached ghost position for responsiveness
     ###################
     if build_mode and selected_building_type:
-        # Use cached grid position (updated on MOUSEMOTION for instant response)
-        if build_ghost_grid_pos is None:
-            build_ghost_grid_pos = pixel_to_grid(mouse_pos)
-        grid_pos = build_ghost_grid_pos
-        can_place = build_ghost_can_place
-        
-        gx, gy = grid_pos
-        w, h = selected_building_type.FOOTPRINT
-        px = gx * TILE
-        py = gy * TILE
-        
-        # Draw tile highlights
-        for dx in range(w):
-            for dy in range(h):
-                tile_px = (gx + dx) * TILE
-                tile_py = (gy + dy) * TILE
+        if wall_dragging and is_wall_building(selected_building_type):
+            preview_tiles = wall_drag_preview_tiles if wall_drag_preview_tiles else []
+            if not preview_tiles and wall_drag_start:
+                preview_tiles = [wall_drag_start]
+            highlight_color = (0, 255, 0, 80) if wall_drag_can_place else (255, 0, 0, 80)
+            outline_color = (0, 255, 0) if wall_drag_can_place else (255, 0, 0)
+            for tile in preview_tiles:
+                gx, gy = tile
+                px = gx * TILE
+                py = gy * TILE
                 highlight = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
-                if can_place:
-                    highlight.fill((100, 200, 255, 40))  # Soft light-blue tint
-                else:
-                    highlight.fill((255, 100, 100, 40))  # Soft red tint
-                screen.blit(highlight, (tile_px, tile_py))
-        
-        # Draw preview ghost
-        if can_place:
-            color = (0, 255, 0, 100)
-            outline_color = (0, 255, 0)
+                highlight.fill(highlight_color)
+                screen.blit(highlight, (px, py))
+                pygame.draw.rect(screen, outline_color, (px, py, TILE, TILE), 1)
         else:
-            color = (255, 0, 0, 100)
-            outline_color = (255, 0, 0)
-        
-        preview_surface = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
-        preview_surface.fill(color)
-        screen.blit(preview_surface, (px, py))
-        pygame.draw.rect(screen, outline_color, (px, py, w * TILE, h * TILE), 2)
+            # Use cached grid position (updated on MOUSEMOTION for instant response)
+            if build_ghost_grid_pos is None:
+                build_ghost_grid_pos = pixel_to_grid(mouse_pos)
+            grid_pos = build_ghost_grid_pos
+            can_place = build_ghost_can_place
+            
+            gx, gy = grid_pos
+            w, h = selected_building_type.FOOTPRINT
+            px = gx * TILE
+            py = gy * TILE
+            
+            # Draw tile highlights
+            for dx in range(w):
+                for dy in range(h):
+                    tile_px = (gx + dx) * TILE
+                    tile_py = (gy + dy) * TILE
+                    highlight = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
+                    if can_place:
+                        highlight.fill((100, 200, 255, 40))  # Soft light-blue tint
+                    else:
+                        highlight.fill((255, 100, 100, 40))  # Soft red tint
+                    screen.blit(highlight, (tile_px, tile_py))
+            
+            # Draw preview ghost
+            if can_place:
+                color = (0, 255, 0, 100)
+                outline_color = (0, 255, 0)
+            else:
+                color = (255, 0, 0, 100)
+                outline_color = (255, 0, 0)
+            
+            preview_surface = pygame.Surface((w * TILE, h * TILE), pygame.SRCALPHA)
+            preview_surface.fill(color)
+            screen.blit(preview_surface, (px, py))
+            pygame.draw.rect(screen, outline_color, (px, py, w * TILE, h * TILE), 2)
     
     ###################
     # Draw gather mode indicator
@@ -4991,6 +5124,15 @@ while running:
             running = False
             continue
         
+        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if wall_dragging:
+                if wall_drag_can_place:
+                    build_wall_line_from_preview()
+                else:
+                    sound_system.play("error")
+                cancel_wall_drag()
+                continue
+        
         if game_state_manager.get_state() == GameState.SELECT_DIFFICULTY:
             if difficulty_screen.handle_event(event):
                 continue
@@ -5018,6 +5160,8 @@ while running:
                     or resources.coins < effective_cost.coins
                 ):
                     build_ghost_can_place = False
+                if wall_dragging and is_wall_building(selected_building_type):
+                    update_wall_drag_preview(build_ghost_grid_pos)
 
             # Debug: drag research nodes when research panel is open and movable nodes mode is ON
             if debug_movable_nodes and research_panel_ui.visible:
@@ -5159,6 +5303,19 @@ while running:
                 continue
             
             if build_mode and selected_building_type:
+                if is_wall_building(selected_building_type):
+                    if wave_manager.state != WaveManager.STATE_DAY:
+                        hud.show_event("Can only build during Day Phase!", 2.0)
+                        sound_system.play("button_click")
+                        continue
+                    grid_pos = pixel_to_grid(mouse_pos)
+                    if not can_place_building(selected_building_type, grid_pos, grid, building_group):
+                        sound_system.play("error")
+                        continue
+                    wall_dragging = True
+                    wall_drag_start = grid_pos
+                    update_wall_drag_preview(grid_pos)
+                    continue
                 # CONSTRUCTION RULES: Can only build/upgrade during Day Phase
                 if wave_manager.state != WaveManager.STATE_DAY:
                     hud.show_event("Can only build during Day Phase!", 2.0)
@@ -5189,6 +5346,7 @@ while running:
                         grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, False)
                         grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, True)
                         build_mode = False
+                        cancel_wall_drag()
                         print(f"Debug: Instant built {building_class_name} at {grid_pos}")
                         selected_building_type = None
                         sound_system.play("build_placed")
@@ -5208,6 +5366,7 @@ while running:
                             # Mark tiles as blocked
                             grid.set_footprint_blocked(grid_pos, selected_building_type.FOOTPRINT, True)
                             build_mode = False  # Exit build mode after placing
+                            cancel_wall_drag()
                             selected_building_type = None
                             pending_construction = building
                             
@@ -5240,6 +5399,7 @@ while running:
             if build_mode and selected_building_type:
                 build_mode = False
                 selected_building_type = None
+                cancel_wall_drag()
                 deselect_building()
                 print("Build mode cancelled (right-click)")
                 continue
@@ -5300,6 +5460,7 @@ while running:
                 input_buffer.add_input('key_g', {})
                 gather_mode = not gather_mode
                 build_mode = False  # Disable build mode when entering gather mode
+                cancel_wall_drag()
                 selected_building_type = None
                 sound_system.play("button_click")
                 if gather_mode:
@@ -5338,6 +5499,7 @@ while running:
                     continue
                 elif build_mode:
                     build_mode = False  # Exit build mode
+                    cancel_wall_drag()
                     selected_building_type = None
                     deselect_building()
                     continue
@@ -5350,6 +5512,7 @@ while running:
                         turret_group.remove(pending_construction)
                     pending_construction = None
                     build_mode = False
+                    cancel_wall_drag()
                     selected_building_type = None
                     print("Construction cancelled - 60% refund")
                     continue

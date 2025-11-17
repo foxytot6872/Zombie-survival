@@ -1089,53 +1089,48 @@ class Worker(Survivor):
         
         # Handle wall collisions using tile-based collision map (BEFORE movement)
         # Survivors ignore gates (can pass through them)
+        def tile_blocks(tile_x: int, tile_y: int) -> bool:
+            if not world or not hasattr(world, 'collision_map') or not world.collision_map:
+                return False
+            if not world.collision_map.is_solid(tile_x, tile_y):
+                return False
+            if world and hasattr(world, 'building_group'):
+                for building in world.building_group:
+                    if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
+                        building.grid_x == tile_x and building.grid_y == tile_y):
+                        building_type = getattr(building, 'TYPE_ID', '').lower()
+                        if building_type == 'gate':
+                            return False
+            return True
+        
         if world and hasattr(world, 'collision_map') and world.collision_map and hasattr(world, 'tile_size'):
-            # Convert position to tile index
             tile_x = int(self.pos.x // world.tile_size)
             tile_y = int(self.pos.y // world.tile_size)
+            if tile_blocks(tile_x, tile_y):
+                self.pos -= self.velocity * dt * 0.5
             
-            # Check if current tile is solid
-            if world.collision_map.is_solid(tile_x, tile_y):
-                # Check if it's a gate (survivors can pass through gates)
-                is_gate = False
-                if world and hasattr(world, 'building_group'):
-                    for building in world.building_group:
-                        if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
-                            building.grid_x == tile_x and building.grid_y == tile_y):
-                            building_type = getattr(building, 'TYPE_ID', '').lower()
-                            if building_type == 'gate':
-                                is_gate = True
-                                break
-                
-                # Only collide with walls/HQ (not gates)
-                if not is_gate:
-                    # Push survivor back out of the wall
-                    self.pos -= self.velocity * dt * 1.2
-            
-            # Check the tile we're moving into
             next_pos = self.pos + self.velocity * dt
             next_tile_x = int(next_pos.x // world.tile_size)
             next_tile_y = int(next_pos.y // world.tile_size)
             
-            if world.collision_map.is_solid(next_tile_x, next_tile_y):
-                # Check if it's a gate
-                is_gate = False
-                if world and hasattr(world, 'building_group'):
-                    for building in world.building_group:
-                        if (hasattr(building, 'grid_x') and hasattr(building, 'grid_y') and
-                            building.grid_x == next_tile_x and building.grid_y == next_tile_y):
-                            building_type = getattr(building, 'TYPE_ID', '').lower()
-                            if building_type == 'gate':
-                                is_gate = True
-                                break
-                
-                # Only collide with walls/HQ (not gates)
-                if not is_gate:
-                    # Prevent moving into wall
-                    self.pos -= self.velocity * dt * 1.2
-            
-            # Normal movement (if no collision)
-            self.pos += self.velocity * dt
+            if tile_blocks(next_tile_x, next_tile_y):
+                moved = False
+                if abs(self.velocity.x) > 0.1:
+                    tentative_x = self.pos.x + self.velocity.x * dt
+                    tile_x_only = int(tentative_x // world.tile_size)
+                    if not tile_blocks(tile_x_only, tile_y):
+                        self.pos.x = tentative_x
+                        moved = True
+                if not moved and abs(self.velocity.y) > 0.1:
+                    tentative_y = self.pos.y + self.velocity.y * dt
+                    tile_y_only = int(tentative_y // world.tile_size)
+                    if not tile_blocks(tile_x, tile_y_only):
+                        self.pos.y = tentative_y
+                        moved = True
+                if not moved:
+                    self.pos -= self.velocity * dt * 0.5
+            else:
+                self.pos = next_pos
         else:
             # Fallback: normal movement if no collision map
             self.pos += self.velocity * dt
