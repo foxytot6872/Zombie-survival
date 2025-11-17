@@ -1,34 +1,34 @@
 {
   "version": "1.0",
   "wave_manager": {
-    "night": 1,
-    "day": 1,
+    "night": 8,
+    "day": 8,
     "state": "SUMMARY",
     "difficulty": "easy",
     "enemies_killed": 0,
-    "enemies_spawned": 24,
+    "enemies_spawned": 15,
     "timer": 0.0
   },
   "resources": {
-    "wood": 350,
-    "iron": 350,
-    "food": 350
+    "wood": 466,
+    "iron": 349,
+    "food": 327
   },
   "buildings": [
     {
-      "uid": "2d3f20ac-eaa5-4a78-88e5-6cff0abeb841",
+      "uid": "9da61cc5-2946-4fde-a1b9-0cf43a1ccec3",
       "type": "hq",
       "grid": [
         29,
         14
       ],
       "tier": 1,
-      "hp": 1531,
+      "hp": 116.03049999998973,
       "state": "active",
       "progress": 0.0
     },
     {
-      "uid": "4cdc5f4a-2510-4407-a5b5-057834d98c33",
+      "uid": "5bb7f65a-f349-4c6d-a549-44f39b7f5523",
       "type": "turret_ballistic",
       "grid": [
         30,

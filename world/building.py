@@ -364,6 +364,13 @@ class Building(pygame.sprite.Sprite):
             self.max_hp = base_max_hp
 
     def update(self, dt: float, world=None):
+        # Apply HP regeneration from self-sealing technology if researched
+        if self.state == BuildState.ACTIVE and world and hasattr(world, 'modifiers'):
+            hp_regen = world.modifiers.get("building_hp_regen", 0.0)
+            if hp_regen > 0.0 and self.hp < self.max_hp:
+                # Regenerate HP (5 per second by default)
+                self.hp = min(self.max_hp, self.hp + hp_regen * dt)
+        
         if self.state == BuildState.CONSTRUCTING:
             self.progress += dt
             if self.progress >= self.BUILD_TIME:

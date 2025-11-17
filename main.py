@@ -2537,6 +2537,14 @@ def upgrade_building(building):
         return
 
     if building.tier < building.TIER_MAX:
+        # Check if gate level 2 upgrade requires structural_reinforcement research
+        from world.buildings.gate import Gate
+        if isinstance(building, Gate) and building.tier == 1:
+            # Gate level 1 -> level 2 requires structural_reinforcement research
+            if not research_manager.is_unlocked("gate_lv2"):
+                print("Gate level 2 requires Structural Reinforcement research.")
+                return
+        
         from world.building import Cost
         # Base upgrade multiplier (1.25× per tier level)
         upgrade_mult = 1.25
@@ -2857,7 +2865,7 @@ building_types = [
     (BallisticTurret, "Ballistic", (150, 100, 100), turret_sprite_sheets, turret_base_images),
     (GatlingTurret, "Gatling", (200, 150, 100), gatling_sprite_sheets, gatling_base_images),
     (PiercerTurret, "Piercer", (150, 100, 150), railgun_sprite_sheets, railgun_base_images),
-    (Wall, "Wall", (120, 120, 120)),
+    (WallWood, "Wall", (120, 120, 120)),  # WallWood is level 1 wall, unlocked via perimeter_fortification
     (Gate, "Gate", (100, 100, 100)),
     (Farm, "Farm", (100, 150, 100)),
     (Sawmill, "Sawmill", (139, 90, 43)),
@@ -2870,6 +2878,10 @@ building_to_research = {
     Sawmill: "sawmill",
     Smelter: "smelter",
     PiercerTurret: "railgun",  # Research "railgun" unlocks "railgun"
+    GatlingTurret: "gatling",  # Research "multibarrel_mechanism" unlocks "gatling"
+    WallWood: "wall_wood",  # Research "perimeter_fortification" unlocks "wall_wood"
+    WallIron: "wall_iron",  # Research "structural_reinforcement" unlocks "wall_iron"
+    Gate: "gate",  # Research "perimeter_fortification" unlocks "gate" (lv1)
 }
 
 # Store all building types for potential unlocking later
@@ -4217,15 +4229,19 @@ while running:
         if hire_survivor_button and world:
             can_afford = resources.coins >= HIRE_SURVIVOR_COST
             can_hire = world.can_hire_survivor()
-            hire_survivor_button.enabled = can_afford and can_hire
-            # Show tooltip if disabled
-            if not can_hire:
-                hire_survivor_button.text = f"Hire ({world.get_current_survivor_count()}/{world.get_max_survivors()})"
-            elif not can_afford:
-                hire_survivor_button.text = f"Hire ({HIRE_SURVIVOR_COST} coins)"
-            else:
-                hire_survivor_button.text = f"Hire Survivor ({HIRE_SURVIVOR_COST} coins)"
-            hire_survivor_button.draw(screen)
+            # Check if hiring is unlocked through research
+            hiring_unlocked = research_manager.is_unlocked("hire_survivor")
+            hire_survivor_button.enabled = can_afford and can_hire and hiring_unlocked
+            # Only show button if hiring is unlocked
+            if hiring_unlocked:
+                # Show tooltip if disabled
+                if not can_hire:
+                    hire_survivor_button.text = f"Hire ({world.get_current_survivor_count()}/{world.get_max_survivors()})"
+                elif not can_afford:
+                    hire_survivor_button.text = f"Hire ({HIRE_SURVIVOR_COST} coins)"
+                else:
+                    hire_survivor_button.text = f"Hire Survivor ({HIRE_SURVIVOR_COST} coins)"
+                hire_survivor_button.draw(screen)
     
     ################### 
     # Update debug info

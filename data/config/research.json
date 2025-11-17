@@ -50,7 +50,7 @@
 		"cost": 120,
 		"tier": 2,
 		"prerequisites": ["basic_woodworking"],
-		"unlocks": [],
+		"unlocks": ["wall_wood", "gate"],
 		"modifiers": {
 			"building_damage_taken_mult": 0.95
 		}
@@ -74,7 +74,7 @@
 		"cost": 180,
 		"tier": 3,
 		"prerequisites": ["agriculture"],
-		"unlocks": ["max_survivor_plus_2"],
+		"unlocks": ["max_survivor_plus_2", "hire_survivor"],
 		"modifiers": {
 			"max_survivors": 2
 		}
@@ -86,7 +86,7 @@
 		"cost": 200,
 		"tier": 3,
 		"prerequisites": ["perimeter_fortification","metalworking_fundamentals"],
-		"unlocks": [],
+		"unlocks": ["wall_iron", "gate_lv2"],
 		"modifiers": {
 			"building_hp_mult": 1.15,
 			"wall_hp_mult": 1.15
@@ -137,7 +137,7 @@
 		"prerequisites": ["advanced_wood_processing"],
 		"unlocks": [],
 		"modifiers": {
-			"wall_repair_rate_mult": 1.25
+			"building_hp_regen": 5.0
 		}
 	},
 	"computer_engineering": {
@@ -194,7 +194,7 @@
 		"cost": 120,
 		"tier": 2,
 		"prerequisites": ["ballistic_engineering"],
-		"unlocks": ["turret_lv2"],
+		"unlocks": ["gatling"],
 		"modifiers": {
 			"turret_fire_rate_mult": 0.90
 		}
