@@ -1717,6 +1717,16 @@ world = World(resources, grid, enemy_group=enemy_group, projectile_group=project
 research_manager = ResearchManager(world)
 world.research = research_manager
 
+# Callback function for research unlocks - called immediately when research is unlocked
+def on_research_unlocked(research_key: str, unlocks: list):
+    """Callback called when research is unlocked - updates build panel immediately."""
+    print(f"[RESEARCH UNLOCK] Research '{research_key}' unlocked items: {unlocks}")
+    # Immediately update build panel to show new buttons
+    update_build_panel()
+
+# Set up callback
+research_manager.on_unlock_callback = on_research_unlocked
+
 # Initialize wave manager
 wave_manager = WaveManager(world, waves_config, difficulty="normal")
 # Update world with wave_manager reference
@@ -3088,18 +3098,29 @@ building_to_research = {
 # Store all building types for potential unlocking later
 all_building_types = building_types.copy()
 
-def rebuild_building_buttons():
-    """Rebuild building buttons based on current research unlocks."""
+def update_build_panel():
+    """
+    Update build panel dynamically based on current research unlocks.
+    This function reads 'unlocks' from research and rebuilds buttons.
+    Called immediately when research is unlocked.
+    """
     global buttons, button_index
     buttons = {}
     button_index = 0
     
+    print(f"[BUILD PANEL] Updating build panel... (unlocked: {list(research_manager.unlocked)})")
+    
     for building_class, label, color, *args in all_building_types:
         # Check if building requires research unlock
         research_key = building_to_research.get(building_class)
-        if research_key and not research_manager.is_unlocked(research_key):
-            continue  # Skip this building if not unlocked
         
+        # If building has a research requirement, check if it's unlocked
+        if research_key:
+            if not research_manager.is_unlocked(research_key):
+                # Building is locked - skip it
+                continue
+        
+        # Building is unlocked (or has no requirement) - add it to build panel
         button_img = create_button_image(label, color, button_width, button_height)
         # Position buttons horizontally at bottom left
         button_x = button_x_start + button_index * button_spacing
@@ -3112,9 +3133,15 @@ def rebuild_building_buttons():
             'args': args
         }
         button_index += 1
+        print(f"[BUILD PANEL] Added button: {label} (research_key: {research_key or 'none'})")
+
+# Alias for backward compatibility
+def rebuild_building_buttons():
+    """Alias for update_build_panel() for backward compatibility."""
+    update_build_panel()
 
 # Initial button creation
-rebuild_building_buttons()
+update_build_panel()
 
 def launch_research_tree():
     """Toggle the research panel overlay."""

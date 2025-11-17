@@ -4,7 +4,7 @@ Research system for unlocking buildings and upgrades.
 import copy
 import json
 import os
-from typing import Set, Dict, Optional
+from typing import Set, Dict, Optional, Callable, List
 
 class ResearchManager:
     """Manages research unlocks and research definitions."""
@@ -24,6 +24,9 @@ class ResearchManager:
         self.research_modifiers: Dict[str, float] = {}  # Permanent research modifiers
         self._cached_effective_modifiers: Dict[str, float] = {}  # Cached effective modifiers
         self._modifiers_dirty: bool = True  # Flag to indicate if modifiers need recalculation
+        
+        # Callback function called when research is unlocked (for UI updates)
+        self.on_unlock_callback: Optional[Callable[[str, List[str]], None]] = None
         
         # Load research definitions
         path = "data/config/research.json"
@@ -118,6 +121,13 @@ class ResearchManager:
         unlocks = self.research_defs[research_key].get("unlocks", [])
         for item in unlocks:
             self.unlocked.add(item)
+        
+        # Call callback to notify UI systems (e.g., update build panel)
+        if self.on_unlock_callback:
+            try:
+                self.on_unlock_callback(research_key, unlocks)
+            except Exception as e:
+                print(f"Warning: Error in unlock callback: {e}")
         
         # Apply modifiers immediately
         modifiers = self.research_defs[research_key].get("modifiers", {})
