@@ -1741,8 +1741,8 @@ pause_menu = PauseMenu(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 start_screen = StartScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, font_medium)
 difficulty_screen = SelectDifficultyScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, sound_system)
 mode_screen = SelectModeScreen(c.SCREEN_WIDTH, c.SCREEN_HEIGHT, font_huge, sound_system)
-# Play gamestart sound when start screen is first shown
-sound_system.play("gamestart")
+# NOTE: gamestart.mp3 is BGM, not a sound effect
+# It will be played via play_start_music() in the game loop when on start screen
 # Create scaled versions for building panel fonts
 custom_font_blue_large = create_scaled_custom_font(custom_font_blue, 2.18, 48) if custom_font_blue else None  # ~48px
 custom_font_blue_medium_panel = create_scaled_custom_font(custom_font_blue, 1.45, 32) if custom_font_blue else None  # ~32px
@@ -2590,9 +2590,14 @@ pause_menu.on_resume = resume_game  # For ESC key in pause menu
 
 def open_difficulty_selection():
     """Transition from start screen to difficulty selection."""
+    # CRITICAL: Stop gamestart.mp3 IMMEDIATELY when player clicks to start
+    # This cuts the music instantly (even before 0.40s) - no waiting
+    sound_system.stop_music()
+    
     start_screen.hide()
     difficulty_screen.show()
-    sound_system.play("gamestart")
+    # Play button click sound effect (if available)
+    sound_system.play("button_click")
     game_state_manager.set_state(GameState.SELECT_DIFFICULTY)
 
 
@@ -2603,7 +2608,8 @@ def handle_difficulty_selected(selection: Difficulty):
     apply_difficulty_settings(selection, reset_resources=True)
     difficulty_screen.hide()
     mode_screen.show()
-    sound_system.play("gamestart")
+    # Play button click sound effect (if available)
+    sound_system.play("button_click")
     game_state_manager.set_state(GameState.SELECT_MODE)
 
 
@@ -2611,7 +2617,8 @@ def handle_difficulty_cancel():
     """Return to start screen from difficulty selection."""
     difficulty_screen.hide()
     start_screen.show()
-    sound_system.play("gamestart")
+    # Play button click sound effect (if available)
+    sound_system.play("button_click")
     game_state_manager.set_state(GameState.MENU)
 
 
@@ -2619,6 +2626,11 @@ def handle_mode_selected(mode: GameMode):
     """Apply mode and start gameplay."""
     global current_game_mode
     current_game_mode = mode
+    
+    # CRITICAL: Force-stop gamestart.mp3 IMMEDIATELY when game page loads
+    # This ensures instant stop - no waiting for 0.40s to finish
+    sound_system.stop_music()
+    
     mode_screen.hide()
     game_state_manager.set_state(GameState.PLAYING)
 
@@ -3604,6 +3616,10 @@ while running:
     
     # Handle start screen (menu state)
     if game_state_manager.get_state() == GameState.MENU:
+        # Play gamestart.mp3 on start screen (loops until game starts)
+        # This will continue looping or replaying until player selects Survival Mode
+        sound_system.play_start_music()
+        
         # Update start screen animation
         start_screen.update(dt)
         
@@ -3927,6 +3943,7 @@ while running:
                         "enemies_killed": wave_manager.enemies_killed,
                         "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
                     })
+                    sound_system.stop_music()  # Stop daytime music on game over
                     sound_system.play("game_over")
                     # Mark HQ as destroyed
                     building.state = BuildState.DESTROYED
@@ -3979,6 +3996,7 @@ while running:
         # Check win condition
         if wave_state == "WIN" or wave_manager.is_won():
             game_state_manager.win()
+            sound_system.stop_music()  # Stop daytime music on win
             game_over_screen.show(GameState.WIN, {
                 "nights": wave_manager.night - 1,
                 "enemies_killed": wave_manager.enemies_killed,
@@ -3992,6 +4010,9 @@ while running:
             # Roll day event on first day
             if wave_manager.state == WaveManager.STATE_DAY and world.day_events:
                 world.day_events.roll_new_day_event(wave_manager.day)
+            # Start daytime music when game first loads (if in day phase)
+            if wave_manager.state == WaveManager.STATE_DAY:
+                sound_system.play_daytime_music()
         
         # Check for state transitions
         if wave_manager._prev_state != wave_manager.state:
@@ -4064,6 +4085,7 @@ while running:
                                         "enemies_killed": wave_manager.enemies_killed,
                                         "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
                                     })
+                                    sound_system.stop_music()  # Stop daytime music on game over
                                     sound_system.play("game_over")
                                     hq_building.state = BuildState.DESTROYED
                                     # Game over - continue to next iteration (game over screen will be shown)
@@ -4080,6 +4102,10 @@ while running:
 
                 # Only after all day-start tasks are complete, switch visual theme to DAY
                 world.visual_phase = WaveManager.STATE_DAY
+                
+                # Start Day Phase BGM: Play daytime.mp3 (loop = True)
+                # If already playing, won't stack or replay
+                sound_system.play_daytime_music()
             elif wave_manager.state == WaveManager.STATE_NIGHT:
                 # PERFECT FLOW FOR NIGHT PHASE START:
                 # 1. Luck Roll → Event Type
@@ -4115,6 +4141,10 @@ while running:
 
                 # After night-start setup, switch visual theme to NIGHT
                 world.visual_phase = WaveManager.STATE_NIGHT
+                
+                # Nighttime music logic: Stop daytime.mp3 immediately, then start in-the-night.mp3
+                # No fade required - strict stop before night begins
+                sound_system.play_nighttime_music()
             elif wave_manager.state == WaveManager.STATE_SUMMARY:
                 # Just started summary - autosave
                 save_system.save_world(world, wave_manager, game_state_manager, resources)
