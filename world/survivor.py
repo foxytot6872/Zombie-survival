@@ -254,6 +254,8 @@ class Survivor(pygame.sprite.Sprite):
         if not self.all_frames:
             return
         
+        previous_animation = self.current_animation_type
+        
         # Update hurt timer
         if self.is_hurt:
             self.hurt_timer += dt
@@ -350,6 +352,15 @@ class Survivor(pygame.sprite.Sprite):
             if len(self.all_frames) >= 4:
                 self.current_frames = self.all_frames[0:4]
                 self.current_animation_type = "idle"
+        
+        # If animation type changed or the current frame list shrank, reset frame index
+        if self.current_frames:
+            if (
+                self.current_animation_type != previous_animation
+                or self.frame_index >= len(self.current_frames)
+            ):
+                self.frame_index = 0
+                self.animation_timer = 0.0
         
         # Update animation timer
         if self.current_frames:
