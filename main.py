@@ -2314,7 +2314,9 @@ def spawn_daily_resource_nodes():
         pass
     
     new_nodes = []
-    ui_exclusion_rect = pygame.Rect(0, 970, 1920, 1080 - 970)
+    # UI exclusion area - reduced spawn area by 150 pixels in Y direction
+    # Original: started at y=970, now starts at y=820 (970 - 150)
+    ui_exclusion_rect = pygame.Rect(0, 820, 1920, 1080 - 820)
     
     # Define cluster areas around the compound (4 quadrants + corners)
     # Each cluster will have nodes of the same type
@@ -2386,11 +2388,14 @@ def spawn_daily_resource_nodes():
                     if panel_area.collidepoint(node_x_px, node_y_px):
                         in_building_panel_area = True
                 
-                # Check if position is in the bottom UI area (invisible rect: (0,970) to (1500,1080))
+                # Check if position is in the bottom UI area (invisible rect: (0,820) to (1920,1080))
                 in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
                 
                 # Ensure position is valid and not too close to compound and not in building panel or UI exclusion area
+                # Also ensure Y position is not too low (reduced spawn area by 150 pixels)
+                max_spawn_y = c.SCREEN_HEIGHT - 150
                 if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                    node_y_px <= max_spawn_y and  # Restrict Y spawn area
                     not grid.is_blocked(node_gx, node_gy) and
                     not in_building_panel_area and
                     not in_ui_exclusion_area and
@@ -2425,6 +2430,8 @@ def spawn_daily_resource_nodes():
     # Add remaining nodes randomly around the compound if we didn't spawn enough
     if trees_spawned < num_trees:
         remaining = num_trees - trees_spawned
+        # Define max spawn Y (reduced by 150 pixels)
+        max_spawn_y = c.SCREEN_HEIGHT - 150
         for _ in range(remaining * 20):  # Try multiple times
             if trees_spawned >= num_trees:
                 break
@@ -2437,15 +2444,26 @@ def spawn_daily_resource_nodes():
             elif side == 'bottom':
                 node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
                                            (compound_bounds['right'] + 10) * TILE)
-                node_y_px = (compound_bounds['bottom'] + random.randint(5, 15)) * TILE
+                # Ensure bottom spawns don't exceed max_spawn_y (reduced by 150 pixels)
+                bottom_y_base = (compound_bounds['bottom'] + 5) * TILE
+                # Skip if bottom_y_base is already at or above max_spawn_y
+                if bottom_y_base >= max_spawn_y:
+                    continue  # Try another side
+                max_bottom_y = min(bottom_y_base + (10 * TILE), max_spawn_y)
+                # Ensure max_bottom_y is greater than bottom_y_base
+                if max_bottom_y <= bottom_y_base:
+                    continue  # Try another side
+                node_y_px = random.randint(int(bottom_y_base), int(max_bottom_y))
             elif side == 'left':
                 node_x_px = (compound_bounds['left'] - random.randint(5, 15)) * TILE
+                # Ensure Y doesn't exceed max_spawn_y (reduced by 150 pixels)
                 node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
-                                           (compound_bounds['bottom'] + 10) * TILE)
+                                           min((compound_bounds['bottom'] + 10) * TILE, max_spawn_y))
             else:  # right
                 node_x_px = (compound_bounds['right'] + random.randint(5, 15)) * TILE
+                # Ensure Y doesn't exceed max_spawn_y (reduced by 150 pixels)
                 node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
-                                           (compound_bounds['bottom'] + 10) * TILE)
+                                           min((compound_bounds['bottom'] + 10) * TILE, max_spawn_y))
             
             node_gx = int(node_x_px // TILE)
             node_gy = int(node_y_px // TILE)
@@ -2465,9 +2483,14 @@ def spawn_daily_resource_nodes():
                 if panel_area.collidepoint(node_x_px, node_y_px):
                     in_building_panel_area = True
             
-            in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
+            # Check if position is in the bottom UI area (invisible rect: (0,820) to (1920,1080))
+            # Reduced spawn area by 150 pixels in Y direction
+            ui_exclusion_rect_trees = pygame.Rect(0, 820, 1920, 1080 - 820)
+            in_ui_exclusion_area = ui_exclusion_rect_trees.collidepoint(node_x_px, node_y_px)
             
+            # Also ensure Y position is not too low (reduced spawn area by 150 pixels)
             if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                node_y_px <= max_spawn_y and  # Restrict Y spawn area
                 not grid.is_blocked(node_gx, node_gy) and
                 not in_building_panel_area and
                 not in_ui_exclusion_area):
@@ -2489,6 +2512,8 @@ def spawn_daily_resource_nodes():
     
     if scrap_spawned < num_scrap:
         remaining = num_scrap - scrap_spawned
+        # Define max spawn Y (reduced by 150 pixels)
+        max_spawn_y = c.SCREEN_HEIGHT - 150
         for _ in range(remaining * 20):
             if scrap_spawned >= num_scrap:
                 break
@@ -2500,15 +2525,26 @@ def spawn_daily_resource_nodes():
             elif side == 'bottom':
                 node_x_px = random.randint((compound_bounds['left'] - 10) * TILE, 
                                            (compound_bounds['right'] + 10) * TILE)
-                node_y_px = (compound_bounds['bottom'] + random.randint(5, 15)) * TILE
+                # Ensure bottom spawns don't exceed max_spawn_y (reduced by 150 pixels)
+                bottom_y_base = (compound_bounds['bottom'] + 5) * TILE
+                # Skip if bottom_y_base is already at or above max_spawn_y
+                if bottom_y_base >= max_spawn_y:
+                    continue  # Try another side
+                max_bottom_y = min(bottom_y_base + (10 * TILE), max_spawn_y)
+                # Ensure max_bottom_y is greater than bottom_y_base
+                if max_bottom_y <= bottom_y_base:
+                    continue  # Try another side
+                node_y_px = random.randint(int(bottom_y_base), int(max_bottom_y))
             elif side == 'left':
                 node_x_px = (compound_bounds['left'] - random.randint(5, 15)) * TILE
+                # Ensure Y doesn't exceed max_spawn_y (reduced by 150 pixels)
                 node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
-                                           (compound_bounds['bottom'] + 10) * TILE)
-            else:
+                                           min((compound_bounds['bottom'] + 10) * TILE, max_spawn_y))
+            else:  # right
                 node_x_px = (compound_bounds['right'] + random.randint(5, 15)) * TILE
+                # Ensure Y doesn't exceed max_spawn_y (reduced by 150 pixels)
                 node_y_px = random.randint((compound_bounds['top'] - 10) * TILE, 
-                                           (compound_bounds['bottom'] + 10) * TILE)
+                                           min((compound_bounds['bottom'] + 10) * TILE, max_spawn_y))
             
             node_gx = int(node_x_px // TILE)
             node_gy = int(node_y_px // TILE)
@@ -2528,11 +2564,15 @@ def spawn_daily_resource_nodes():
                 if panel_area.collidepoint(node_x_px, node_y_px):
                     in_building_panel_area = True
             
-            # Check if position is in the bottom UI area (invisible rect: (0,960) to (1365,1080))
-            ui_exclusion_rect = pygame.Rect(0, 960, 1365, 1080 - 960)
+            # Check if position is in the bottom UI area (invisible rect: (0,820) to (1365,1080))
+            # Reduced spawn area by 150 pixels in Y direction
+            ui_exclusion_rect = pygame.Rect(0, 820, 1365, 1080 - 820)
             in_ui_exclusion_area = ui_exclusion_rect.collidepoint(node_x_px, node_y_px)
             
+            # Also ensure Y position is not too low (reduced spawn area by 150 pixels)
+            max_spawn_y = c.SCREEN_HEIGHT - 150
             if (0 <= node_gx < grid.width and 0 <= node_gy < grid.height and
+                node_y_px <= max_spawn_y and  # Restrict Y spawn area
                 not grid.is_blocked(node_gx, node_gy) and
                 not in_building_panel_area and
                 not in_ui_exclusion_area):

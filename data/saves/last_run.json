@@ -1,22 +1,22 @@
 {
   "version": "1.0",
   "wave_manager": {
-    "night": 1,
-    "day": 1,
+    "night": 9,
+    "day": 10,
     "state": "SUMMARY",
-    "difficulty": "medium",
+    "difficulty": "easy",
     "enemies_killed": 0,
-    "enemies_spawned": 44,
-    "timer": 0.0
+    "enemies_spawned": 0,
+    "timer": 0.017
   },
   "resources": {
-    "wood": 50,
-    "iron": 225,
-    "food": 298
+    "wood": 296,
+    "iron": 301,
+    "food": 269
   },
   "buildings": [
     {
-      "uid": "ef7a3adb-bc41-4c28-8806-e6b02d847c24",
+      "uid": "89a48ed1-8392-4a9b-b1a5-11a88589f4fc",
       "type": "hq",
       "grid": [
         29,
@@ -28,50 +28,11 @@
       "progress": 0.0
     },
     {
-      "uid": "ab09dec4-5f8e-403f-b132-e390cee5802e",
+      "uid": "c62023c7-b5a7-461f-9ce0-6830557afc97",
       "type": "turret_ballistic",
       "grid": [
         30,
         12
-      ],
-      "tier": 2,
-      "hp": 220,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "0709f72e-83c6-4fbd-99b6-0b80bed97f23",
-      "type": "turret_ballistic",
-      "grid": [
-        26,
-        16
-      ],
-      "tier": 1,
-      "hp": 220,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "3fc96ef0-34ae-4640-960f-8089f067019d",
-      "type": "turret_ballistic",
-      "grid": [
-        31,
-        18
-      ],
-      "tier": 1,
-      "hp": 220,
-      "state": "active",
-      "progress": 2.5,
-      "turret_type": "turret_ballistic"
-    },
-    {
-      "uid": "78478f0e-8693-418f-956e-31c018d94a6e",
-      "type": "turret_ballistic",
-      "grid": [
-        33,
-        15
       ],
       "tier": 1,
       "hp": 220,
