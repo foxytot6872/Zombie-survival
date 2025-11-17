@@ -106,6 +106,14 @@ class GameOverScreen:
             f"Buildings Built: {self.stats.get('buildings_built', 0)}",
         ]
         
+        mode_label = self.stats.get("mode_label")
+        goal_text = self.stats.get("goal_text")
+        if mode_label:
+            stats_texts.insert(0, f"Mode: {mode_label}")
+        if goal_text:
+            insert_index = 1 if mode_label else 0
+            stats_texts.insert(insert_index, goal_text)
+        
         for text in stats_texts:
             stat_surface = self.font_medium.render(text, True, (255, 255, 255))
             stat_rect = stat_surface.get_rect(center=(self.screen_width // 2, y_offset))

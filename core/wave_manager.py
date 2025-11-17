@@ -176,7 +176,7 @@ class WaveManager:
             # Summary phase: wait for summary duration, then start next day
             if self.timer >= self.summary_duration:
                 # Check win condition
-                if self.night > self.win_nights:
+                if self.win_nights is not None and self.night >= self.win_nights:
                     return "WIN"
                 self.start_day()
         
@@ -196,7 +196,9 @@ class WaveManager:
     
     def is_won(self) -> bool:
         """Check if game is won"""
-        return self.night > self.win_nights
+        if self.win_nights is None:
+            return False
+        return self.night >= self.win_nights
     
     def reset(self):
         """Reset wave manager"""

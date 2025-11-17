@@ -66,6 +66,10 @@ class HUD:
         self.event_visible = False
         self.event_fade_alpha = 0  # For fade-in/fade-out animation
         
+        # Game mode info
+        self.mode_label: str = ""
+        self.mode_target_nights: Optional[int] = None
+        
         # Day/night counter pulse animation
         self.day_night_pulse_anim = None  # PulseAnimation for day/night transitions
         self.previous_day = None
@@ -218,6 +222,11 @@ class HUD:
     def show_starting_defenses_hint(self):
         """Show 'Starting Defenses' hint on Day 1"""
         self.show_event("Starting Defenses: Wall, Gate, and Turrets", duration=5.0)
+    
+    def set_game_mode_info(self, label: str, target_nights: Optional[int]):
+        """Update HUD with the current game mode details."""
+        self.mode_label = label or ""
+        self.mode_target_nights = target_nights
     
     def draw_number(self, surface: pygame.Surface, number: int, x: int, y: int, use_red: bool = True):
         """
@@ -526,20 +535,14 @@ class HUD:
         
         # Draw wave info (top-right, below day counter)
         if self.wave_info:
-            # Position below day counter (128 pixels tall + 5 pixel spacing)
-            wave_y = 10 + 128 + 5 if (self.daycounter_frames and len(self.daycounter_frames) > 0) else 60
-            
-            # Draw "Zombies: " text
             label_text = "Zombies: "
             label_surface = self.font_medium.render(label_text, True, (255, 255, 255))
-            # Move label left by 150px (another 50px more)
-            label_x = self.screen_width - 10 - label_surface.get_width() - 125
+            label_x = 1515
+            label_y = 1040
             
-            # Draw numbers using number fonts - scale to match font_medium size
             enemies_spawned = self.wave_info.get('enemies_spawned', 0)
             total_to_spawn = self.wave_info.get('total_to_spawn', 0)
             
-            # Get font height for scaling and positioning
             if hasattr(self.font_medium, 'letter_height'):
                 font_height = self.font_medium.letter_height  # CustomFont
             elif hasattr(self.font_medium, 'get_height'):
@@ -547,36 +550,28 @@ class HUD:
             else:
                 font_height = 32  # Fallback
             
-            # Scale factor to match font size (original number frames are 22px tall)
             scale_factor = font_height / 22.0 if 22 > 0 else 1.0
-            # Calculate scaled width per digit (reduced gap: 17px - 2px overlap = 15px effective)
-            scaled_number_width = int((17 - 2) * scale_factor)  # Reduced gap between digits
+            scaled_number_width = int((17 - 2) * scale_factor)
             
-            number_y = wave_y + (font_height - font_height) // 2 + 3  # Center vertically with text, then move down 3px
+            number_y = label_y + (font_height - font_height) // 2
             number_start_x = label_x + label_surface.get_width()
             
-            # Draw first number (enemies_spawned) - scaled to match font
             self._draw_scaled_number(surface, enemies_spawned, number_start_x, number_y, scale_factor)
             
-            # Draw " / " separator - calculate position based on actual number width
             separator_text = " / "
             separator_surface = self.font_medium.render(separator_text, True, (255, 255, 255))
-            # Calculate separator position: start + (number of digits * scaled width per digit)
             separator_x = number_start_x + len(str(enemies_spawned)) * scaled_number_width
-            surface.blit(separator_surface, (separator_x, wave_y))
+            surface.blit(separator_surface, (separator_x, label_y))
             
-            # Draw second number (total_to_spawn) - scaled to match font
             second_number_x = separator_x + separator_surface.get_width()
             self._draw_scaled_number(surface, total_to_spawn, second_number_x, number_y, scale_factor)
             
-            # Draw label
-            surface.blit(label_surface, (label_x, wave_y))
+            surface.blit(label_surface, (label_x, label_y))
             
-            # Overlay rectangle for wave info (estimated ~250x30)
             if show_ui_rectangles:
                 overlay = pygame.Surface((250, 30), pygame.SRCALPHA)
                 overlay.fill((255, 255, 0, 80))  # Yellow overlay
-                surface.blit(overlay, (self.screen_width - 260, wave_y))
+                surface.blit(overlay, (label_x - 10, label_y - 5))
         
         # Draw event popup panel (top-center, with overlay and fade animation)
         if self.event_visible and self.event_fade_alpha > 0:

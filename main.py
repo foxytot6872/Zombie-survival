@@ -1355,6 +1355,18 @@ resources = Resources(wood=0, iron=0, food=0, coins=0)
 current_difficulty = Difficulty.EASY
 current_game_mode = GameMode.TEN_DAY
 
+GAME_MODE_TARGET_NIGHTS = {
+    GameMode.TEN_DAY: 10,
+    GameMode.TWENTY_DAY: 20,
+    GameMode.ENDLESS: None,
+}
+
+GAME_MODE_LABELS = {
+    GameMode.TEN_DAY: "10-Day Challenge",
+    GameMode.TWENTY_DAY: "20-Day Siege",
+    GameMode.ENDLESS: "Endless Survival",
+}
+
 # Building groups
 building_group = pygame.sprite.Group()
 turret_group = pygame.sprite.Group()
@@ -1792,6 +1804,58 @@ tooltip_manager = BuildTooltipManager(
     red_number_frames=red_number_font_frames,
     blue_number_frames=blue_number_font_frames
 )
+
+def get_game_mode_label(mode: GameMode) -> str:
+    """Return a friendly label for the selected mode."""
+    return GAME_MODE_LABELS.get(mode, mode.value.replace("_", " ").title())
+
+def get_mode_goal_text(mode: GameMode) -> str:
+    """Return a short description of the current mode goal."""
+    target = GAME_MODE_TARGET_NIGHTS.get(mode)
+    if target:
+        return f"Goal: Survive {target} Nights"
+    return "Goal: Endless Survival"
+
+def apply_game_mode_settings(mode: GameMode, announce: bool = False):
+    """Configure wave manager and HUD for the selected mode."""
+    global current_game_mode
+    current_game_mode = mode
+    target_nights = GAME_MODE_TARGET_NIGHTS.get(mode)
+    if 'wave_manager' in globals() and wave_manager:
+        wave_manager.win_nights = target_nights
+    mode_label = get_game_mode_label(mode)
+    if 'hud' in globals() and hud:
+        hud.set_game_mode_info(mode_label, target_nights)
+        if announce:
+            if target_nights:
+                hud.show_event(
+                    text=f"{mode_label}: Survive {target_nights} nights to win.",
+                    duration=4.5,
+                    title=mode_label,
+                    description=f"Hold out through {target_nights} full nights to claim victory.",
+                    effects=["Progress tracker updated top-right"],
+                    event_type="neutral",
+                )
+            else:
+                hud.show_event(
+                    text=f"{mode_label}: Endless waves incoming.",
+                    duration=4.5,
+                    title=mode_label,
+                    description="There is no win condition. Last as long as you can.",
+                    effects=["Higher score the longer you endure"],
+                    event_type="neutral",
+                )
+
+def get_completed_nights() -> int:
+    """Return the number of fully cleared nights."""
+    if 'wave_manager' not in globals() or wave_manager is None:
+        return 0
+    completed = max(0, wave_manager.night)
+    if wave_manager.state == WaveManager.STATE_NIGHT:
+        completed = max(0, completed - 1)
+    return completed
+
+apply_game_mode_settings(current_game_mode, announce=False)
 
 
 # Set UI callbacks
@@ -2532,6 +2596,7 @@ def restart_game():
     # Spawn daily nodes
     spawn_daily_resource_nodes()
     apply_difficulty_settings(current_difficulty, reset_resources=True)
+    apply_game_mode_settings(current_game_mode, announce=False)
     print("Game restarted")
 
 def load_game():
@@ -2858,6 +2923,7 @@ def debug_add_resources():
     resources.iron += 100
     resources.food += 100
     print("Debug: Added +100 to all resources")
+    debug_system.log_event("+100 wood/iron/food")
 
 def debug_instant_build():
     """Complete all buildings under construction"""
@@ -2870,6 +2936,7 @@ def debug_instant_build():
             # Mark tiles as blocked
             grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, True)
     print("Debug: Completed all buildings")
+    debug_system.log_event("All builds completed")
 
 def debug_spawn_zombie_at_mouse(mouse_pos):
     """Spawn all types of enemies at mouse position (with small offset for visibility)"""
@@ -2887,6 +2954,7 @@ def debug_spawn_zombie_at_mouse(mouse_pos):
         enemy_group.add(enemy)
     
     print(f"Debug: Spawned all enemy types (8 total) near {mouse_pos}")
+    debug_system.log_event("Spawned 8 enemies at cursor")
 
 def debug_clear_enemies():
     """Clear all enemies (release to pool)"""
@@ -2895,6 +2963,7 @@ def debug_clear_enemies():
         enemy_group.remove(enemy)
         EnemyPool.release(enemy)
     print(f"Debug: Cleared {count} enemies")
+    debug_system.log_event(f"Cleared {count} enemies")
 
 def debug_clear_buildings():
     """Clear all buildings"""
@@ -2905,12 +2974,14 @@ def debug_clear_buildings():
     building_group.empty()
     turret_group.empty()
     print(f"Debug: Cleared {count} buildings")
+    debug_system.log_event(f"Cleared {count} buildings")
 
 def debug_toggle_spawner():
     """Toggle spawner on/off"""
     zombie_spawner.set_active(not zombie_spawner.active)
     status = "ON" if zombie_spawner.active else "OFF"
     print(f"Debug: Spawner {status}")
+    debug_system.log_event(f"Spawner {status}")
 
 def debug_kill_all_enemies():
     """Kill all enemies (they will be released to pool on death)"""
@@ -2919,6 +2990,7 @@ def debug_kill_all_enemies():
         enemy.take_damage(enemy.hp)
         count += 1
     print(f"Debug: Killed {count} enemies")
+    debug_system.log_event(f"Killed {count} enemies")
 
 def debug_complete_all_buildings():
     """Complete all buildings instantly"""
@@ -2932,11 +3004,13 @@ def debug_complete_all_buildings():
             grid.set_footprint_blocked((building.grid_x, building.grid_y), building.FOOTPRINT, True)
             count += 1
     print(f"Debug: Completed {count} buildings")
+    debug_system.log_event(f"Instant completed {count} builds")
 
 def debug_add_coins():
     """Add +100 coins"""
     resources.add_coins(100)
     print("Debug: Added +100 coins")
+    debug_system.log_event("+100 coins")
 
 def debug_unlock_all_research():
     """Unlock all research items"""
@@ -2946,30 +3020,35 @@ def debug_unlock_all_research():
                 world.research.unlock(key)
         rebuild_building_buttons()
         print("Debug: Unlocked all research")
+        debug_system.log_event("Research unlocked")
 
 def debug_roll_day_event():
     """Force roll a new day event"""
     if world.day_events:
         world.day_events.roll_new_day_event(wave_manager.day)
         print("Debug: Rolled new day event")
+        debug_system.log_event("Rolled new day event")
 
 def debug_clear_day_event():
     """Clear current day event and reset modifiers"""
     if world.day_events:
         world.day_events.clear_event()
         print("Debug: Cleared day event, modifiers reset")
+        debug_system.log_event("Cleared day event")
 
 def debug_toggle_footprints():
     """Toggle showing building footprints"""
     debug_system.show_footprints = not debug_system.show_footprints
     status = "ON" if debug_system.show_footprints else "OFF"
     print(f"Debug: Show footprints {status}")
+    debug_system.log_event(f"Footprints {status}")
 
 def debug_toggle_ui_rectangles():
     """Toggle showing UI element rectangles"""
     debug_system.show_ui_rectangles = not debug_system.show_ui_rectangles
     status = "ON" if debug_system.show_ui_rectangles else "OFF"
     print(f"Debug: Show UI rectangles {status}")
+    debug_system.log_event(f"UI rects {status}")
 
 def debug_skip_state():
     """Skip to the next game state (DAY -> NIGHT -> SUMMARY -> DAY)"""
@@ -2985,6 +3064,7 @@ def debug_skip_state():
         zombie_spawner.begin(recipe, spawn_config)
         hud.show_event(f"Debug: Skipped to Night {wave_manager.night}", 3.0)
         print(f"Debug: Skipped to night {wave_manager.night}")
+        debug_system.log_event(f"Jumped to night {wave_manager.night}")
     elif current_state == WaveManager.STATE_NIGHT:
         # Skip to summary (clear all enemies first - release to pool)
         for enemy in list(enemy_group):
@@ -2995,6 +3075,7 @@ def debug_skip_state():
         wave_manager.start_summary()
         hud.show_event("Debug: Skipped to Summary", 3.0)
         print("Debug: Skipped to summary")
+        debug_system.log_event("Jumped to summary")
     elif current_state == WaveManager.STATE_SUMMARY:
         # Skip to next day
         wave_manager.start_day()
@@ -3003,6 +3084,7 @@ def debug_skip_state():
         spawn_daily_resource_nodes()
         hud.show_event(f"Debug: Skipped to Day {wave_manager.day}", 3.0)
         print(f"Debug: Skipped to day {wave_manager.day}")
+        debug_system.log_event(f"Jumped to day {wave_manager.day}")
 
 def debug_pause_cycle():
     """Pause/stop the current wave cycle (stop spawning, freeze enemies)"""
@@ -3012,6 +3094,7 @@ def debug_pause_cycle():
         zombie_spawner.active = False
         hud.show_event("Debug: Cycle Paused", 3.0)
         print("Debug: Wave cycle paused")
+        debug_system.log_event("Spawner paused")
     else:
         # Resume if paused
         if wave_manager.state == WaveManager.STATE_NIGHT:
@@ -3019,27 +3102,40 @@ def debug_pause_cycle():
             zombie_spawner.done = False
             hud.show_event("Debug: Cycle Resumed", 3.0)
             print("Debug: Wave cycle resumed")
+            debug_system.log_event("Spawner resumed")
         else:
             hud.show_event("Debug: Not in night phase", 2.0)
             print("Debug: Cannot resume - not in night phase")
+            debug_system.log_event("Resume failed (not night)")
 
 # Register debug actions
-debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources)
-debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build)
-debug_system.register_action(pygame.K_F3, "Spawn Zombie @ Mouse", lambda: None)  # Handled separately
-debug_system.register_action(pygame.K_F4, "Clear All Enemies", debug_clear_enemies)
-debug_system.register_action(pygame.K_F5, "Clear All Buildings", debug_clear_buildings)
-debug_system.register_action(pygame.K_F6, "Toggle Spawner", debug_toggle_spawner)
-debug_system.register_action(pygame.K_F7, "Pause/Resume Cycle", debug_pause_cycle)
+debug_system.register_action(pygame.K_F1, "Add +100 Resources", debug_add_resources, category="Economy")
+debug_system.register_action(pygame.K_F2, "Instant Build", debug_instant_build, category="Construction")
+debug_system.register_action(pygame.K_F3, "Spawn Zombie @ Mouse", lambda: None, category="Combat")  # Handled separately
+debug_system.register_action(pygame.K_F4, "Clear All Enemies", debug_clear_enemies, category="Combat")
+debug_system.register_action(pygame.K_F5, "Clear All Buildings", debug_clear_buildings, category="Construction")
+debug_system.register_action(pygame.K_F6, "Toggle Spawner", debug_toggle_spawner, category="Waves")
+debug_system.register_action(pygame.K_F7, "Pause/Resume Cycle", debug_pause_cycle, category="Waves")
 # F8: Skip State (handled manually in event loop to support Shift+F8 for Complete All Buildings)
 # Additional debug actions (using number keys)
-debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins)
-debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research)
-debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event)
-debug_system.register_action(pygame.K_f, "Toggle Footprints", debug_toggle_footprints)
-debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rectangles)
+debug_system.register_action(pygame.K_1, "Add +100 Coins", debug_add_coins, category="Economy")
+debug_system.register_action(pygame.K_2, "Unlock All Research", debug_unlock_all_research, category="Research")
+debug_system.register_action(pygame.K_3, "Roll Day Event", debug_roll_day_event, category="Events")
+debug_system.register_action(pygame.K_4, "Clear Day Event", debug_clear_day_event, category="Events")
+debug_system.register_action(pygame.K_k, "Kill All Enemies", debug_kill_all_enemies, category="Combat")
+debug_system.register_action(pygame.K_f, "Toggle Footprints", debug_toggle_footprints, category="Visual")
+debug_system.register_action(pygame.K_u, "Toggle UI Rects", debug_toggle_ui_rectangles, category="Visual")
 # F9-F11: Wave skipping (handled in event loop)
 # F12: Toggle debug mode only (handled in event loop)
+
+debug_system.register_virtual_action("F8", "Skip Wave State", category="Waves")
+debug_system.register_virtual_action("Shift+F8", "Complete All Buildings", category="Construction")
+debug_system.register_virtual_action("F9", "Skip to Night", category="Waves")
+debug_system.register_virtual_action("F10", "Skip Summary", category="Waves")
+debug_system.register_virtual_action("F11", "Cycle Difficulty", category="Waves")
+debug_system.register_virtual_action("F12", "Toggle Debug Mode", category="General")
+debug_system.register_virtual_action("M", "Toggle Movable Nodes", category="UI Tools")
+debug_system.register_virtual_action("Shift+Drag", "Move Research Nodes", category="UI Tools")
 
 ###################
 # Helper functions for buttons
@@ -3966,9 +4062,11 @@ while running:
                 if not game_over_screen.is_visible:  # Only trigger once
                     game_state_manager.game_over()
                     game_over_screen.show(GameState.GAME_OVER, {
-                        "nights": wave_manager.night - 1,
+                        "nights": get_completed_nights(),
                         "enemies_killed": wave_manager.enemies_killed,
-                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
+                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)]),
+                        "mode_label": get_game_mode_label(current_game_mode),
+                        "goal_text": get_mode_goal_text(current_game_mode),
                     })
                     sound_system.stop_music()  # Stop daytime music on game over
                     sound_system.play("game_over")
@@ -4025,9 +4123,11 @@ while running:
             game_state_manager.win()
             sound_system.stop_music()  # Stop daytime music on win
             game_over_screen.show(GameState.WIN, {
-                "nights": wave_manager.night - 1,
+                "nights": get_completed_nights(),
                 "enemies_killed": wave_manager.enemies_killed,
-                "buildings_built": len(building_group)
+                "buildings_built": len(building_group),
+                "mode_label": get_game_mode_label(current_game_mode),
+                "goal_text": get_mode_goal_text(current_game_mode),
             })
             sound_system.play("game_over")
         
@@ -4108,9 +4208,11 @@ while running:
                                 if not game_over_screen.is_visible:
                                     game_state_manager.game_over()
                                     game_over_screen.show(GameState.GAME_OVER, {
-                                        "nights": wave_manager.night - 1,
+                                        "nights": get_completed_nights(),
                                         "enemies_killed": wave_manager.enemies_killed,
-                                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)])
+                                        "buildings_built": len([b for b in building_group if not isinstance(b, HQ)]),
+                                        "mode_label": get_game_mode_label(current_game_mode),
+                                        "goal_text": get_mode_goal_text(current_game_mode),
                                     })
                                     sound_system.stop_music()  # Stop daytime music on game over
                                     sound_system.play("game_over")
@@ -4739,59 +4841,100 @@ while running:
     ################### 
     # Update debug info
     ###################
+    debug_system.set_toggle_state("Build Mode", build_mode)
+    debug_system.set_toggle_state("Gather Mode", gather_mode)
+    debug_system.set_toggle_state("Footprints", debug_system.show_footprints)
+    debug_system.set_toggle_state("UI Rects", debug_system.show_ui_rectangles)
+    debug_system.set_toggle_state("Node Drag", debug_movable_nodes)
+    debug_system.set_toggle_state("Spawner", zombie_spawner.active)
+    debug_system.set_toggle_state("Research UI", research_panel_ui.visible)
+    debug_system.set_toggle_state("Paused", game_state_manager.is_paused())
+    
     if debug_system.is_active():
-        debug_system.update_info("Buildings", len(building_group))
-        debug_system.update_info("Enemies", len(enemy_group))
-        debug_system.update_info("Turrets", len(turret_group))
-        debug_system.update_info("Spawner", "ON" if zombie_spawner.active else "OFF")
-        debug_system.update_info("Wave State", wave_manager.state)  
-        debug_system.update_info("Day", wave_manager.day)
-        debug_system.update_info("Night", wave_manager.night)
-        debug_system.update_info("Coins", resources.coins)
+        debug_system.begin_frame()
+        
+        # Cursor + placement data
         grid_pos_debug = pixel_to_grid(mouse_pos)
-        debug_system.update_info("Grid Pos", f"({grid_pos_debug[0]}, {grid_pos_debug[1]})")
+        debug_system.update_section("Cursor", "Screen", f"{mouse_pos[0]}, {mouse_pos[1]}")
+        debug_system.update_section("Cursor", "Grid", f"{grid_pos_debug[0]}, {grid_pos_debug[1]}")
+        if build_mode and selected_building_type:
+            debug_system.update_section("Placement", "Blueprint", selected_building_type.__name__)
+            debug_system.update_section("Placement", "Grid", f"{build_ghost_grid_pos[0]}, {build_ghost_grid_pos[1]}" if build_ghost_grid_pos else "N/A")
+            debug_system.update_section("Placement", "Can Place", "YES" if build_ghost_can_place else "NO")
+        
+        # World + units
+        debug_system.update_section("World", "Buildings", len(building_group))
+        debug_system.update_section("World", "Turrets", len(turret_group))
+        debug_system.update_section("World", "Projectiles", len(projectile_group))
+        debug_system.update_section("World", "Resource Nodes", len(node_group))
+        debug_system.update_section("Units", "Enemies", len(enemy_group))
+        debug_system.update_section("Units", "Survivors", len(survivor_group))
+        debug_system.update_section("Units", "Coin Drops", len(coin_drops))
+        
+        # Economy
+        debug_system.update_section("Economy", "Coins", resources.coins)
+        debug_system.update_section("Economy", "Wood", resources.wood)
+        debug_system.update_section("Economy", "Iron", resources.iron)
+        debug_system.update_section("Economy", "Food", resources.food)
+        
+        # Wave + systems
+        debug_system.update_section("Wave", "State", wave_manager.state)
+        debug_system.update_section("Wave", "Day", wave_manager.day)
+        debug_system.update_section("Wave", "Night", wave_manager.night)
+        debug_system.update_section("Wave", "Difficulty", wave_manager.difficulty)
+        debug_system.update_section("Wave", "Spawner", "ON" if zombie_spawner.active else "OFF")
+        total_to_spawn = getattr(zombie_spawner, "total_to_spawn", 0) or 0
+        debug_system.update_section("Wave", "Spawned", f"{zombie_spawner.spawn_count}/{total_to_spawn}")
+        
+        # Selection context
+        if building_panel.selected_building:
+            sel = building_panel.selected_building
+            debug_system.update_section("Selection", "Building", getattr(sel, "TYPE_ID", "Unknown"))
+            debug_system.update_section("Selection", "HP", f"{getattr(sel, 'hp', 0)}/{getattr(sel, 'max_hp', 0)}")
+            debug_system.update_section("Selection", "Tier", getattr(sel, "tier", "N/A"))
+        elif selected_building_type:
+            debug_system.update_section("Selection", "Building", selected_building_type.__name__)
         
         # Research info
         if world.research:
             unlocked_count = len(world.research.unlocked)
             purchased_count = len(world.research.purchased)
-            debug_system.update_info("Research Unlocked", f"{unlocked_count} items")
-            debug_system.update_info("Research Purchased", f"{purchased_count} items")
+            debug_system.update_section("Research", "Unlocked", unlocked_count)
+            debug_system.update_section("Research", "Purchased", purchased_count)
         
         # Day event info
+        active_event = None
         if world.day_events and world.day_events.current_event:
-            event_name = world.day_events.current_event.get("name", "None")
-            debug_system.update_info("Day Event", event_name)
-        else:
-            debug_system.update_info("Day Event", "None")
+            active_event = world.day_events.current_event.get("name", "None")
+        debug_system.update_section("Events", "Day Event", active_event or "None")
         
         # Modifiers info
         if hasattr(world, 'modifiers'):
             mods = []
             if world.modifiers.get("resource_prod_mult", 1.0) != 1.0:
-                mods.append(f"Prod: {world.modifiers['resource_prod_mult']:.2f}x")
+                mods.append(f"Prod {world.modifiers['resource_prod_mult']:.2f}x")
             if world.modifiers.get("coin_drop_mult", 1.0) != 1.0:
-                mods.append(f"Coins: {world.modifiers['coin_drop_mult']:.2f}x")
+                mods.append(f"Coins {world.modifiers['coin_drop_mult']:.2f}x")
             if world.modifiers.get("build_cost_mult", 1.0) != 1.0:
-                mods.append(f"Cost: {world.modifiers['build_cost_mult']:.2f}x")
+                mods.append(f"Cost {world.modifiers['build_cost_mult']:.2f}x")
             if world.modifiers.get("turret_fire_rate_mult", 1.0) != 1.0:
-                mods.append(f"Fire: {world.modifiers['turret_fire_rate_mult']:.2f}x")
+                mods.append(f"Fire {world.modifiers['turret_fire_rate_mult']:.2f}x")
             if world.modifiers.get("building_damage_taken_mult", 1.0) != 1.0:
-                mods.append(f"Dmg: {world.modifiers['building_damage_taken_mult']:.2f}x")
+                mods.append(f"Dmg {world.modifiers['building_damage_taken_mult']:.2f}x")
             if world.modifiers.get("zombie_spawn_mult", 1.0) != 1.0:
-                mods.append(f"Spawn: {world.modifiers['zombie_spawn_mult']:.2f}x")
+                mods.append(f"Spawn {world.modifiers['zombie_spawn_mult']:.2f}x")
             if world.modifiers.get("zombie_speed_mult", 1.0) != 1.0:
-                mods.append(f"ZSpeed: {world.modifiers['zombie_speed_mult']:.2f}x")
+                mods.append(f"ZSpeed {world.modifiers['zombie_speed_mult']:.2f}x")
             if world.modifiers.get("zombie_hp_mult", 1.0) != 1.0:
-                mods.append(f"ZHP: {world.modifiers['zombie_hp_mult']:.2f}x")
+                mods.append(f"ZHP {world.modifiers['zombie_hp_mult']:.2f}x")
             if world.modifiers.get("turret_range_mult", 1.0) != 1.0:
-                mods.append(f"Range: {world.modifiers['turret_range_mult']:.2f}x")
+                mods.append(f"Range {world.modifiers['turret_range_mult']:.2f}x")
             if world.modifiers.get("node_spawn_bonus", False):
-                mods.append("NodeBonus")
+                mods.append("Node Bonus")
             if world.modifiers.get("lightning_storm", False):
                 mods.append("Lightning")
             if mods:
-                debug_system.update_info("Modifiers", ", ".join(mods))
+                debug_system.update_section("Modifiers", "Active", ", ".join(mods))
     
     ###################
     # Draw HUD (after all game world elements to ensure it's on top)
